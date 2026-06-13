@@ -16,6 +16,11 @@
         <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
         <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}" />
         <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#182231" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="{StaticResource TextColor}" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#6F7D91" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#29445D" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI" />
@@ -81,6 +86,26 @@
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Margin" Value="0,5,0,10" />
+        </Style>
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="#182231" />
+            <Setter Property="BorderBrush" Value="#3A506C" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Background" Value="#182231" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="MinHeight" Value="28" />
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="#29445D" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#6F7D91" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="{StaticResource FieldBrush}" />
