@@ -1,0 +1,156 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #10141b;
+  color: #eef3f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 960px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(480px, 1fr) 300px;
+  min-height: 100vh;
+  background: #10141b;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-color: #26303e;
+  background: #151b24;
+}
+
+.side-panel-left {
+  border-right: 1px solid #26303e;
+}
+
+.side-panel-right {
+  border-left: 1px solid #26303e;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border-bottom: 1px solid #26303e;
+  color: #d8e2ef;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvas-region {
+  min-width: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(105, 210, 177, 0.07), transparent 28%),
+    #111720;
+}
+
+.react-flow {
+  --xy-node-background-color-default: #1a2330;
+  --xy-node-border-default: 1px solid #38485d;
+  --xy-node-boxshadow-default: 0 18px 44px rgba(0, 0, 0, 0.24);
+  --xy-edge-stroke-default: #69d2b1;
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: #1a2330;
+  --xy-controls-button-background-color-hover-default: #233044;
+  --xy-controls-button-color-default: #d9e7f2;
+  --xy-controls-button-border-color-default: #38485d;
+  background: transparent;
+}
+
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output {
+  width: 210px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  color: #edf5fb;
+  font-size: 13px;
+}
+
+.react-flow__attribution {
+  background: rgba(16, 20, 27, 0.78);
+}
+
+.graph-node {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+}
+
+.graph-node-title {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #304052;
+  color: #f7fbff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.graph-node-pins {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.graph-node-pin-column {
+  display: grid;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.graph-node-pin-column-right {
+  justify-items: end;
+}
+
+.graph-node-pin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: #b9c6d6;
+}
+
+.graph-node-pin::before,
+.graph-node-pin::after {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #69d2b1;
+  content: "";
+}
+
+.graph-node-pin-input::before {
+  margin-right: 8px;
+}
+
+.graph-node-pin-input::after {
+  display: none;
+}
+
+.graph-node-pin-output::before {
+  display: none;
+}
+
+.graph-node-pin-output::after {
+  margin-left: 8px;
+}
