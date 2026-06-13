@@ -1,0 +1,154 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using NovelEngine.Core;
+
+namespace NovelEngine.Editor;
+
+internal static class ScreenshotRenderer
+{
+    public static void RenderEditor(string path)
+    {
+        var window = new MainWindow
+        {
+            Width = 1480,
+            Height = 900,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        window.SelectPreviewNode(NodeKind.Dialogue);
+        RenderWindow(window, path);
+        window.Close();
+    }
+
+    public static void RenderPreview(string path)
+    {
+        var assetDirectory = Path.Combine(Path.GetTempPath(), "novel-engine-wpf-preview");
+        Directory.CreateDirectory(assetDirectory);
+        var background = Path.Combine(assetDirectory, "background.png");
+        var character = Path.Combine(assetDirectory, "character.png");
+        CreateImage(background, 1280, 720, backgroundImage: true);
+        CreateImage(character, 360, 640, backgroundImage: false);
+
+        var project = NovelProject.CreateDefault();
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = background;
+        scene.InheritBackground = false;
+        scene.InheritCharacters = false;
+        scene.Characters.Add(
+            new CharacterPlacement
+            {
+                Id = "preview-character",
+                Name = "Герой",
+                Sprite = character,
+                Position = CharacterPosition.Left,
+            });
+        var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+
+        var window = new PreviewWindow(project, dialogue.Id, assetDirectory)
+        {
+            Width = 1160,
+            Height = 780,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        RenderWindow(window, path);
+        window.Close();
+    }
+
+    private static void RenderWindow(Window window, string path)
+    {
+        window.Dispatcher.Invoke(
+            () => { },
+            DispatcherPriority.ApplicationIdle);
+        window.UpdateLayout();
+
+        var dpi = VisualTreeHelper.GetDpi(window);
+        var width = Math.Max(1, (int)Math.Ceiling(window.ActualWidth * dpi.DpiScaleX));
+        var height = Math.Max(1, (int)Math.Ceiling(window.ActualHeight * dpi.DpiScaleY));
+        var bitmap = new RenderTargetBitmap(
+            width,
+            height,
+            dpi.PixelsPerInchX,
+            dpi.PixelsPerInchY,
+            PixelFormats.Pbgra32);
+        bitmap.Render(window);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+    }
+
+    private static void CreateImage(
+        string path,
+        int width,
+        int height,
+        bool backgroundImage)
+    {
+        var pixels = new byte[width * height * 4];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var index = (y * width + x) * 4;
+                byte red;
+                byte green;
+                byte blue;
+                byte alpha;
+                if (backgroundImage)
+                {
+                    red = (byte)(22 + x * 28 / width);
+                    green = (byte)(36 + x * 42 / width);
+                    blue = (byte)(58 + x * 54 / width);
+                    alpha = 255;
+                }
+                else
+                {
+                    var inHead = Math.Pow((x - width / 2d) / 70, 2)
+                        + Math.Pow((y - 95d) / 70, 2) <= 1;
+                    var inBody = x > 70 && x < width - 70 && y > 155 && y < height - 35;
+                    if (!inHead && !inBody)
+                    {
+                        red = green = blue = alpha = 0;
+                    }
+                    else
+                    {
+                        red = inHead ? (byte)92 : (byte)52;
+                        green = inHead ? (byte)211 : (byte)77;
+                        blue = inHead ? (byte)178 : (byte)112;
+                        alpha = 255;
+                    }
+                }
+
+                pixels[index] = blue;
+                pixels[index + 1] = green;
+                pixels[index + 2] = red;
+                pixels[index + 3] = alpha;
+            }
+        }
+
+        var bitmap = BitmapSource.Create(
+            width,
+            height,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            pixels,
+            width * 4);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+    }
+}

@@ -1,5 +1,9 @@
-node_modules/
+bin/
+obj/
+.vs/
+.vscode/
+build/
 dist/
-.tools/
-.vite/
 *.log
+__pycache__/
+*.py[cod]
