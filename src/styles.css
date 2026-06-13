@@ -64,6 +64,13 @@ body {
     #111720;
 }
 
+.node-canvas-frame {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .react-flow {
   --xy-node-background-color-default: #1a2330;
   --xy-node-border-default: 1px solid #38485d;
@@ -153,4 +160,34 @@ body {
 
 .graph-node-pin-output::after {
   margin-left: 8px;
+}
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid #3d4c5f;
+  border-radius: 8px;
+  background: #182130;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+}
+
+.canvas-context-menu button {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #edf5fb;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-context-menu button:hover,
+.canvas-context-menu button:focus-visible {
+  outline: none;
+  background: #243349;
 }
