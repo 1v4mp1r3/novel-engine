@@ -363,6 +363,12 @@ public sealed class GraphSurface : FrameworkElement
                     () => AddChoiceRequested?.Invoke(node.Id)));
             }
 
+            if (node.Kind != NodeKind.Start)
+            {
+                menu.Items.Add(new Separator());
+                menu.Items.Add(CreateInheritanceMenu(node));
+            }
+
             OpenContextMenu(menu);
             return;
         }
@@ -389,6 +395,102 @@ public sealed class GraphSurface : FrameworkElement
         var item = new MenuItem { Header = header };
         item.Click += (_, _) => action();
         return item;
+    }
+
+    private MenuItem CreateInheritanceMenu(NovelNode node)
+    {
+        var menu = new MenuItem { Header = "Наследовать" };
+        menu.Items.Add(CreateInheritanceResourceMenu(
+            node,
+            InheritanceResource.Music,
+            "Наследовать музыку"));
+        menu.Items.Add(CreateInheritanceResourceMenu(
+            node,
+            InheritanceResource.Background,
+            "Наследовать задний фон"));
+        menu.Items.Add(CreateInheritanceResourceMenu(
+            node,
+            InheritanceResource.Characters,
+            "Наследовать персонажей"));
+        return menu;
+    }
+
+    private MenuItem CreateInheritanceResourceMenu(
+        NovelNode node,
+        InheritanceResource resource,
+        string header)
+    {
+        var item = new MenuItem { Header = header };
+        var sources = GetIncomingNodes(node).ToList();
+        if (sources.Count == 0)
+        {
+            item.IsEnabled = false;
+            item.Items.Add(new MenuItem
+            {
+                Header = "Нет входящих связанных нод",
+                IsEnabled = false,
+            });
+            return item;
+        }
+
+        foreach (var source in sources)
+        {
+            item.Items.Add(CreateMenuItem(
+                $"Из «{source.Title}»: {DescribeInheritanceSource(source, resource)}",
+                () => ApplyInheritance(node, resource)));
+        }
+
+        return item;
+    }
+
+    private IEnumerable<NovelNode> GetIncomingNodes(NovelNode node) =>
+        Project.Nodes
+            .Where(candidate => candidate.Outputs.Any(output => output.TargetNodeId == node.Id))
+            .OrderBy(candidate => candidate.Title, StringComparer.CurrentCulture);
+
+    private static string DescribeInheritanceSource(
+        NovelNode source,
+        InheritanceResource resource) =>
+        resource switch
+        {
+            InheritanceResource.Music => source.InheritMusic
+                ? "сама наследует музыку"
+                : EmptyFallback(source.Music, "музыка не задана"),
+            InheritanceResource.Background => source.InheritBackground
+                ? "сама наследует фон"
+                : EmptyFallback(source.Background, "фон не задан"),
+            InheritanceResource.Characters => source.InheritCharacters
+                ? "сама наследует персонажей"
+                : source.Characters.Count == 0
+                    ? "персонажи не заданы"
+                    : string.Join(", ", source.Characters.Select(character => character.Name)),
+            _ => string.Empty,
+        };
+
+    private static string EmptyFallback(string value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private void ApplyInheritance(NovelNode node, InheritanceResource resource)
+    {
+        switch (resource)
+        {
+            case InheritanceResource.Music:
+                node.InheritMusic = true;
+                break;
+            case InheritanceResource.Background:
+                node.InheritBackground = true;
+                break;
+            case InheritanceResource.Characters:
+                node.InheritCharacters = true;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(resource), resource, null);
+        }
+
+        SelectedNodeId = node.Id;
+        ProjectChanged?.Invoke(this, EventArgs.Empty);
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        InvalidateVisual();
     }
 
     private void DrawGrid(DrawingContext drawingContext)
@@ -701,4 +803,11 @@ public sealed class GraphSurface : FrameworkElement
         string OutputId,
         Point Center,
         Rect HitArea);
+
+    private enum InheritanceResource
+    {
+        Background,
+        Music,
+        Characters,
+    }
 }
