@@ -91,21 +91,98 @@
             <Setter Property="Background" Value="#182231" />
             <Setter Property="BorderBrush" Value="#3A506C" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-        </Style>
-        <Style TargetType="MenuItem">
-            <Setter Property="Background" Value="#182231" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="MinHeight" Value="28" />
-            <Style.Triggers>
-                <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="#29445D" />
-                    <Setter Property="Foreground" Value="White" />
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="#6F7D91" />
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                SnapsToDevicePixels="True">
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                            Margin="4" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Resources">
+                <Setter.Value>
+                    <ResourceDictionary>
+                        <Style TargetType="Separator">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Separator">
+                                        <Border Height="1"
+                                                Margin="8,4"
+                                                Background="#3A506C" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            <Setter Property="MinWidth" Value="230" />
+                            <Setter Property="MinHeight" Value="30" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="MenuItem">
+                                        <Border x:Name="ItemBorder"
+                                                Background="Transparent"
+                                                SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="24" />
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  ContentSource="Header"
+                                                                  Margin="10,6,8,6"
+                                                                  RecognizesAccessKey="True"
+                                                                  VerticalAlignment="Center" />
+                                                <Path x:Name="SubmenuArrow"
+                                                      Grid.Column="1"
+                                                      Width="6"
+                                                      Height="10"
+                                                      Margin="0,0,8,0"
+                                                      HorizontalAlignment="Right"
+                                                      VerticalAlignment="Center"
+                                                      Fill="{TemplateBinding Foreground}"
+                                                      Data="M 0 0 L 0 10 L 6 5 Z"
+                                                      Visibility="Collapsed" />
+                                                <Popup x:Name="PART_Popup"
+                                                       AllowsTransparency="True"
+                                                       Focusable="False"
+                                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                                       Placement="Right"
+                                                       PopupAnimation="Fade">
+                                                    <Border Background="#182231"
+                                                            BorderBrush="#3A506C"
+                                                            BorderThickness="1">
+                                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                                        Margin="4" />
+                                                    </Border>
+                                                </Popup>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="Role" Value="SubmenuHeader">
+                                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                                            </Trigger>
+                                            <Trigger Property="IsHighlighted" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="#29445D" />
+                                                <Setter Property="Foreground" Value="White" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Foreground" Value="#78879A" />
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="Transparent" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ResourceDictionary>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="{StaticResource FieldBrush}" />
