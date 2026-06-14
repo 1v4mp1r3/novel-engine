@@ -6,6 +6,39 @@ public static class ProjectAssets
 {
     public const string ManagedFilesDirectoryName = "files";
     public const string LegacyAssetsDirectoryName = "assets";
+    public static readonly IReadOnlyList<string> DefaultProjectFolders =
+    [
+        "characters",
+        "voices",
+        "audio_fx",
+        "audio",
+        "backgrounds",
+    ];
+
+    public static int EnsureDefaultFolders(NovelProject project)
+    {
+        var changes = 0;
+        foreach (var folder in DefaultProjectFolders)
+        {
+            var before = project.AssetFolders.Count;
+            EnsureFolder(project, folder);
+            changes += project.AssetFolders.Count - before;
+        }
+        return changes;
+    }
+
+    public static int EnsureDefaultStructure(NovelProject project, string projectPath)
+    {
+        var changes = EnsureDefaultFolders(project);
+        var root = GetAssetsDirectory(projectPath);
+        Directory.CreateDirectory(root);
+        foreach (var folder in DefaultProjectFolders)
+        {
+            Directory.CreateDirectory(
+                Path.Combine(root, folder.Replace('/', Path.DirectorySeparatorChar)));
+        }
+        return changes;
+    }
 
     public static NovelAsset Import(
         NovelProject project,

@@ -78,6 +78,13 @@ public partial class App : Application
         }
 
         var startupProjectPath = GetStartupProjectPath(e.Args);
+        if (startupProjectPath is null
+            && !TryGetStartupProjectFromDialog(out startupProjectPath))
+        {
+            Shutdown();
+            return;
+        }
+
         var window = new MainWindow(startupProjectPath);
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -96,6 +103,36 @@ public partial class App : Application
             return args[1];
         }
         return null;
+    }
+
+    private bool TryGetStartupProjectFromDialog(out string? startupProjectPath)
+    {
+        startupProjectPath = null;
+        var launcher = new ProjectStartupWindow();
+        if (launcher.ShowDialog() != true || launcher.SelectedDirectory is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            startupProjectPath = launcher.SelectedAction == ProjectStartupAction.Create
+                ? ProjectWorkspace.CreateProjectInDirectory(launcher.SelectedDirectory)
+                : launcher.SelectedDirectory;
+            return true;
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                error.Message,
+                "Проект Novel Engine",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
     }
 
     private void CompileProject(

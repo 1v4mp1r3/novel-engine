@@ -40,10 +40,8 @@ public sealed class CodeEditorControl : RichTextBox
     private readonly Popup _completionPopup;
     private readonly ListBox _completionList;
     private readonly TextBlock _completionDescription;
+    private readonly DispatcherTimer _completionTimer;
     private ProjectLanguageCompletionContext? _completionContext;
-    private IReadOnlyList<ProjectLanguageScopeSpan> _scopeSpans = [];
-    private ScopeGuideAdorner? _scopeAdorner;
-    private bool _scopeGuideInvalidateQueued;
     private readonly List<EditorSnapshot> _undoHistory = [];
     private readonly List<EditorSnapshot> _redoHistory = [];
     private EditorSnapshot _currentSnapshot = new(string.Empty, 0);
@@ -66,11 +64,6 @@ public sealed class CodeEditorControl : RichTextBox
         SpellCheck.SetIsEnabled(this, false);
         Document.PageWidth = 100_000;
         Document.PagePadding = new Thickness(0);
-        AddHandler(
-            ScrollViewer.ScrollChangedEvent,
-            new ScrollChangedEventHandler((_, _) => InvalidateScopeGuides()));
-        Loaded += (_, _) => EnsureScopeAdorner();
-        Unloaded += (_, _) => RemoveScopeAdorner();
 
         _completionDescription = new TextBlock
         {
@@ -122,6 +115,15 @@ public sealed class CodeEditorControl : RichTextBox
             PlacementTarget = this,
             PopupAnimation = PopupAnimation.Fade,
             StaysOpen = true,
+        };
+        _completionTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+        };
+        _completionTimer.Tick += (_, _) =>
+        {
+            _completionTimer.Stop();
+            ShowCompletions(force: false);
         };
     }
 
@@ -182,9 +184,8 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
         RecordUserChange();
-        Dispatcher.BeginInvoke(
-            () => ShowCompletions(force: false),
-            DispatcherPriority.Background);
+        _completionTimer.Stop();
+        _completionTimer.Start();
     }
 
     protected override void OnSelectionChanged(RoutedEventArgs e)
@@ -262,100 +263,6 @@ public sealed class CodeEditorControl : RichTextBox
         }
     }
 
-    private void DrawScopeGuides(DrawingContext drawingContext)
-    {
-        if (_scopeSpans.Count == 0)
-        {
-            return;
-        }
-
-        drawingContext.PushClip(
-            new RectangleGeometry(
-                new Rect(0, 0, ActualWidth, ActualHeight)));
-        var visibleRange = GetVisibleSourceRange();
-        var visibleStart = Math.Max(0, (visibleRange?.Start ?? 0) - 2_000);
-        var visibleEnd = visibleRange is null
-            ? int.MaxValue
-            : visibleRange.Value.End + 2_000;
-
-        foreach (var scope in _scopeSpans)
-        {
-            if (scope.CloseBraceOffset < visibleStart
-                || scope.OpenBraceOffset > visibleEnd)
-            {
-                continue;
-            }
-
-            var open = GetPosition(scope.OpenBraceOffset);
-            var close = GetPosition(scope.CloseBraceOffset);
-            if (open is null || close is null)
-            {
-                continue;
-            }
-
-            var openRect = open.GetCharacterRect(LogicalDirection.Forward);
-            var closeRect = close.GetCharacterRect(LogicalDirection.Forward);
-            var top = openRect.Bottom + 2;
-            var bottom = closeRect.Top - 2;
-            if (bottom <= top || bottom < 0 || top > ActualHeight)
-            {
-                continue;
-            }
-
-            var color = (scope.Depth % 3) switch
-            {
-                0 => Color.FromArgb(170, 100, 218, 183),
-                1 => Color.FromArgb(155, 116, 174, 255),
-                _ => Color.FromArgb(145, 211, 159, 255),
-            };
-            var pen = new Pen(new SolidColorBrush(color), 1.25);
-            pen.Freeze();
-            var x = closeRect.Left + 3.5;
-            var visibleTop = Math.Max(0, top);
-            var visibleBottom = Math.Min(ActualHeight, bottom);
-            drawingContext.DrawLine(
-                pen,
-                new Point(x, visibleTop),
-                new Point(x, visibleBottom));
-            if (top >= 0)
-            {
-                drawingContext.DrawLine(
-                    pen,
-                    new Point(x, top),
-                    new Point(x + 8, top));
-            }
-            if (bottom <= ActualHeight)
-            {
-                drawingContext.DrawLine(
-                    pen,
-                    new Point(x, bottom),
-                    new Point(x + 8, bottom));
-            }
-        }
-        drawingContext.Pop();
-    }
-
-    private (int Start, int End)? GetVisibleSourceRange()
-    {
-        var top = GetPositionFromPoint(new Point(0, 0), snapToText: true);
-        var bottom = GetPositionFromPoint(
-            new Point(
-                Math.Max(0, ActualWidth - 1),
-                Math.Max(0, ActualHeight - 1)),
-            snapToText: true);
-        if (top is null || bottom is null)
-        {
-            return null;
-        }
-
-        var start = GetSourceOffset(top);
-        var end = GetSourceOffset(bottom);
-        return start <= end ? (start, end) : (end, start);
-    }
-
-    private int GetSourceOffset(TextPointer position) =>
-        NormalizeText(new TextRange(Document.ContentStart, position).Text).Length;
-
     private void ShowCompletions(bool force)
     {
         if (CompletionProvider is null || !IsKeyboardFocusWithin)
@@ -366,6 +273,12 @@ public sealed class CodeEditorControl : RichTextBox
 
         var source = SourceText;
         var caretOffset = Math.Clamp(SourceCaretOffset, 0, source.Length);
+        if (!force && !ShouldAutoComplete(source, caretOffset))
+        {
+            CloseCompletions();
+            return;
+        }
+
         var context = CompletionProvider(source, caretOffset);
         if (context.Items.Count == 0
             || !force && context.ReplacementLength == 0)
@@ -420,10 +333,25 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void CloseCompletions()
     {
+        _completionTimer.Stop();
         _completionPopup.IsOpen = false;
         _completionList.ItemsSource = null;
         _completionContext = null;
     }
+
+    private static bool ShouldAutoComplete(string source, int caretOffset)
+    {
+        if (caretOffset == 0)
+        {
+            return false;
+        }
+
+        var previous = source[caretOffset - 1];
+        return previous == '@' || IsSyntaxIdentifierPart(previous);
+    }
+
+    private static bool IsSyntaxIdentifierPart(char character) =>
+        character is '_' or '-' || char.IsLetterOrDigit(character);
 
     private void RecordUserChange()
     {
@@ -538,7 +466,6 @@ public sealed class CodeEditorControl : RichTextBox
         _updatingDocument = true;
         try
         {
-            _scopeSpans = ProjectLanguage.GetScopeSpans(source);
             Document.Blocks.Clear();
             var paragraph = new Paragraph
             {
@@ -587,7 +514,6 @@ public sealed class CodeEditorControl : RichTextBox
                     isError);
             }
             Document.PageWidth = 100_000;
-            InvalidateScopeGuides();
         }
         finally
         {
@@ -679,66 +605,6 @@ public sealed class CodeEditorControl : RichTextBox
 
     private static string NormalizeText(string text) =>
         text.Replace("\r\n", "\n");
-
-    private void EnsureScopeAdorner()
-    {
-        if (_scopeAdorner is not null)
-        {
-            return;
-        }
-        var layer = AdornerLayer.GetAdornerLayer(this);
-        if (layer is null)
-        {
-            return;
-        }
-        _scopeAdorner = new ScopeGuideAdorner(this);
-        layer.Add(_scopeAdorner);
-    }
-
-    private void RemoveScopeAdorner()
-    {
-        if (_scopeAdorner is null)
-        {
-            return;
-        }
-        AdornerLayer.GetAdornerLayer(this)?.Remove(_scopeAdorner);
-        _scopeAdorner = null;
-    }
-
-    private void InvalidateScopeGuides()
-    {
-        if (_scopeAdorner is null || _scopeGuideInvalidateQueued)
-        {
-            return;
-        }
-
-        _scopeGuideInvalidateQueued = true;
-        Dispatcher.BeginInvoke(
-            () =>
-            {
-                _scopeGuideInvalidateQueued = false;
-                _scopeAdorner?.InvalidateVisual();
-            },
-            DispatcherPriority.Render);
-    }
-
-    private sealed class ScopeGuideAdorner : Adorner
-    {
-        private readonly CodeEditorControl _editor;
-
-        public ScopeGuideAdorner(CodeEditorControl editor)
-            : base(editor)
-        {
-            _editor = editor;
-            IsHitTestVisible = false;
-        }
-
-        protected override void OnRender(DrawingContext drawingContext)
-        {
-            base.OnRender(drawingContext);
-            _editor.DrawScopeGuides(drawingContext);
-        }
-    }
 
     private sealed record EditorSnapshot(string Source, int CaretOffset);
 }

@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
+    ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
@@ -569,6 +570,36 @@ static void ProjectAssetImportCopiesFiles()
                 asset,
                 ProjectAssets.Import(project, projectPath, target)),
             "Importing the registered file created a duplicate asset.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectDefaultFileStructureIsCreated()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-structure-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+
+        var changes = ProjectAssets.EnsureDefaultStructure(project, projectPath);
+
+        Assert(changes == ProjectAssets.DefaultProjectFolders.Count, "Default folders were not registered.");
+        foreach (var folder in ProjectAssets.DefaultProjectFolders)
+        {
+            Assert(
+                project.AssetFolders.Contains(folder),
+                $"Folder {folder} was not added to the project.");
+            Assert(
+                Directory.Exists(Path.Combine(directory, "files", folder)),
+                $"Physical folder {folder} was not created.");
+        }
     }
     finally
     {

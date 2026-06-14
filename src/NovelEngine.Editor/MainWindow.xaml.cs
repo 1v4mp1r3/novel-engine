@@ -189,7 +189,12 @@ public partial class MainWindow : Window
         _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
+        var structureChanges = EnsureWorkspaceStructure();
         var filesChanged = SyncFilesFromDisk(refreshCode: false);
+        if (structureChanges > 0 && _projectPath is not null)
+        {
+            ProjectSerializer.Save(_project, _projectPath);
+        }
         ConfigureFilesWatcher();
         Graph.SetProject(project);
         RefreshExplorer();
@@ -1231,6 +1236,10 @@ public partial class MainWindow : Window
                 "Привязать как фон выбранной ноды",
                 () => BindAssetAsNodeBackground(view.Asset),
                 selectedNode is not null));
+            if (IsInAssetFolder(view.Asset, "characters"))
+            {
+                menu.Items.Add(CreateCharacterAssetVoiceMenu(view.Asset, selectedNode));
+            }
         }
 
         if (view.Asset.Kind == AssetKind.Audio)
@@ -1240,8 +1249,51 @@ public partial class MainWindow : Window
                 "Привязать как музыку выбранной ноды",
                 () => BindAssetAsNodeMusic(view.Asset),
                 selectedNode is not null));
-            menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
+            if (IsInAssetFolder(view.Asset, "voices"))
+            {
+                menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
+            }
         }
+    }
+
+    private MenuItem CreateCharacterAssetVoiceMenu(NovelAsset asset, NovelNode? node)
+    {
+        var menu = new MenuItem { Header = "Подвязать voice-блип из voices" };
+        if (node is null)
+        {
+            menu.IsEnabled = false;
+            menu.Items.Add(CreateDisabledAssetMenuItem("Сначала выберите ноду"));
+            return menu;
+        }
+
+        var character = FindEffectiveCharacterBySprite(node, asset);
+        if (character is null)
+        {
+            menu.IsEnabled = false;
+            menu.Items.Add(CreateDisabledAssetMenuItem(
+                "На выбранной ноде нет персонажа с этим спрайтом"));
+            return menu;
+        }
+
+        var voices = _project.Assets
+            .Where(candidate => candidate.Kind == AssetKind.Audio)
+            .Where(candidate => IsInAssetFolder(candidate, "voices"))
+            .OrderBy(candidate => candidate.Id, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        if (voices.Count == 0)
+        {
+            menu.IsEnabled = false;
+            menu.Items.Add(CreateDisabledAssetMenuItem("В папке voices нет аудио"));
+            return menu;
+        }
+
+        foreach (var voice in voices)
+        {
+            menu.Items.Add(CreateAssetMenuItem(
+                $"{voice.Id}  ·  {Path.GetFileName(voice.Path)}",
+                () => BindVoiceAssetToCharacter(voice, character.Id)));
+        }
+        return menu;
     }
 
     private MenuItem CreateVoiceBindingMenu(NovelAsset asset, NovelNode? node)
@@ -1275,6 +1327,23 @@ public partial class MainWindow : Window
         }
 
         return menu;
+    }
+
+    private CharacterPlacement? FindEffectiveCharacterBySprite(
+        NovelNode node,
+        NovelAsset asset) =>
+        GetEffectiveCharacters(node).FirstOrDefault(
+            character => ReferencesAsset(character.Sprite, asset));
+
+    private static bool ReferencesAsset(string value, NovelAsset asset)
+    {
+        if (AssetReference.TryGetId(value, out var id))
+        {
+            return id.Equals(asset.Id, StringComparison.OrdinalIgnoreCase);
+        }
+        return value.Replace('\\', '/').Equals(
+            asset.Path,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private IReadOnlyList<CharacterPlacement> GetEffectiveCharacters(NovelNode node)
@@ -1322,6 +1391,11 @@ public partial class MainWindow : Window
         var node = _project.FindNode(Graph.SelectedNodeId);
         if (node is null || asset.Kind != AssetKind.Audio)
         {
+            return;
+        }
+        if (!IsInAssetFolder(asset, "voices"))
+        {
+            StatusText.Text = "Voice-блип нужно выбрать из папки voices";
             return;
         }
 
@@ -1373,6 +1447,16 @@ public partial class MainWindow : Window
 
         MarkDirty();
         StatusText.Text = $"Voice-блип персонажа «{character.Name}»: {reference}";
+    }
+
+    private static bool IsInAssetFolder(NovelAsset asset, string folder)
+    {
+        var assetFolder = ProjectAssets.NormalizeFolder(asset.Folder);
+        folder = ProjectAssets.NormalizeFolder(folder);
+        return assetFolder.Equals(folder, StringComparison.OrdinalIgnoreCase)
+            || assetFolder.StartsWith(
+                folder + "/",
+                StringComparison.OrdinalIgnoreCase);
     }
 
     private void CopyAssetReference(AssetView view)
@@ -1847,15 +1931,32 @@ public partial class MainWindow : Window
 
     private void NewProject()
     {
-        if (ConfirmDiscardChanges())
+        if (!ConfirmDiscardChanges())
         {
-            var shouldSaveIntoWorkspace =
-                _workspaceNeedsProjectFile && _workspaceDirectory is not null;
-            SetProject(NovelProject.CreateDefault(), null, _workspaceDirectory);
-            if (shouldSaveIntoWorkspace && !SaveProjectToWorkspace())
-            {
-                StatusText.Text = "Новый проект создан в памяти, но не сохранён";
-            }
+            return;
+        }
+
+        var directory = ChooseProjectFolder("Выберите папку для нового проекта");
+        if (directory is null)
+        {
+            return;
+        }
+
+        try
+        {
+            OpenProject(ProjectWorkspace.CreateProjectInDirectory(directory));
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось создать проект:\n\n{error.Message}",
+                "Создание проекта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
@@ -1866,19 +1967,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new OpenFileDialog
-        {
-            Title = "Открыть проект новеллы",
-            Filter = "Проект Novel Engine|*.novel.json|JSON|*.json|Все файлы|*.*",
-        };
-        if (dialog.ShowDialog(this) != true)
+        var directory = ChooseProjectFolder("Выберите папку с проектом");
+        if (directory is null)
         {
             return;
         }
 
         try
         {
-            OpenProject(dialog.FileName);
+            OpenProject(directory);
         }
         catch (Exception error) when (
             error is IOException
@@ -1975,21 +2072,28 @@ public partial class MainWindow : Window
 
     private bool WriteProject(string path)
     {
+        var previousProjectPath = _projectPath;
+        var previousWorkspaceDirectory = _workspaceDirectory;
+        var previousWorkspaceNeedsProjectFile = _workspaceNeedsProjectFile;
         try
         {
-            ProjectSerializer.Save(_project, path);
-            _projectPath = path;
-            _workspaceDirectory = NormalizeWorkspaceDirectory(Path.GetDirectoryName(path));
+            var fullPath = Path.GetFullPath(path);
+            _projectPath = fullPath;
+            _workspaceDirectory = NormalizeWorkspaceDirectory(Path.GetDirectoryName(fullPath));
             _workspaceNeedsProjectFile = false;
             EnsureWorkspaceStructure();
+            ProjectSerializer.Save(_project, fullPath);
             ConfigureFilesWatcher();
             _dirty = false;
             RefreshWindowTitle();
-            StatusText.Text = $"Сохранён {Path.GetFileName(path)}";
+            StatusText.Text = $"Сохранён {Path.GetFileName(fullPath)}";
             return true;
         }
         catch (Exception error) when (error is IOException or InvalidDataException)
         {
+            _projectPath = previousProjectPath;
+            _workspaceDirectory = previousWorkspaceDirectory;
+            _workspaceNeedsProjectFile = previousWorkspaceNeedsProjectFile;
             MessageBox.Show(
                 this,
                 $"Не удалось сохранить проект:\n\n{error.Message}",
@@ -2757,6 +2861,21 @@ public partial class MainWindow : Window
                 ? null
                 : Path.GetDirectoryName(_projectPath);
 
+    private string? ChooseProjectFolder(string title)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = title,
+            Multiselect = false,
+        };
+        var initialDirectory = GetSaveDialogInitialDirectory();
+        if (initialDirectory is not null)
+        {
+            dialog.InitialDirectory = initialDirectory;
+        }
+        return dialog.ShowDialog(this) == true ? dialog.FolderName : null;
+    }
+
     private string GetDefaultProjectFileName()
     {
         var source = _workspaceDirectory is null
@@ -2883,16 +3002,34 @@ public partial class MainWindow : Window
         }
     }
 
-    private void EnsureWorkspaceStructure()
+    private int EnsureWorkspaceStructure()
     {
         if (_workspaceDirectory is null)
         {
-            return;
+            return 0;
         }
+
         Directory.CreateDirectory(_workspaceDirectory);
-        Directory.CreateDirectory(
-            Path.Combine(_workspaceDirectory, ProjectAssets.ManagedFilesDirectoryName));
+        var changes = _projectPath is null
+            ? EnsureDefaultWorkspaceFoldersWithoutProjectFile()
+            : ProjectAssets.EnsureDefaultStructure(_project, _projectPath);
         Directory.CreateDirectory(Path.Combine(_workspaceDirectory, "autosaves"));
+        return changes;
+    }
+
+    private int EnsureDefaultWorkspaceFoldersWithoutProjectFile()
+    {
+        var changes = ProjectAssets.EnsureDefaultFolders(_project);
+        var root = Path.Combine(
+            _workspaceDirectory!,
+            ProjectAssets.ManagedFilesDirectoryName);
+        Directory.CreateDirectory(root);
+        foreach (var folder in ProjectAssets.DefaultProjectFolders)
+        {
+            Directory.CreateDirectory(
+                Path.Combine(root, folder.Replace('/', Path.DirectorySeparatorChar)));
+        }
+        return changes;
     }
 
     private string NormalizeAssetPath(string path)
