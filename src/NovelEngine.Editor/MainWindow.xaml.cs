@@ -1258,21 +1258,16 @@ public partial class MainWindow : Window
 
     private MenuItem CreateCharacterAssetVoiceMenu(NovelAsset asset, NovelNode? node)
     {
-        var menu = new MenuItem { Header = "Подвязать voice-блип из voices" };
         if (node is null)
         {
-            menu.IsEnabled = false;
-            menu.Items.Add(CreateDisabledAssetMenuItem("Сначала выберите ноду"));
-            return menu;
+            return CreateDisabledAssetMenuItem("Подвязать voice-блип: выберите ноду");
         }
 
         var character = FindEffectiveCharacterBySprite(node, asset);
         if (character is null)
         {
-            menu.IsEnabled = false;
-            menu.Items.Add(CreateDisabledAssetMenuItem(
-                "На выбранной ноде нет персонажа с этим спрайтом"));
-            return menu;
+            return CreateDisabledAssetMenuItem(
+                "Подвязать voice-блип: персонаж со спрайтом не в ноде");
         }
 
         var voices = _project.Assets
@@ -1282,11 +1277,19 @@ public partial class MainWindow : Window
             .ToList();
         if (voices.Count == 0)
         {
-            menu.IsEnabled = false;
-            menu.Items.Add(CreateDisabledAssetMenuItem("В папке voices нет аудио"));
-            return menu;
+            return CreateDisabledAssetMenuItem("Подвязать voice-блип: в voices нет аудио");
         }
 
+        var characterLabel = CharacterLabel(character);
+        if (voices.Count == 1)
+        {
+            var voice = voices[0];
+            return CreateAssetMenuItem(
+                $"Подвязать «{voice.Id}» к «{characterLabel}»",
+                () => BindVoiceAssetToCharacter(voice, character.Id));
+        }
+
+        var menu = CreateHoverSubmenu("Подвязать voice-блип из voices");
         foreach (var voice in voices)
         {
             menu.Items.Add(CreateAssetMenuItem(
@@ -1298,36 +1301,42 @@ public partial class MainWindow : Window
 
     private MenuItem CreateVoiceBindingMenu(NovelAsset asset, NovelNode? node)
     {
-        var menu = new MenuItem { Header = "Привязать voice-блип к персонажу" };
         if (node is null)
         {
-            menu.IsEnabled = false;
-            menu.Items.Add(CreateDisabledAssetMenuItem("Сначала выберите ноду"));
-            return menu;
+            return CreateDisabledAssetMenuItem("Привязать voice-блип: выберите ноду");
         }
 
         var characters = GetEffectiveCharacters(node).ToList();
         if (characters.Count == 0)
         {
-            menu.IsEnabled = false;
-            menu.Items.Add(CreateDisabledAssetMenuItem("В этой ноде нет персонажей"));
-            return menu;
+            return CreateDisabledAssetMenuItem("Привязать voice-блип: в ноде нет персонажей");
         }
 
+        if (characters.Count == 1)
+        {
+            var character = characters[0];
+            return CreateAssetMenuItem(
+                $"Привязать voice-блип к «{CharacterLabel(character)}»",
+                () => BindVoiceAssetToCharacter(asset, character.Id));
+        }
+
+        var menu = CreateHoverSubmenu("Привязать voice-блип к персонажу");
         foreach (var character in characters.OrderBy(
             character => character.Name,
             StringComparer.CurrentCultureIgnoreCase))
         {
-            var label = string.IsNullOrWhiteSpace(character.Name)
-                ? character.Id
-                : character.Name;
             menu.Items.Add(CreateAssetMenuItem(
-                $"Персонаж «{label}»",
+                $"Персонаж «{CharacterLabel(character)}»",
                 () => BindVoiceAssetToCharacter(asset, character.Id)));
         }
 
         return menu;
     }
+
+    private static string CharacterLabel(CharacterPlacement character) =>
+        string.IsNullOrWhiteSpace(character.Name)
+            ? character.Id
+            : character.Name;
 
     private CharacterPlacement? FindEffectiveCharacterBySprite(
         NovelNode node,
@@ -1483,6 +1492,19 @@ public partial class MainWindow : Window
             IsEnabled = isEnabled,
         };
         item.Click += (_, _) => action();
+        return item;
+    }
+
+    private static MenuItem CreateHoverSubmenu(string header)
+    {
+        var item = new MenuItem { Header = header };
+        item.MouseEnter += (_, _) =>
+        {
+            if (item.IsEnabled && item.HasItems)
+            {
+                item.IsSubmenuOpen = true;
+            }
+        };
         return item;
     }
 

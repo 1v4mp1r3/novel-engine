@@ -300,6 +300,7 @@
                                                Focusable="False"
                                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                                                Placement="Right"
+                                               PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                                PopupAnimation="Fade">
                                             <Border Background="#182231"
                                                     BorderBrush="#3A506C"

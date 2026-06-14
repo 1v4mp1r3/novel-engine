@@ -234,9 +234,11 @@ internal static class ScreenshotRenderer
             },
         };
         menu.IsOpen = true;
+        submenu.IsSubmenuOpen = true;
         window.Dispatcher.Invoke(
             () => { },
             DispatcherPriority.ApplicationIdle);
+        submenu.IsSubmenuOpen = false;
         menu.IsOpen = false;
         window.Close();
     }
