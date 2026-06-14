@@ -129,6 +129,27 @@
                                 <Button DockPanel.Dock="Right" Content="..." Width="42" Margin="7,0,0,0" Click="BrowseBackground_Click" />
                                 <TextBox x:Name="BackgroundBox" Margin="0" />
                             </DockPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Папка фонов" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox x:Name="BackgroundFolderBox"
+                                              Margin="0,4,0,0"
+                                              DisplayMemberPath="Name"
+                                              SelectionChanged="BackgroundFolderBox_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Фон из файлов" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox x:Name="BackgroundAssetBox"
+                                              Margin="0,4,0,0"
+                                              DisplayMemberPath="Name"
+                                              SelectionChanged="BackgroundAssetBox_SelectionChanged" />
+                                </StackPanel>
+                            </Grid>
 
                             <CheckBox x:Name="InheritMusicCheck" Content="Наследовать музыку без перезапуска" Checked="Inheritance_Changed" Unchecked="Inheritance_Changed" />
                             <TextBlock Text="Музыка" Style="{StaticResource FieldLabel}" />
@@ -136,6 +157,27 @@
                                 <Button DockPanel.Dock="Right" Content="..." Width="42" Margin="7,0,0,0" Click="BrowseMusic_Click" />
                                 <TextBox x:Name="MusicBox" Margin="0" />
                             </DockPanel>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Папка музыки" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox x:Name="MusicFolderBox"
+                                              Margin="0,4,0,0"
+                                              DisplayMemberPath="Name"
+                                              SelectionChanged="MusicFolderBox_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Музыка из файлов" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox x:Name="MusicAssetBox"
+                                              Margin="0,4,0,0"
+                                              DisplayMemberPath="Name"
+                                              SelectionChanged="MusicAssetBox_SelectionChanged" />
+                                </StackPanel>
+                            </Grid>
 
                             <CheckBox x:Name="InheritCharactersCheck" Content="Наследовать персонажей" Checked="Inheritance_Changed" Unchecked="Inheritance_Changed" />
                             <TextBlock Text="Персонажи на сцене" Style="{StaticResource SectionHeader}" />

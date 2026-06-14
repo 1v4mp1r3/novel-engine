@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private bool _syncingCode;
     private bool _codeHasPendingChanges;
     private bool _refreshingAssetFolders;
+    private bool _refreshingAssetPickers;
     private bool _buildInProgress;
     private string? _selectedAssetFolder;
     private string? _workspaceDirectory;
@@ -250,6 +251,7 @@ public partial class MainWindow : Window
                 BodyTextBox.Clear();
                 BackgroundBox.Clear();
                 MusicBox.Clear();
+                RefreshNodeAssetPickers(null);
                 ScriptBox.Clear();
                 CharactersGrid.ItemsSource = null;
                 OutputsGrid.ItemsSource = null;
@@ -271,6 +273,7 @@ public partial class MainWindow : Window
             InheritMusicCheck.IsChecked = node.InheritMusic;
             InheritMusicCheck.IsEnabled = node.Kind != NodeKind.Start;
             MusicBox.IsEnabled = node.Kind == NodeKind.Start || !node.InheritMusic;
+            RefreshNodeAssetPickers(node);
             InheritCharactersCheck.IsChecked = node.InheritCharacters;
             InheritCharactersCheck.IsEnabled = node.Kind != NodeKind.Start;
             ScriptBox.Text = node.Script;
@@ -300,8 +303,12 @@ public partial class MainWindow : Window
         yield return SpeakerBox;
         yield return BodyTextBox;
         yield return BackgroundBox;
+        yield return BackgroundFolderBox;
+        yield return BackgroundAssetBox;
         yield return InheritBackgroundCheck;
         yield return MusicBox;
+        yield return MusicFolderBox;
+        yield return MusicAssetBox;
         yield return InheritMusicCheck;
         yield return InheritCharactersCheck;
         yield return CharactersGrid;
@@ -688,6 +695,148 @@ public partial class MainWindow : Window
         SyncFilesFromDisk();
         RefreshAssetFolders();
         RefreshAssetList();
+    }
+
+    private void RefreshNodeAssetPickers(NovelNode? node)
+    {
+        if (node is null)
+        {
+            BackgroundFolderBox.ItemsSource = Array.Empty<NodeAssetFolderOption>();
+            BackgroundAssetBox.ItemsSource = Array.Empty<NodeAssetChoice>();
+            MusicFolderBox.ItemsSource = Array.Empty<NodeAssetFolderOption>();
+            MusicAssetBox.ItemsSource = Array.Empty<NodeAssetChoice>();
+            return;
+        }
+
+        if (_projectPath is not null)
+        {
+            SyncFilesFromDisk();
+        }
+
+        var backgroundEnabled = node.Kind == NodeKind.Start
+            || InheritBackgroundCheck.IsChecked != true;
+        var musicEnabled = node.Kind == NodeKind.Start
+            || InheritMusicCheck.IsChecked != true;
+        RefreshAssetPicker(
+            BackgroundFolderBox,
+            BackgroundAssetBox,
+            AssetKind.Image,
+            BackgroundBox.Text.Trim(),
+            backgroundEnabled,
+            ["backgrounds", "background", "bg", "images"]);
+        RefreshAssetPicker(
+            MusicFolderBox,
+            MusicAssetBox,
+            AssetKind.Audio,
+            MusicBox.Text.Trim(),
+            musicEnabled,
+            ["music", "audio", "bgm", "sound"]);
+    }
+
+    private void RefreshAssetPicker(
+        ComboBox folderBox,
+        ComboBox assetBox,
+        AssetKind kind,
+        string currentReference,
+        bool enabled,
+        IReadOnlyList<string> preferredFolders)
+    {
+        var folderOptions = CreateFolderOptions(kind);
+        folderBox.ItemsSource = folderOptions;
+        var currentAsset = ResolveAssetChoice(currentReference);
+        var selectedFolder =
+            currentAsset?.Folder
+            ?? PreferredFolder(folderOptions, preferredFolders)
+            ?? string.Empty;
+        folderBox.SelectedItem = folderOptions.FirstOrDefault(option =>
+                option.Folder.Equals(selectedFolder, StringComparison.OrdinalIgnoreCase))
+            ?? folderOptions.First();
+        RefreshAssetChoices(assetBox, kind, selectedFolder, currentReference);
+        folderBox.IsEnabled = enabled && folderOptions.Count > 1;
+        assetBox.IsEnabled = enabled;
+    }
+
+    private List<NodeAssetFolderOption> CreateFolderOptions(AssetKind kind)
+    {
+        var folders = _project.AssetFolders
+            .Concat(_project.Assets.Select(asset => asset.Folder))
+            .Select(ProjectAssets.NormalizeFolder)
+            .Where(folder => folder.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(folder => folder, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        return
+        [
+            new NodeAssetFolderOption(string.Empty, "Все папки"),
+            .. folders.Select(folder => new NodeAssetFolderOption(
+                folder,
+                $"{folder} ({_project.Assets.Count(asset =>
+                    asset.Kind == kind
+                    && asset.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))})")),
+        ];
+    }
+
+    private static string? PreferredFolder(
+        IReadOnlyList<NodeAssetFolderOption> options,
+        IReadOnlyList<string> preferredFolders)
+    {
+        foreach (var preferred in preferredFolders)
+        {
+            var found = options.FirstOrDefault(option =>
+                option.Folder.Equals(preferred, StringComparison.OrdinalIgnoreCase)
+                || option.Folder.EndsWith(
+                    "/" + preferred,
+                    StringComparison.OrdinalIgnoreCase));
+            if (found is not null)
+            {
+                return found.Folder;
+            }
+        }
+        return null;
+    }
+
+    private NovelAsset? ResolveAssetChoice(string reference)
+    {
+        if (!reference.StartsWith("@", StringComparison.Ordinal))
+        {
+            return null;
+        }
+        return _project.FindAsset(reference[1..]);
+    }
+
+    private void RefreshAssetChoices(
+        ComboBox assetBox,
+        AssetKind kind,
+        string folder,
+        string currentReference)
+    {
+        _refreshingAssetPickers = true;
+        try
+        {
+            var normalizedFolder = ProjectAssets.NormalizeFolder(folder);
+            var choices = _project.Assets
+                .Where(asset => asset.Kind == kind)
+                .Where(asset =>
+                    normalizedFolder.Length == 0
+                    || asset.Folder.Equals(normalizedFolder, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+                .Select(asset => new NodeAssetChoice(
+                    asset,
+                    $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
+                .Prepend(new NodeAssetChoice(null, "Не выбрано"))
+                .ToList();
+            assetBox.ItemsSource = choices;
+            var currentAsset = ResolveAssetChoice(currentReference);
+            assetBox.SelectedItem = currentAsset is null
+                ? choices[0]
+                : choices.FirstOrDefault(choice =>
+                        ReferenceEquals(choice.Asset, currentAsset))
+                    ?? choices[0];
+        }
+        finally
+        {
+            _refreshingAssetPickers = false;
+        }
     }
 
     private void SyncFilesFromDisk()
@@ -1627,10 +1776,82 @@ public partial class MainWindow : Window
         }
         BackgroundBox.IsEnabled = node.Kind == NodeKind.Start
             || InheritBackgroundCheck.IsChecked != true;
+        BackgroundFolderBox.IsEnabled = BackgroundBox.IsEnabled;
+        BackgroundAssetBox.IsEnabled = BackgroundBox.IsEnabled;
         MusicBox.IsEnabled = node.Kind == NodeKind.Start
             || InheritMusicCheck.IsChecked != true;
+        MusicFolderBox.IsEnabled = MusicBox.IsEnabled;
+        MusicAssetBox.IsEnabled = MusicBox.IsEnabled;
         SetCharacterButtons(
             node.Kind == NodeKind.Start || InheritCharactersCheck.IsChecked != true);
+    }
+
+    private void BackgroundFolderBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_refreshingProperties)
+        {
+            return;
+        }
+        var folder = (BackgroundFolderBox.SelectedItem as NodeAssetFolderOption)?.Folder
+            ?? string.Empty;
+        RefreshAssetChoices(
+            BackgroundAssetBox,
+            AssetKind.Image,
+            folder,
+            BackgroundBox.Text.Trim());
+    }
+
+    private void BackgroundAssetBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_refreshingProperties
+            || _refreshingAssetPickers
+            || BackgroundAssetBox.SelectedItem is not NodeAssetChoice choice)
+        {
+            return;
+        }
+        InheritBackgroundCheck.IsChecked = false;
+        BackgroundBox.Text = choice.Asset is null
+            ? string.Empty
+            : AssetReference.Create(choice.Asset.Id);
+        _ = ApplyProperties();
+    }
+
+    private void MusicFolderBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_refreshingProperties)
+        {
+            return;
+        }
+        var folder = (MusicFolderBox.SelectedItem as NodeAssetFolderOption)?.Folder
+            ?? string.Empty;
+        RefreshAssetChoices(
+            MusicAssetBox,
+            AssetKind.Audio,
+            folder,
+            MusicBox.Text.Trim());
+    }
+
+    private void MusicAssetBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_refreshingProperties
+            || _refreshingAssetPickers
+            || MusicAssetBox.SelectedItem is not NodeAssetChoice choice)
+        {
+            return;
+        }
+        InheritMusicCheck.IsChecked = false;
+        MusicBox.Text = choice.Asset is null
+            ? string.Empty
+            : AssetReference.Create(choice.Asset.Id);
+        _ = ApplyProperties();
     }
 
     private void BrowseBackground_Click(object sender, RoutedEventArgs e)
@@ -2488,4 +2709,8 @@ public partial class MainWindow : Window
         public string Folder => Asset.Folder;
         public string Path => Asset.Path;
     }
+
+    private sealed record NodeAssetFolderOption(string Folder, string Name);
+
+    private sealed record NodeAssetChoice(NovelAsset? Asset, string Name);
 }
