@@ -891,6 +891,24 @@ public static class ProjectLanguage
                 .Append("    sprite ")
                 .AppendLine(FormatAssetValue(character.Sprite));
         }
+        if (character.VoiceSound.Length > 0)
+        {
+            builder.Append(indent)
+                .Append("    voice ")
+                .AppendLine(FormatAssetValue(character.VoiceSound));
+        }
+        if (Math.Abs(character.VoicePitch - 1) > 0.001)
+        {
+            builder.Append(indent)
+                .Append("    voice-pitch ")
+                .AppendLine(character.VoicePitch.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+        if (character.VoiceEveryNthCharacter != 1)
+        {
+            builder.Append(indent)
+                .Append("    voice-every ")
+                .AppendLine(character.VoiceEveryNthCharacter.ToString(CultureInfo.InvariantCulture));
+        }
         builder.Append(indent)
             .Append("    position ")
             .AppendLine(character.Position.ToString().ToLowerInvariant());
@@ -1655,6 +1673,9 @@ public static class ProjectLanguage
             var y = CharacterLayout.DefaultCenterY;
             var scale = 1d;
             var rotation = 0d;
+            var voiceSound = string.Empty;
+            var voicePitch = 1d;
+            var voiceEveryNthCharacter = 1;
             while (!Match(TokenKind.RightBrace))
             {
                 var property = ExpectIdentifier("Ожидалось свойство персонажа.");
@@ -1666,6 +1687,20 @@ public static class ProjectLanguage
                 {
                     sprite = ExpectAssetValue(
                         "Ожидался путь или @ссылка на спрайт.");
+                }
+                else if (Keyword(property, "voice"))
+                {
+                    voiceSound = ExpectAssetValue(
+                        "Ожидался путь или @ссылка на voice-блип.");
+                }
+                else if (Keyword(property, "voice-pitch"))
+                {
+                    voicePitch = ExpectFloat("Ожидалась высота voice-блипа.");
+                }
+                else if (Keyword(property, "voice-every"))
+                {
+                    voiceEveryNthCharacter = ExpectInteger(
+                        "Ожидалась частота voice-блипа.");
                 }
                 else if (Keyword(property, "position"))
                 {
@@ -1717,6 +1752,9 @@ public static class ProjectLanguage
                 Y = y,
                 Scale = scale,
                 Rotation = rotation,
+                VoiceSound = voiceSound,
+                VoicePitch = voicePitch,
+                VoiceEveryNthCharacter = voiceEveryNthCharacter,
             };
         }
 

@@ -15,6 +15,7 @@ namespace NovelEngine.Editor;
 
 public partial class PreviewWindow : Window
 {
+    private static readonly TimeSpan MinVoiceRestartDelay = TimeSpan.FromMilliseconds(45);
     private static readonly JsonSerializerOptions SaveOptions = new()
     {
         WriteIndented = true,
@@ -34,6 +35,9 @@ public partial class PreviewWindow : Window
     private bool _transitioning;
     private bool _paused;
     private bool _mainMenuActive;
+    private string _currentVoicePath = string.Empty;
+    private double _currentVoicePitch = 1;
+    private DateTime _lastVoiceStartedUtc = DateTime.MinValue;
     private CancellationTokenSource? _dialogueCts;
 
     public PreviewWindow(
@@ -173,6 +177,8 @@ public partial class PreviewWindow : Window
         _musicPlayer.Stop();
         _transitionPlayer.Stop();
         _voicePlayer.Stop();
+        _voicePlayer.Close();
+        _currentVoicePath = string.Empty;
         ChoicesPanel.Children.Clear();
         NodeTitleText.Text = string.Empty;
         SpeakerText.Text = string.Empty;
@@ -558,6 +564,7 @@ public partial class PreviewWindow : Window
     {
         var text = node.Text;
         var voice = ResolveVoice(node);
+        PrepareCharacterVoice(voice);
         var visible = string.Empty;
         var voicedCharacters = 0;
         try
@@ -618,17 +625,46 @@ public partial class PreviewWindow : Window
     {
         try
         {
+            if (DateTime.UtcNow - _lastVoiceStartedUtc < MinVoiceRestartDelay)
+            {
+                return;
+            }
+            PrepareCharacterVoice(voice);
             _voicePlayer.Stop();
-            _voicePlayer.Close();
+            _voicePlayer.Position = TimeSpan.Zero;
             _voicePlayer.Volume = _settings.VoiceVolume;
-            _voicePlayer.SpeedRatio = voice.Pitch;
-            _voicePlayer.Open(new Uri(voice.SoundPath, UriKind.Absolute));
+            _lastVoiceStartedUtc = DateTime.UtcNow;
             _voicePlayer.Play();
         }
         catch (Exception)
         {
             // Missing codecs or very short files should not block the scene.
         }
+    }
+
+    private void PrepareCharacterVoice(CharacterVoice? voice)
+    {
+        if (voice is null)
+        {
+            _voicePlayer.Stop();
+            _voicePlayer.Close();
+            _currentVoicePath = string.Empty;
+            return;
+        }
+        if (_currentVoicePath.Equals(voice.SoundPath, StringComparison.OrdinalIgnoreCase)
+            && Math.Abs(_currentVoicePitch - voice.Pitch) < 0.001)
+        {
+            return;
+        }
+
+        _voicePlayer.Stop();
+        _voicePlayer.Close();
+        _voicePlayer.Volume = _settings.VoiceVolume;
+        _voicePlayer.SpeedRatio = voice.Pitch;
+        _voicePlayer.Open(new Uri(voice.SoundPath, UriKind.Absolute));
+        _currentVoicePath = voice.SoundPath;
+        _currentVoicePitch = voice.Pitch;
+        _lastVoiceStartedUtc = DateTime.MinValue;
     }
 
     private void Window_MouseRightButtonUp(object sender, MouseButtonEventArgs e)

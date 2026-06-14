@@ -190,6 +190,12 @@ public static class NovelBuildCompiler
                     outputDirectory,
                     copiedPaths,
                     usedTargets) ?? string.Empty;
+                character.VoiceSound = CompileDirectValue(
+                    character.VoiceSound,
+                    projectDirectory,
+                    outputDirectory,
+                    copiedPaths,
+                    usedTargets) ?? string.Empty;
             }
         }
 
@@ -211,6 +217,12 @@ public static class NovelBuildCompiler
             {
                 character.Sprite = CompileDirectValue(
                     character.Sprite,
+                    projectDirectory,
+                    outputDirectory,
+                    copiedPaths,
+                    usedTargets) ?? string.Empty;
+                character.VoiceSound = CompileDirectValue(
+                    character.VoiceSound,
                     projectDirectory,
                     outputDirectory,
                     copiedPaths,

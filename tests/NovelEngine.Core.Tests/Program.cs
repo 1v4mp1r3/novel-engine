@@ -14,7 +14,7 @@ var tests = new (string Name, Action Run)[]
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
     ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
     ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
-    ("character transforms survive code and JSON", CharacterTransformsRoundTrip),
+    ("character transforms and voice survive code and JSON", CharacterTransformsRoundTrip),
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
@@ -337,6 +337,9 @@ static void CharacterTransformsRoundTrip()
             Y = 476,
             Scale = 1.35,
             Rotation = -7.5,
+            VoiceSound = "voices/hero.wav",
+            VoicePitch = 1.25,
+            VoiceEveryNthCharacter = 3,
         });
 
     var code = ProjectLanguage.Format(project);
@@ -348,9 +351,15 @@ static void CharacterTransformsRoundTrip()
         .Characters.Single();
 
     Assert(code.Contains("placement (742.5, 476)", StringComparison.Ordinal), "Placement was not formatted.");
+    Assert(code.Contains("voice \"voices/hero.wav\"", StringComparison.Ordinal), "Voice sound was not formatted.");
+    Assert(code.Contains("voice-pitch 1.25", StringComparison.Ordinal), "Voice pitch was not formatted.");
+    Assert(code.Contains("voice-every 3", StringComparison.Ordinal), "Voice frequency was not formatted.");
     Assert(fromCode.HasCustomTransform, "Code parser lost the custom transform flag.");
     Assert(Math.Abs(fromCode.Scale - 1.35) < 0.001, "Code parser changed character scale.");
     Assert(Math.Abs(fromCode.Rotation + 7.5) < 0.001, "Code parser changed character rotation.");
+    Assert(fromCode.VoiceSound == "voices/hero.wav", "Code parser lost character voice sound.");
+    Assert(Math.Abs(fromCode.VoicePitch - 1.25) < 0.001, "Code parser changed character voice pitch.");
+    Assert(fromCode.VoiceEveryNthCharacter == 3, "Code parser changed character voice frequency.");
     Assert(Math.Abs(fromJson.X - 742.5) < 0.001, "JSON changed character position.");
 }
 
@@ -821,6 +830,8 @@ static void BuildCompilerEmitsPackage()
     {
         var sourceAsset = Path.Combine(directory, "city.png");
         File.WriteAllBytes(sourceAsset, [137, 80, 78, 71]);
+        var sourceVoice = Path.Combine(directory, "voice.mp3");
+        File.WriteAllBytes(sourceVoice, [73, 68, 51, 3]);
         var projectPath = Path.Combine(directory, "story.novel.json");
         var project = NovelProject.CreateDefault();
         var asset = ProjectAssets.Import(
@@ -828,9 +839,24 @@ static void BuildCompilerEmitsPackage()
             projectPath,
             sourceAsset,
             "backgrounds");
+        var voiceAsset = ProjectAssets.Import(
+            project,
+            projectPath,
+            sourceVoice,
+            "voices");
         var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
         scene.Background = AssetReference.Create(asset.Id);
         scene.InheritBackground = false;
+        scene.InheritCharacters = false;
+        scene.Characters.Add(
+            new CharacterPlacement
+            {
+                Id = "hero",
+                Name = "Hero",
+                VoiceSound = AssetReference.Create(voiceAsset.Id),
+                VoicePitch = 1.1,
+                VoiceEveryNthCharacter = 2,
+            });
         project.SourceCode = ProjectLanguage.Format(project);
         ProjectSerializer.Save(project, projectPath);
 
@@ -842,6 +868,12 @@ static void BuildCompilerEmitsPackage()
         var loaded = NovelBuildCompiler.LoadBuild(result.ManifestPath);
         var builtAsset = loaded.Project.FindAsset(asset.Id)
             ?? throw new InvalidOperationException("Built asset is missing.");
+        var builtVoiceAsset = loaded.Project.FindAsset(voiceAsset.Id)
+            ?? throw new InvalidOperationException("Built voice asset is missing.");
+        var builtCharacter = loaded.Project
+            .FindNode(scene.Id)!
+            .Characters
+            .Single(character => character.Id == "hero");
 
         Assert(File.Exists(result.ManifestPath), "Build manifest was not emitted.");
         Assert(
@@ -855,6 +887,23 @@ static void BuildCompilerEmitsPackage()
                         '/',
                         Path.DirectorySeparatorChar))),
             "Compiled asset was not copied.");
+        Assert(
+            File.Exists(
+                Path.Combine(
+                    result.OutputDirectory,
+                    builtVoiceAsset.Path.Replace(
+                        '/',
+                        Path.DirectorySeparatorChar))),
+            "Compiled voice asset was not copied.");
+        Assert(
+            builtCharacter.VoiceSound == AssetReference.Create(voiceAsset.Id),
+            "Runtime project lost character voice sound.");
+        Assert(
+            Math.Abs(builtCharacter.VoicePitch - 1.1) < 0.001,
+            "Runtime project changed character voice pitch.");
+        Assert(
+            builtCharacter.VoiceEveryNthCharacter == 2,
+            "Runtime project changed character voice frequency.");
         Assert(
             loaded.Manifest.DebugSymbols,
             "Debug build did not retain debug symbols.");
