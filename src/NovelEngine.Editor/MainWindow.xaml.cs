@@ -25,8 +25,10 @@ public partial class MainWindow : Window
     private bool _buildInProgress;
     private string? _selectedAssetFolder;
     private string? _workspaceDirectory;
+    private bool _workspaceNeedsProjectFile;
     private Process? _gameProcess;
     private readonly DispatcherTimer _codeAnalysisTimer;
+    private readonly DispatcherTimer _autoSaveTimer;
 
     public MainWindow()
         : this(null)
@@ -58,6 +60,12 @@ public partial class MainWindow : Window
             _codeAnalysisTimer.Stop();
             AnalyzeCode();
         };
+        _autoSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(5),
+        };
+        _autoSaveTimer.Tick += (_, _) => AutoSaveProject();
+        _autoSaveTimer.Start();
 
         SetProject(_project, null);
         if (startupProjectPath is not null)
@@ -155,6 +163,7 @@ public partial class MainWindow : Window
             ?? (_projectPath is null
                 ? _workspaceDirectory
                 : Path.GetDirectoryName(_projectPath)));
+        _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
         Graph.SetProject(project);
@@ -906,6 +915,10 @@ public partial class MainWindow : Window
 
     private void CreateAssetFolder_Click(object sender, RoutedEventArgs e)
     {
+        if (!EnsureProjectSavedForAssets())
+        {
+            return;
+        }
         var dialog = new AssetFolderEditorWindow("Новая папка") { Owner = this };
         if (dialog.ShowDialog() != true)
         {
@@ -1187,13 +1200,19 @@ public partial class MainWindow : Window
             return;
         }
         var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(_projectPath))!;
-        var assetsDirectory = Path.GetFullPath(
-            Path.Combine(projectDirectory, "assets"))
-            + Path.DirectorySeparatorChar;
+        var managedDirectories = new[]
+        {
+            Path.GetFullPath(ProjectAssets.GetAssetsDirectory(_projectPath))
+                + Path.DirectorySeparatorChar,
+            Path.GetFullPath(
+                    Path.Combine(
+                        projectDirectory,
+                        ProjectAssets.LegacyAssetsDirectoryName))
+                + Path.DirectorySeparatorChar,
+        };
         var path = ResolveAssetPath(asset);
-        if (path.StartsWith(
-                assetsDirectory,
-                StringComparison.OrdinalIgnoreCase)
+        if (managedDirectories.Any(directory =>
+                path.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
             && File.Exists(path))
         {
             File.Delete(path);
@@ -1206,7 +1225,9 @@ public partial class MainWindow : Window
         {
             return;
         }
-        var directory = Path.Combine(GetAssetDirectory(), "assets");
+        var directory = _projectPath is null
+            ? Path.Combine(GetAssetDirectory(), ProjectAssets.ManagedFilesDirectoryName)
+            : ProjectAssets.GetAssetsDirectory(_projectPath);
         Directory.CreateDirectory(directory);
         Process.Start(
             new ProcessStartInfo
@@ -1224,11 +1245,16 @@ public partial class MainWindow : Window
         }
         if (_projectPath is not null)
         {
+            EnsureWorkspaceStructure();
             return true;
+        }
+        if (_workspaceDirectory is not null)
+        {
+            return SaveProjectToWorkspace();
         }
         MessageBox.Show(
             this,
-            "Сначала сохраните проект. Ассеты будут скопированы в папку assets рядом с ним.",
+            "Сначала сохраните проект. Файлы будут скопированы в папку files рядом с ним.",
             "Файлы проекта",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -1261,7 +1287,13 @@ public partial class MainWindow : Window
     {
         if (ConfirmDiscardChanges())
         {
+            var shouldSaveIntoWorkspace =
+                _workspaceNeedsProjectFile && _workspaceDirectory is not null;
             SetProject(NovelProject.CreateDefault(), null, _workspaceDirectory);
+            if (shouldSaveIntoWorkspace && !SaveProjectToWorkspace())
+            {
+                StatusText.Text = "Новый проект создан в памяти, но не сохранён";
+            }
         }
     }
 
@@ -1354,7 +1386,9 @@ public partial class MainWindow : Window
         }
         if (_projectPath is null)
         {
-            return SaveProjectAs();
+            return _workspaceDirectory is not null
+                ? SaveProjectToWorkspace()
+                : SaveProjectAs();
         }
         return WriteProject(_projectPath);
     }
@@ -1384,6 +1418,8 @@ public partial class MainWindow : Window
             ProjectSerializer.Save(_project, path);
             _projectPath = path;
             _workspaceDirectory = NormalizeWorkspaceDirectory(Path.GetDirectoryName(path));
+            _workspaceNeedsProjectFile = false;
+            EnsureWorkspaceStructure();
             _dirty = false;
             RefreshWindowTitle();
             StatusText.Text = $"Сохранён {Path.GetFileName(path)}";
@@ -1399,6 +1435,16 @@ public partial class MainWindow : Window
                 MessageBoxImage.Error);
             return false;
         }
+    }
+
+    private bool SaveProjectToWorkspace()
+    {
+        if (_workspaceDirectory is null)
+        {
+            return SaveProjectAs();
+        }
+        var path = Path.Combine(_workspaceDirectory, GetDefaultProjectFileName());
+        return WriteProject(path);
     }
 
     private bool ConfirmDiscardChanges()
@@ -1429,6 +1475,7 @@ public partial class MainWindow : Window
             e.Cancel = true;
             return;
         }
+        _autoSaveTimer.Stop();
         StopGameProcess(silent: true);
     }
 
@@ -1507,7 +1554,9 @@ public partial class MainWindow : Window
         {
             Title = title,
             Filter = $"{filter}|Все файлы|*.*",
-            InitialDirectory = Path.Combine(GetAssetDirectory(), "assets"),
+            InitialDirectory = _projectPath is null
+                ? Path.Combine(GetAssetDirectory(), ProjectAssets.ManagedFilesDirectoryName)
+                : ProjectAssets.GetAssetsDirectory(_projectPath),
         };
         if (dialog.ShowDialog(this) != true)
         {
@@ -2122,9 +2171,93 @@ public partial class MainWindow : Window
 
     private string GetAssetDirectory() =>
         _projectPath is null
-            ? Environment.CurrentDirectory
+            ? _workspaceDirectory ?? Environment.CurrentDirectory
             : Path.GetDirectoryName(Path.GetFullPath(_projectPath))
                 ?? Environment.CurrentDirectory;
+
+    private void AutoSaveProject()
+    {
+        if (_projectPath is null)
+        {
+            if (_workspaceDirectory is null || !SaveProjectToWorkspace())
+            {
+                return;
+            }
+        }
+        var projectPath = _projectPath;
+        if (projectPath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            PreservePendingSourceCode();
+            ProjectSerializer.Save(_project, projectPath);
+            WriteAutoSaveSnapshot();
+            _dirty = false;
+            _workspaceNeedsProjectFile = false;
+            RefreshWindowTitle();
+            StatusText.Text = $"Автосохранено {DateTime.Now:HH:mm}";
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            StatusText.Text = $"Автосохранение не удалось: {error.Message}";
+        }
+    }
+
+    private void PreservePendingSourceCode()
+    {
+        if (_codeHasPendingChanges)
+        {
+            _project.SourceCode = CodeEditor.SourceText;
+        }
+    }
+
+    private void WriteAutoSaveSnapshot()
+    {
+        if (_projectPath is null)
+        {
+            return;
+        }
+
+        var workspace = _workspaceDirectory
+            ?? Path.GetDirectoryName(Path.GetFullPath(_projectPath))!;
+        var directory = Path.Combine(workspace, "autosaves");
+        Directory.CreateDirectory(directory);
+        var stem = Path.GetFileNameWithoutExtension(_projectPath);
+        var path = Path.Combine(
+            directory,
+            $"{stem}-{DateTime.Now:yyyyMMdd-HHmmss}.novel.json");
+        ProjectSerializer.Save(_project, path);
+        PruneAutoSaves(directory, stem, keepCount: 24);
+    }
+
+    private static void PruneAutoSaves(string directory, string stem, int keepCount)
+    {
+        foreach (var file in Directory
+            .EnumerateFiles(directory, $"{stem}-*.novel.json")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .Skip(keepCount))
+        {
+            File.Delete(file);
+        }
+    }
+
+    private void EnsureWorkspaceStructure()
+    {
+        if (_workspaceDirectory is null)
+        {
+            return;
+        }
+        Directory.CreateDirectory(_workspaceDirectory);
+        Directory.CreateDirectory(
+            Path.Combine(_workspaceDirectory, ProjectAssets.ManagedFilesDirectoryName));
+        Directory.CreateDirectory(Path.Combine(_workspaceDirectory, "autosaves"));
+    }
 
     private string NormalizeAssetPath(string path)
     {

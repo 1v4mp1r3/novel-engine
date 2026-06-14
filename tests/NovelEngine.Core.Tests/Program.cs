@@ -560,7 +560,7 @@ static void ProjectAssetImportCopiesFiles()
         Assert(File.Exists(target), "Imported file was not copied into the project.");
         Assert(
             target.Contains(
-                Path.Combine("assets", "images"),
+                Path.Combine("files", "images"),
                 StringComparison.OrdinalIgnoreCase),
             "Imported image was placed in the wrong folder.");
         Assert(

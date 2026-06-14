@@ -4,6 +4,9 @@ namespace NovelEngine.Core;
 
 public static class ProjectAssets
 {
+    public const string ManagedFilesDirectoryName = "files";
+    public const string LegacyAssetsDirectoryName = "assets";
+
     public static NovelAsset Import(
         NovelProject project,
         string projectPath,
@@ -38,7 +41,7 @@ public static class ProjectAssets
         EnsureFolder(project, folder);
         var targetDirectory = Path.Combine(
             projectDirectory,
-            "assets",
+            ManagedFilesDirectoryName,
             folder.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(targetDirectory);
 
@@ -89,7 +92,7 @@ public static class ProjectAssets
     }
 
     public static string GetAssetsDirectory(string projectPath) =>
-        Path.Combine(GetProjectDirectory(projectPath), "assets");
+        Path.Combine(GetProjectDirectory(projectPath), ManagedFilesDirectoryName);
 
     public static void CreateFolder(NovelProject project, string folder)
     {
@@ -121,9 +124,7 @@ public static class ProjectAssets
             throw new InvalidDataException("Папка с таким именем уже существует.");
         }
 
-        var sourceDirectory = Path.Combine(
-            GetAssetsDirectory(projectPath),
-            folder.Replace('/', Path.DirectorySeparatorChar));
+        var sourceDirectory = ExistingManagedFolderDirectory(projectPath, folder);
         var targetDirectory = Path.Combine(
             GetAssetsDirectory(projectPath),
             target.Replace('/', Path.DirectorySeparatorChar));
@@ -150,7 +151,7 @@ public static class ProjectAssets
             }
             asset.Folder = target + candidate[folder.Length..];
             var relativeFile = Path.GetFileName(asset.Path);
-            asset.Path = $"assets/{asset.Folder}/{relativeFile}";
+            asset.Path = BuildManagedAssetPath(asset.Folder, relativeFile);
         }
     }
 
@@ -171,12 +172,12 @@ public static class ProjectAssets
         }
         project.AssetFolders.RemoveAll(
             candidate => candidate.Equals(folder, StringComparison.OrdinalIgnoreCase));
-        var directory = Path.Combine(
-            GetAssetsDirectory(projectPath),
-            folder.Replace('/', Path.DirectorySeparatorChar));
-        if (Directory.Exists(directory))
+        foreach (var directory in ManagedFolderDirectories(projectPath, folder))
         {
-            Directory.Delete(directory, recursive: false);
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: false);
+            }
         }
     }
 
@@ -252,9 +253,45 @@ public static class ProjectAssets
         return char.IsDigit(result[0]) ? $"asset_{result}" : result;
     }
 
+    public static string BuildManagedAssetPath(string folder, string fileName)
+    {
+        folder = NormalizeFolder(folder);
+        return folder.Length == 0
+            ? $"{ManagedFilesDirectoryName}/{fileName}"
+            : $"{ManagedFilesDirectoryName}/{folder}/{fileName}";
+    }
+
     private static string GetProjectDirectory(string projectPath) =>
         Path.GetDirectoryName(Path.GetFullPath(projectPath))
         ?? throw new InvalidOperationException("Не удалось определить папку проекта.");
+
+    private static string ExistingManagedFolderDirectory(string projectPath, string folder)
+    {
+        var preferred = Path.Combine(
+            GetAssetsDirectory(projectPath),
+            folder.Replace('/', Path.DirectorySeparatorChar));
+        if (Directory.Exists(preferred))
+        {
+            return preferred;
+        }
+        var legacy = Path.Combine(
+            GetProjectDirectory(projectPath),
+            LegacyAssetsDirectoryName,
+            folder.Replace('/', Path.DirectorySeparatorChar));
+        return Directory.Exists(legacy) ? legacy : preferred;
+    }
+
+    private static IEnumerable<string> ManagedFolderDirectories(
+        string projectPath,
+        string folder)
+    {
+        var relativeFolder = folder.Replace('/', Path.DirectorySeparatorChar);
+        yield return Path.Combine(GetAssetsDirectory(projectPath), relativeFolder);
+        yield return Path.Combine(
+            GetProjectDirectory(projectPath),
+            LegacyAssetsDirectoryName,
+            relativeFolder);
+    }
 
     private static void EnsureFolder(NovelProject project, string folder)
     {
