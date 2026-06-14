@@ -26,7 +26,9 @@ public partial class MainWindow : Window
     private string? _selectedAssetFolder;
     private string? _workspaceDirectory;
     private bool _workspaceNeedsProjectFile;
+    private bool _refreshingFilesFromWatcher;
     private Process? _gameProcess;
+    private FileSystemWatcher? _filesWatcher;
     private readonly DispatcherTimer _codeAnalysisTimer;
     private readonly DispatcherTimer _autoSaveTimer;
 
@@ -166,6 +168,7 @@ public partial class MainWindow : Window
         _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
+        ConfigureFilesWatcher();
         Graph.SetProject(project);
         RefreshExplorer();
         RefreshProperties();
@@ -682,8 +685,91 @@ public partial class MainWindow : Window
 
     private void RefreshAssets()
     {
+        SyncFilesFromDisk();
         RefreshAssetFolders();
         RefreshAssetList();
+    }
+
+    private void SyncFilesFromDisk()
+    {
+        if (_projectPath is null)
+        {
+            return;
+        }
+        try
+        {
+            var changes = ProjectAssets.SyncFromDisk(_project, _projectPath);
+            if (changes == 0)
+            {
+                return;
+            }
+
+            PreservePendingSourceCode();
+            ProjectSerializer.Save(_project, _projectPath);
+            _dirty = false;
+            _workspaceNeedsProjectFile = false;
+            if (!_codeHasPendingChanges)
+            {
+                RefreshCodeFromProject(useStoredSource: false);
+            }
+            RefreshWindowTitle();
+            StatusText.Text = $"Файлы синхронизированы: найдено новых записей {changes}";
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            StatusText.Text = $"Не удалось синхронизировать files: {error.Message}";
+        }
+    }
+
+    private void ConfigureFilesWatcher()
+    {
+        _filesWatcher?.Dispose();
+        _filesWatcher = null;
+        if (_projectPath is null)
+        {
+            return;
+        }
+
+        var directory = ProjectAssets.GetAssetsDirectory(_projectPath);
+        Directory.CreateDirectory(directory);
+        _filesWatcher = new FileSystemWatcher(directory)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter =
+                NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.LastWrite,
+            EnableRaisingEvents = true,
+        };
+        _filesWatcher.Created += (_, _) => ScheduleFilesRefresh();
+        _filesWatcher.Renamed += (_, _) => ScheduleFilesRefresh();
+        _filesWatcher.Changed += (_, _) => ScheduleFilesRefresh();
+    }
+
+    private void ScheduleFilesRefresh()
+    {
+        if (_refreshingFilesFromWatcher)
+        {
+            return;
+        }
+        _refreshingFilesFromWatcher = true;
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
+                {
+                    RefreshAssets();
+                }
+            }
+            finally
+            {
+                _refreshingFilesFromWatcher = false;
+            }
+        });
     }
 
     private void RefreshAssetList()
@@ -724,7 +810,7 @@ public partial class MainWindow : Window
             AssetFoldersTree.Items.Clear();
             var all = new TreeViewItem
             {
-                Header = $"Все файлы ({_project.Assets.Count})",
+                Header = CreateFolderHeader("Все файлы", _project.Assets.Count),
                 Tag = null,
                 IsExpanded = true,
                 IsSelected = _selectedAssetFolder is null,
@@ -751,7 +837,7 @@ public partial class MainWindow : Window
                                 StringComparison.OrdinalIgnoreCase));
                         item = new TreeViewItem
                         {
-                            Header = $"{segment} ({count})",
+                            Header = CreateFolderHeader(segment, count),
                             Tag = path,
                             IsExpanded = true,
                             IsSelected = path.Equals(
@@ -781,6 +867,27 @@ public partial class MainWindow : Window
         RenameFolderButton.IsEnabled = hasFolder;
         DeleteFolderButton.IsEnabled = hasFolder;
     }
+
+    private static StackPanel CreateFolderHeader(string title, int count) =>
+        new()
+        {
+            Orientation = Orientation.Horizontal,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "\uE8B7",
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    Margin = new Thickness(0, 0, 7, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+                new TextBlock
+                {
+                    Text = $"{title} ({count})",
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            },
+        };
 
     private string AssetSize(NovelAsset asset)
     {
@@ -1420,6 +1527,7 @@ public partial class MainWindow : Window
             _workspaceDirectory = NormalizeWorkspaceDirectory(Path.GetDirectoryName(path));
             _workspaceNeedsProjectFile = false;
             EnsureWorkspaceStructure();
+            ConfigureFilesWatcher();
             _dirty = false;
             RefreshWindowTitle();
             StatusText.Text = $"Сохранён {Path.GetFileName(path)}";
@@ -1476,6 +1584,7 @@ public partial class MainWindow : Window
             return;
         }
         _autoSaveTimer.Stop();
+        _filesWatcher?.Dispose();
         StopGameProcess(silent: true);
     }
 
@@ -2369,6 +2478,12 @@ public partial class MainWindow : Window
             AssetKind.Image => "Изображение",
             AssetKind.Audio => "Аудио",
             _ => "Файл",
+        };
+        public string IconGlyph => Asset.Kind switch
+        {
+            AssetKind.Image => "\uEB9F",
+            AssetKind.Audio => "\uE8D6",
+            _ => "\uE8A5",
         };
         public string Folder => Asset.Folder;
         public string Path => Asset.Path;

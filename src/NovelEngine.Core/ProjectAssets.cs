@@ -94,6 +94,57 @@ public static class ProjectAssets
     public static string GetAssetsDirectory(string projectPath) =>
         Path.Combine(GetProjectDirectory(projectPath), ManagedFilesDirectoryName);
 
+    public static int SyncFromDisk(NovelProject project, string projectPath)
+    {
+        var root = GetAssetsDirectory(projectPath);
+        if (!Directory.Exists(root))
+        {
+            return 0;
+        }
+
+        var changes = 0;
+        foreach (var directory in Directory.EnumerateDirectories(
+            root,
+            "*",
+            SearchOption.AllDirectories))
+        {
+            var folder = NormalizeFolder(
+                Path.GetRelativePath(root, directory).Replace('\\', '/'));
+            var before = project.AssetFolders.Count;
+            EnsureFolder(project, folder);
+            changes += project.AssetFolders.Count - before;
+        }
+
+        var projectDirectory = GetProjectDirectory(projectPath);
+        foreach (var file in Directory.EnumerateFiles(
+            root,
+            "*",
+            SearchOption.AllDirectories))
+        {
+            var relativeProjectPath = Path.GetRelativePath(projectDirectory, file)
+                .Replace('\\', '/');
+            var existing = project.Assets.FirstOrDefault(asset =>
+                asset.Path.Equals(relativeProjectPath, StringComparison.OrdinalIgnoreCase)
+                || ResolvePath(projectPath, asset).Equals(
+                    Path.GetFullPath(file),
+                    StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                continue;
+            }
+
+            var relativeFolder = Path.GetDirectoryName(
+                    Path.GetRelativePath(root, file))
+                ?.Replace('\\', '/')
+                ?? string.Empty;
+            var before = project.Assets.Count;
+            _ = Import(project, projectPath, file, relativeFolder);
+            changes += project.Assets.Count - before;
+        }
+
+        return changes;
+    }
+
     public static void CreateFolder(NovelProject project, string folder)
     {
         folder = NormalizeFolder(folder);

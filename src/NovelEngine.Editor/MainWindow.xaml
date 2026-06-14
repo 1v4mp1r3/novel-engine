@@ -316,9 +316,22 @@
                                       SelectionChanged="AssetsGrid_SelectionChanged"
                                       MouseDoubleClick="CopyAssetReference_Click">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Имя"
-                                                        Binding="{Binding Id}"
-                                                        Width="170" />
+                                    <DataGridTemplateColumn Header="Имя"
+                                                            Width="190">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding IconGlyph}"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               Foreground="{StaticResource AccentBrush}"
+                                                               Margin="0,0,8,0"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Id}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="Тип"
                                                         Binding="{Binding Kind}"
                                                         Width="90" />

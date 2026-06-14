@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
+    ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
@@ -568,6 +569,44 @@ static void ProjectAssetImportCopiesFiles()
                 asset,
                 ProjectAssets.Import(project, projectPath, target)),
             "Importing the registered file created a duplicate asset.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectAssetSyncDiscoversFilesFromDisk()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-sync-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var physicalFolder = Path.Combine(directory, "files", "backgrounds");
+        Directory.CreateDirectory(physicalFolder);
+        var imagePath = Path.Combine(physicalFolder, "MountFuji.jpg");
+        File.WriteAllBytes(imagePath, [255, 216, 255, 217]);
+        var project = NovelProject.CreateDefault();
+
+        var changes = ProjectAssets.SyncFromDisk(project, projectPath);
+        var asset = project.Assets.SingleOrDefault();
+
+        Assert(changes >= 2, "Sync did not report the discovered folder and file.");
+        Assert(project.AssetFolders.Contains("backgrounds"), "Physical folder was not registered.");
+        Assert(asset is not null, "Physical file was not registered.");
+        asset = project.Assets.Single();
+        Assert(asset.Kind == AssetKind.Image, "Discovered image kind was not detected.");
+        Assert(asset.Folder == "backgrounds", "Discovered image folder was wrong.");
+        Assert(
+            asset.Path == "files/backgrounds/MountFuji.jpg",
+            "Discovered image path should point into files.");
+        Assert(
+            ProjectAssets.SyncFromDisk(project, projectPath) == 0,
+            "Second sync created duplicate records.");
+        Assert(project.Assets.Count == 1, "Second sync duplicated the asset.");
     }
     finally
     {
