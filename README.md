@@ -36,7 +36,8 @@ powershell -ExecutionPolicy Bypass -File tools/install-explorer-context-menu.ps1
 After installation, right-click a project folder or empty space inside it and
 choose `Открыть с помощью Novel Engine`. The editor will find the
 `*.novel.json` file in that folder and load the project with its adjacent
-assets.
+assets. Empty folders are opened as a workspace too, so you can create a new
+project there with `Ctrl+N` and save it into that folder.
 
 ## Build and test
 

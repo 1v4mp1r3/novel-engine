@@ -2,11 +2,16 @@ using System.IO;
 
 namespace NovelEngine.Editor;
 
+internal sealed record ProjectOpenResult(
+    string? ProjectPath,
+    string WorkspaceDirectory,
+    bool CreatedEmptyWorkspace);
+
 internal static class ProjectOpenResolver
 {
     private const string ProjectPattern = "*.novel.json";
 
-    public static string ResolveProjectPath(string inputPath)
+    public static ProjectOpenResult Resolve(string inputPath)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
         {
@@ -18,7 +23,10 @@ internal static class ProjectOpenResolver
         var fullPath = Path.GetFullPath(expandedPath);
         if (File.Exists(fullPath))
         {
-            return fullPath;
+            return new ProjectOpenResult(
+                fullPath,
+                Path.GetDirectoryName(fullPath)!,
+                CreatedEmptyWorkspace: false);
         }
         if (Directory.Exists(fullPath))
         {
@@ -30,16 +38,19 @@ internal static class ProjectOpenResolver
             fullPath);
     }
 
-    private static string ResolveProjectFromDirectory(string directory)
+    private static ProjectOpenResult ResolveProjectFromDirectory(string directory)
     {
+        directory = Path.GetFullPath(directory);
         var projectFiles = Directory
             .EnumerateFiles(directory, ProjectPattern, SearchOption.TopDirectoryOnly)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (projectFiles.Count == 0)
         {
-            throw new InvalidDataException(
-                $"В папке '{directory}' не найден файл проекта {ProjectPattern}.");
+            return new ProjectOpenResult(
+                null,
+                directory,
+                CreatedEmptyWorkspace: true);
         }
 
         var directoryName = Path.GetFileName(directory.TrimEnd(
@@ -52,16 +63,23 @@ internal static class ProjectOpenResolver
                 StringComparison.OrdinalIgnoreCase));
         if (preferredProject is not null)
         {
-            return preferredProject;
+            return new ProjectOpenResult(
+                preferredProject,
+                directory,
+                CreatedEmptyWorkspace: false);
         }
 
         if (projectFiles.Count == 1)
         {
-            return projectFiles[0];
+            return new ProjectOpenResult(
+                projectFiles[0],
+                directory,
+                CreatedEmptyWorkspace: false);
         }
 
-        throw new InvalidDataException(
-            "В папке найдено несколько файлов проекта. "
-            + $"Ожидался один {ProjectPattern} или файл '{preferredName}'.");
+        return new ProjectOpenResult(
+            null,
+            directory,
+            CreatedEmptyWorkspace: true);
     }
 }

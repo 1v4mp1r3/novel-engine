@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private bool _refreshingAssetFolders;
     private bool _buildInProgress;
     private string? _selectedAssetFolder;
+    private string? _workspaceDirectory;
     private Process? _gameProcess;
     private readonly DispatcherTimer _codeAnalysisTimer;
 
@@ -101,6 +102,22 @@ public partial class MainWindow : Window
             PreviewNode(Graph.SelectedNodeId);
             e.Handled = true;
         }
+        else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            NewProject();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.O && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            OpenProject_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+        }
+        else if (e.Key == Key.S
+            && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            SaveProjectAs();
+            e.Handled = true;
+        }
         else if (e.Key == Key.Delete && !IsTextEditing())
         {
             Graph.DeleteSelected();
@@ -126,10 +143,18 @@ public partial class MainWindow : Window
     private static bool IsTextEditing() =>
         Keyboard.FocusedElement is TextBox or RichTextBox;
 
-    private void SetProject(NovelProject project, string? path)
+    private void SetProject(
+        NovelProject project,
+        string? path,
+        string? workspaceDirectory = null)
     {
         _project = project;
         _projectPath = path;
+        _workspaceDirectory = NormalizeWorkspaceDirectory(
+            workspaceDirectory
+            ?? (_projectPath is null
+                ? _workspaceDirectory
+                : Path.GetDirectoryName(_projectPath)));
         _dirty = false;
         _selectedAssetFolder = null;
         Graph.SetProject(project);
@@ -138,7 +163,11 @@ public partial class MainWindow : Window
         RefreshAssets();
         RefreshCodeFromProject(useStoredSource: true);
         RefreshWindowTitle();
-        StatusText.Text = path is null ? "Новый проект" : $"Открыт {Path.GetFileName(path)}";
+        StatusText.Text = path is null
+            ? _workspaceDirectory is null
+                ? "Новый проект"
+                : $"Новый проект в папке {Path.GetFileName(_workspaceDirectory)}"
+            : $"Открыт {Path.GetFileName(path)}";
     }
 
     private void HandleGraphSelection()
@@ -1215,15 +1244,24 @@ public partial class MainWindow : Window
 
     private void RefreshWindowTitle()
     {
-        var name = _projectPath is null ? "Без имени" : Path.GetFileName(_projectPath);
+        var name = _projectPath is null
+            ? _workspaceDirectory is null
+                ? "Без имени"
+                : $"{Path.GetFileName(_workspaceDirectory)} / Без имени"
+            : Path.GetFileName(_projectPath);
         Title = $"{name}{(_dirty ? " *" : string.Empty)} — Novel Engine WPF";
     }
 
     private void NewProject_Click(object sender, RoutedEventArgs e)
     {
+        NewProject();
+    }
+
+    private void NewProject()
+    {
         if (ConfirmDiscardChanges())
         {
-            SetProject(NovelProject.CreateDefault(), null);
+            SetProject(NovelProject.CreateDefault(), null, _workspaceDirectory);
         }
     }
 
@@ -1286,8 +1324,22 @@ public partial class MainWindow : Window
 
     private void OpenProject(string inputPath)
     {
-        var projectPath = ProjectOpenResolver.ResolveProjectPath(inputPath);
-        SetProject(ProjectSerializer.Load(projectPath), projectPath);
+        var result = ProjectOpenResolver.Resolve(inputPath);
+        if (result.ProjectPath is null)
+        {
+            SetProject(
+                NovelProject.CreateDefault(),
+                null,
+                result.WorkspaceDirectory);
+            StatusText.Text =
+                $"Открыта папка {Path.GetFileName(result.WorkspaceDirectory)}. Создайте новый проект через Ctrl+N или сохраните текущий.";
+            return;
+        }
+
+        SetProject(
+            ProjectSerializer.Load(result.ProjectPath),
+            result.ProjectPath,
+            result.WorkspaceDirectory);
     }
 
     private void SaveProject_Click(object sender, RoutedEventArgs e) => SaveProject();
@@ -1319,6 +1371,8 @@ public partial class MainWindow : Window
             Filter = "Проект Novel Engine|*.novel.json|JSON|*.json",
             DefaultExt = ".novel.json",
             AddExtension = true,
+            InitialDirectory = GetSaveDialogInitialDirectory(),
+            FileName = GetDefaultProjectFileName(),
         };
         return dialog.ShowDialog(this) == true && WriteProject(dialog.FileName);
     }
@@ -1329,6 +1383,7 @@ public partial class MainWindow : Window
         {
             ProjectSerializer.Save(_project, path);
             _projectPath = path;
+            _workspaceDirectory = NormalizeWorkspaceDirectory(Path.GetDirectoryName(path));
             _dirty = false;
             RefreshWindowTitle();
             StatusText.Text = $"Сохранён {Path.GetFileName(path)}";
@@ -2009,6 +2064,35 @@ public partial class MainWindow : Window
         MarkDirty();
         StatusText.Text = $"Сцена «{node.Title}» обновлена";
     }
+
+    private string? GetSaveDialogInitialDirectory() =>
+        _workspaceDirectory is not null && Directory.Exists(_workspaceDirectory)
+            ? _workspaceDirectory
+            : _projectPath is null
+                ? null
+                : Path.GetDirectoryName(_projectPath);
+
+    private string GetDefaultProjectFileName()
+    {
+        var source = _workspaceDirectory is null
+            ? _project.Title
+            : Path.GetFileName(_workspaceDirectory);
+        var safeName = string.Concat(
+            source.Select(character =>
+                Path.GetInvalidFileNameChars().Contains(character)
+                    ? '_'
+                    : character)).Trim();
+        if (safeName.Length == 0)
+        {
+            safeName = "NovelProject";
+        }
+        return $"{safeName}.novel.json";
+    }
+
+    private static string? NormalizeWorkspaceDirectory(string? directory) =>
+        string.IsNullOrWhiteSpace(directory)
+            ? null
+            : Path.GetFullPath(directory);
 
     private void EditMainMenu()
     {
