@@ -41,6 +41,33 @@ public sealed record ProjectLanguageSourceLocation(
     int Line,
     int Column);
 
+public enum ProjectLanguageCompletionKind
+{
+    Keyword,
+    Snippet,
+    Node,
+    Type,
+    Asset,
+    Value,
+}
+
+public sealed record ProjectLanguageCompletion(
+    string Label,
+    string InsertText,
+    string Description,
+    ProjectLanguageCompletionKind Kind,
+    int CaretOffset = -1);
+
+public sealed record ProjectLanguageCompletionContext(
+    int ReplacementStart,
+    int ReplacementLength,
+    IReadOnlyList<ProjectLanguageCompletion> Items);
+
+public sealed record ProjectLanguageScopeSpan(
+    int OpenBraceOffset,
+    int CloseBraceOffset,
+    int Depth);
+
 public static class ProjectLanguage
 {
     private static readonly JsonSerializerOptions StringOptions = new()
@@ -236,6 +263,198 @@ public static class ProjectLanguage
             index += punctuationLength;
         }
         return spans;
+    }
+
+    public static ProjectLanguageCompletionContext GetCompletions(
+        string source,
+        int caretOffset)
+    {
+        caretOffset = Math.Clamp(caretOffset, 0, source.Length);
+        var spans = GetSyntaxSpans(source);
+        if (spans.Any(
+            span => span.Kind is ProjectLanguageSyntaxKind.String
+                or ProjectLanguageSyntaxKind.Comment
+                && caretOffset > span.Start
+                && caretOffset <= span.Start + span.Length))
+        {
+            return new ProjectLanguageCompletionContext(caretOffset, 0, []);
+        }
+
+        var replacementStart = caretOffset;
+        while (replacementStart > 0
+            && IsSyntaxIdentifierPart(source[replacementStart - 1]))
+        {
+            replacementStart--;
+        }
+        if (replacementStart > 0 && source[replacementStart - 1] == '@')
+        {
+            replacementStart--;
+        }
+
+        var prefix = source[replacementStart..caretOffset];
+        var lineStart = source.LastIndexOf('\n', Math.Max(0, replacementStart - 1));
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        var before = source[lineStart..replacementStart];
+        var linePrefix = source[lineStart..caretOffset];
+        var candidates = new List<ProjectLanguageCompletion>();
+
+        if (prefix.StartsWith('@') || before.TrimEnd().EndsWith('@'))
+        {
+            AddDeclarationCompletions(
+                candidates,
+                source,
+                @"(?m)^[ \t]*asset[ \t]+(?<id>[\p{L}_][\p{L}\p{N}_-]*)",
+                "@",
+                "Ассет проекта",
+                ProjectLanguageCompletionKind.Asset);
+        }
+        else if (Regex.IsMatch(before, @"->[ \t]*$", RegexOptions.CultureInvariant))
+        {
+            AddDeclarationCompletions(
+                candidates,
+                source,
+                @"(?m)^[ \t]*node[ \t]+(?<id>[\p{L}_][\p{L}\p{N}_-]*)",
+                string.Empty,
+                "Целевая нода",
+                ProjectLanguageCompletionKind.Node);
+            candidates.Add(
+                new ProjectLanguageCompletion(
+                    "none",
+                    "none",
+                    "Оставить переход неподключённым",
+                    ProjectLanguageCompletionKind.Value));
+        }
+        else if (Regex.IsMatch(
+            before,
+            @"^[ \t]*node[ \t]+[\p{L}_][\p{L}\p{N}_-]*[ \t]*:[ \t]*$",
+            RegexOptions.CultureInvariant))
+        {
+            AddTypeCompletions(candidates, source);
+        }
+        else if (Regex.IsMatch(
+            before,
+            @"^[ \t]*type[ \t]+[\p{L}_][\p{L}\p{N}_-]*[ \t]+extends[ \t]*$",
+            RegexOptions.CultureInvariant))
+        {
+            AddTypeCompletions(candidates, source);
+        }
+        else if (Regex.IsMatch(
+            linePrefix,
+            @"^[ \t]*asset[ \t]+[\p{L}_][\p{L}\p{N}_-]*[ \t]*:[ \t]*[\p{L}_-]*$",
+            RegexOptions.CultureInvariant))
+        {
+            AddValues(candidates, ["image", "audio", "other"], "Тип ассета");
+        }
+        else if (Regex.IsMatch(
+            linePrefix,
+            @"^[ \t]*position[ \t]+[\p{L}_-]*$",
+            RegexOptions.CultureInvariant))
+        {
+            AddValues(candidates, ["left", "center", "right"], "Позиция персонажа");
+        }
+        else if (Regex.IsMatch(
+            before,
+            @"^[ \t]*inherit[ \t]+$",
+            RegexOptions.CultureInvariant))
+        {
+            AddValues(
+                candidates,
+                ["background", "music", "characters"],
+                "Наследуемое состояние");
+        }
+        else if (Regex.IsMatch(
+            before,
+            @"^[ \t]*inherit[ \t]+(?:background|music|characters)[ \t]+$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            AddValues(candidates, ["true", "false"], "Логическое значение");
+        }
+        else if (GetBraceDepth(source, replacementStart, spans) == 0)
+        {
+            candidates.AddRange(TopLevelCompletions);
+        }
+        else
+        {
+            candidates.AddRange(NodeBodyCompletions);
+        }
+
+        var normalizedPrefix = prefix.TrimStart('@');
+        var items = candidates
+            .Where(
+                item => normalizedPrefix.Length == 0
+                    || item.Label.TrimStart('@').StartsWith(
+                        normalizedPrefix,
+                        StringComparison.OrdinalIgnoreCase))
+            .DistinctBy(item => item.InsertText, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(
+                item => item.Label.StartsWith(
+                    normalizedPrefix,
+                    StringComparison.OrdinalIgnoreCase)
+                        ? 0
+                        : 1)
+            .ThenBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+            .Take(40)
+            .ToList();
+        return new ProjectLanguageCompletionContext(
+            replacementStart,
+            caretOffset - replacementStart,
+            items);
+    }
+
+    public static IReadOnlyList<ProjectLanguageScopeSpan> GetScopeSpans(
+        string source)
+    {
+        var ignored = GetSyntaxSpans(source)
+            .Where(
+                span => span.Kind is ProjectLanguageSyntaxKind.String
+                    or ProjectLanguageSyntaxKind.Comment)
+            .OrderBy(span => span.Start)
+            .ToList();
+        var scopes = new List<ProjectLanguageScopeSpan>();
+        var stack = new Stack<(int Offset, int Depth)>();
+        var ignoredIndex = 0;
+        for (var index = 0; index < source.Length; index++)
+        {
+            while (ignoredIndex < ignored.Count
+                && index >= ignored[ignoredIndex].Start
+                    + ignored[ignoredIndex].Length)
+            {
+                ignoredIndex++;
+            }
+            if (ignoredIndex < ignored.Count
+                && index >= ignored[ignoredIndex].Start
+                && index < ignored[ignoredIndex].Start
+                    + ignored[ignoredIndex].Length)
+            {
+                index = ignored[ignoredIndex].Start
+                    + ignored[ignoredIndex].Length - 1;
+                continue;
+            }
+
+            if (source[index] == '{')
+            {
+                stack.Push((index, stack.Count));
+            }
+            else if (source[index] == '}' && stack.TryPop(out var opening))
+            {
+                scopes.Add(
+                    new ProjectLanguageScopeSpan(
+                        opening.Offset,
+                        index,
+                        opening.Depth));
+            }
+        }
+        while (stack.TryPop(out var opening))
+        {
+            scopes.Add(
+                new ProjectLanguageScopeSpan(
+                    opening.Offset,
+                    source.Length,
+                    opening.Depth));
+        }
+        return scopes
+            .OrderBy(scope => scope.OpenBraceOffset)
+            .ToList();
     }
 
     public static ProjectLanguageSourceLocation? FindNodeDeclaration(
@@ -740,6 +959,179 @@ public static class ProjectLanguage
 
     private static bool IsSyntaxIdentifierPart(char value) =>
         value is '_' or '-' || char.IsLetterOrDigit(value);
+
+    private static readonly IReadOnlyList<ProjectLanguageCompletion>
+        TopLevelCompletions =
+        [
+            new(
+                "asset",
+                "asset id : image \"assets/path.png\"\n\n",
+                "Объявить ассет проекта",
+                ProjectLanguageCompletionKind.Snippet,
+                6),
+            new(
+                "folder",
+                "folder \"path\"\n\n",
+                "Объявить папку ассетов",
+                ProjectLanguageCompletionKind.Snippet,
+                8),
+            new(
+                "node",
+                "node id : scene at (0, 0) {\n    \n}\n\n",
+                "Объявить ноду",
+                ProjectLanguageCompletionKind.Snippet,
+                5),
+            new(
+                "type",
+                "type Name extends scene {\n    \n}\n\n",
+                "Объявить наследуемый тип ноды",
+                ProjectLanguageCompletionKind.Snippet,
+                5),
+        ];
+
+    private static readonly IReadOnlyList<ProjectLanguageCompletion>
+        NodeBodyCompletions =
+        [
+            new(
+                "background",
+                "background @",
+                "Установить фон ноды",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "character",
+                "character id {\n    name \"\"\n    sprite @\n    position center\n}",
+                "Добавить персонажа",
+                ProjectLanguageCompletionKind.Snippet,
+                10),
+            new(
+                "choice",
+                "choice \"\" -> none",
+                "Добавить вариант ответа",
+                ProjectLanguageCompletionKind.Snippet,
+                8),
+            new(
+                "inherit",
+                "inherit background true",
+                "Настроить наследование состояния",
+                ProjectLanguageCompletionKind.Snippet,
+                8),
+            new(
+                "music",
+                "music @",
+                "Установить музыку ноды",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "next",
+                "next \"\" -> none",
+                "Добавить линейный переход",
+                ProjectLanguageCompletionKind.Snippet,
+                6),
+            new(
+                "script",
+                "script \"\"",
+                "Выполнить скрипт при входе",
+                ProjectLanguageCompletionKind.Snippet,
+                8),
+            new(
+                "speaker",
+                "speaker \"\"",
+                "Задать имя говорящего",
+                ProjectLanguageCompletionKind.Snippet,
+                9),
+            new(
+                "text",
+                "text \"\"",
+                "Задать текст сцены или реплики",
+                ProjectLanguageCompletionKind.Snippet,
+                6),
+            new(
+                "title",
+                "title \"\"",
+                "Задать название ноды",
+                ProjectLanguageCompletionKind.Snippet,
+                7),
+        ];
+
+    private static void AddTypeCompletions(
+        ICollection<ProjectLanguageCompletion> candidates,
+        string source)
+    {
+        AddValues(candidates, ["start", "scene", "dialogue"], "Встроенный тип ноды");
+        AddDeclarationCompletions(
+            candidates,
+            source,
+            @"(?m)^[ \t]*type[ \t]+(?<id>[\p{L}_][\p{L}\p{N}_-]*)",
+            string.Empty,
+            "Пользовательский тип ноды",
+            ProjectLanguageCompletionKind.Type);
+    }
+
+    private static void AddDeclarationCompletions(
+        ICollection<ProjectLanguageCompletion> candidates,
+        string source,
+        string pattern,
+        string insertPrefix,
+        string description,
+        ProjectLanguageCompletionKind kind)
+    {
+        foreach (Match match in Regex.Matches(
+            source,
+            pattern,
+            RegexOptions.CultureInvariant))
+        {
+            var id = match.Groups["id"].Value;
+            candidates.Add(
+                new ProjectLanguageCompletion(
+                    $"{insertPrefix}{id}",
+                    $"{insertPrefix}{id}",
+                    description,
+                    kind));
+        }
+    }
+
+    private static void AddValues(
+        ICollection<ProjectLanguageCompletion> candidates,
+        IEnumerable<string> values,
+        string description)
+    {
+        foreach (var value in values)
+        {
+            candidates.Add(
+                new ProjectLanguageCompletion(
+                    value,
+                    value,
+                    description,
+                    ProjectLanguageCompletionKind.Value));
+        }
+    }
+
+    private static int GetBraceDepth(
+        string source,
+        int end,
+        IReadOnlyList<ProjectLanguageSyntaxSpan> spans)
+    {
+        var ignored = spans
+            .Where(
+                span => span.Kind is ProjectLanguageSyntaxKind.String
+                    or ProjectLanguageSyntaxKind.Comment)
+            .ToList();
+        var depth = 0;
+        for (var index = 0; index < end; index++)
+        {
+            if (ignored.Any(
+                span => index >= span.Start && index < span.Start + span.Length))
+            {
+                continue;
+            }
+            depth += source[index] switch
+            {
+                '{' => 1,
+                '}' => -1,
+                _ => 0,
+            };
+        }
+        return Math.Max(0, depth);
+    }
 
     private static (int Line, int Column) GetLineColumn(string source, int offset)
     {

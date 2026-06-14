@@ -52,5 +52,9 @@ currently installed on this workstation.
 - Double-click a graph node to open its declaration in the code editor.
 - The code editor highlights language constructs and marks parser errors inline
   while you type.
+- Code completion suggests properties, snippets, node targets, types, values,
+  and assets. Use `Ctrl+Space` to open it explicitly, then `Tab` or `Enter`.
+- Scope guides connect matching braces and show the exact extent of nested code
+  blocks while scrolling.
 - The file manager supports nested project folders; assets can be created,
   renamed, moved, and referenced without depending on their physical path.

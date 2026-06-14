@@ -55,6 +55,14 @@ asset references. Parser errors are underlined and shown in the status bar as
 the document changes. Double-clicking a node in the graph switches to the code
 tab and selects that node's declaration.
 
+Autocompletion opens while typing or through `Ctrl+Space`. It suggests language
+snippets and context-specific values, including declared node targets after
+`->`, asset references after `@`, and user-defined node types. Use `Up`/`Down`
+to select a suggestion and `Tab` or `Enter` to insert it.
+
+Vertical scope guides connect each opening brace to its matching closing brace.
+Nested node, type, character, and transition blocks use different guide colors.
+
 ## Minimal project
 
 ```text

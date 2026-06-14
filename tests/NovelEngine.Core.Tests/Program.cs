@@ -20,6 +20,8 @@ var tests = new (string Name, Action Run)[]
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
+    ("project language suggests context completions", ProjectLanguageSuggestsCompletions),
+    ("project language finds nested code scopes", ProjectLanguageFindsScopes),
 };
 
 var failures = 0;
@@ -493,6 +495,9 @@ static void ProjectLanguageSyntaxAndLocations()
         asset bg : image "assets/bg.png"
         node start : start {
             background @bg
+            next "End" -> scene-1
+        }
+        node scene-1 : scene {
             next "End" -> none
         }
         """;
@@ -509,10 +514,64 @@ static void ProjectLanguageSyntaxAndLocations()
     Assert(
         spans.Any(span => span.Kind == ProjectLanguageSyntaxKind.AssetReference),
         "Asset reference syntax spans were not produced.");
+    var sceneIdStart = source.IndexOf("scene-1", StringComparison.Ordinal);
+    Assert(
+        spans.Any(
+            span => span.Start == sceneIdStart
+                && span.Length == "scene-1".Length
+                && span.Kind == ProjectLanguageSyntaxKind.Declaration),
+        "Hyphenated identifiers were split into partially highlighted spans.");
     Assert(location is not null, "Node declaration location was not found.");
     Assert(
         source.Substring(location!.Start, location.Length) == "start",
         "Node declaration location points to the wrong text.");
+}
+
+static void ProjectLanguageSuggestsCompletions()
+{
+    const string source = """
+        novel "Completions"
+        asset city_bg : image "assets/city.png"
+        node start : start {
+            background @ci
+            next "Go" -> dia
+        }
+        node dialogue-1 : dialogue {
+            choice "End" -> none
+        }
+        """;
+
+    var assetCaret = source.IndexOf("@ci", StringComparison.Ordinal) + 3;
+    var assetCompletions = ProjectLanguage.GetCompletions(source, assetCaret);
+    Assert(
+        assetCompletions.Items.Any(item => item.InsertText == "@city_bg"),
+        "Asset completion was not suggested after @.");
+
+    var nodeCaret = source.IndexOf("-> dia", StringComparison.Ordinal) + 6;
+    var nodeCompletions = ProjectLanguage.GetCompletions(source, nodeCaret);
+    Assert(
+        nodeCompletions.Items.Any(item => item.InsertText == "dialogue-1"),
+        "Node completion was not suggested after an arrow.");
+}
+
+static void ProjectLanguageFindsScopes()
+{
+    const string source = """
+        node scene-1 : scene {
+            text "{ this is not a scope }"
+            character hero {
+                name "Hero"
+            }
+            # { comment }
+        }
+        """;
+
+    var scopes = ProjectLanguage.GetScopeSpans(source);
+    Assert(scopes.Count == 2, "Braces inside strings or comments became scopes.");
+    Assert(
+        scopes.Any(scope => scope.Depth == 0)
+            && scopes.Any(scope => scope.Depth == 1),
+        "Nested scope depths were not detected.");
 }
 
 static int CountOccurrences(string source, string value)

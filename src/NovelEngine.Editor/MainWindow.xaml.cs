@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        CodeEditor.CompletionProvider = ProjectLanguage.GetCompletions;
 
         Graph.SelectionChanged += (_, _) => HandleGraphSelection();
         Graph.ProjectChanged += (_, _) => MarkDirty();
