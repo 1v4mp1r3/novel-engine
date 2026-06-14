@@ -65,8 +65,20 @@ position. A node with `inheritMusic: false` replaces or stops the track.
 Connections own their transition sound and fade duration.
 
 Node preview restores inherited state by replaying the first graph path from
-the start node to the selected node. The full test run always starts at the
-start node.
+the start node to the selected node. A compiled run always starts at the start
+node.
+
+## Build pipeline
+
+`NovelBuildCompiler` reparses the project language and validates the concrete
+runtime graph and scripts. It copies catalog and direct-path assets into an
+atomic build directory, rewrites runtime paths, removes source code from release
+builds, and emits `game.novel.json` plus `manifest.json`.
+
+Run and debug commands launch the editor executable in a separate
+`--play-build` process. This process only loads the compiled package and can be
+stopped without closing the editor. Debug builds retain source and show the
+current node, inherited media state, characters, and script variables.
 
 ## C++ runtime
 

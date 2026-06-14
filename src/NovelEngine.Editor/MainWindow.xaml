@@ -9,7 +9,12 @@
         MinHeight="700"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
-        <Menu DockPanel.Dock="Top" Background="#111822" Foreground="{StaticResource TextBrush}">
+        <Grid DockPanel.Dock="Top" Background="#111822">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+        <Menu Grid.Column="0" Background="#111822" Foreground="{StaticResource TextBrush}">
             <MenuItem Header="Файл">
                 <MenuItem Header="Новый" InputGestureText="Ctrl+N" Click="NewProject_Click" />
                 <MenuItem Header="Открыть..." InputGestureText="Ctrl+O" Click="OpenProject_Click" />
@@ -28,13 +33,47 @@
             <MenuItem Header="Проект">
                 <MenuItem Header="Проверить" Click="ValidateProject_Click" />
                 <Separator />
-                <MenuItem Header="Тестовый запуск" InputGestureText="F5" Click="RunProject_Click" />
+                <MenuItem Header="Собрать игру" InputGestureText="Ctrl+B" Click="BuildGame_Click" />
+                <MenuItem Header="Запустить игру" InputGestureText="F5" Click="RunProject_Click" />
+                <MenuItem Header="Запустить отладку" InputGestureText="F6" Click="DebugGame_Click" />
+                <MenuItem Header="Остановить игру" InputGestureText="Shift+F5" Click="StopGame_Click" />
                 <MenuItem Header="Предпросмотр выбранной ноды" InputGestureText="Ctrl+F5" Click="PreviewNode_Click" />
                 <Separator />
                 <MenuItem Header="Центрировать граф" InputGestureText="Home" Click="CenterGraph_Click" />
                 <MenuItem Header="Менеджер файлов" Click="OpenAssetManager_Click" />
             </MenuItem>
         </Menu>
+            <Border Grid.Column="1"
+                    Padding="8,5,8,3"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1,0,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BuildGameButton"
+                            Content="Собрать"
+                            ToolTip="Компилировать игру (Ctrl+B)"
+                            Padding="11,5"
+                            Click="BuildGame_Click" />
+                    <Button x:Name="RunGameButton"
+                            Content="Запустить"
+                            ToolTip="Собрать и запустить игру (F5)"
+                            Background="#305B55"
+                            Padding="11,5"
+                            Click="RunProject_Click" />
+                    <Button x:Name="DebugGameButton"
+                            Content="Отладка"
+                            ToolTip="Собрать и запустить с runtime-диагностикой (F6)"
+                            Padding="11,5"
+                            Click="DebugGame_Click" />
+                    <Button x:Name="StopGameButton"
+                            Content="Остановить"
+                            ToolTip="Остановить запущенную игру (Shift+F5)"
+                            Background="#4A2932"
+                            Padding="11,5"
+                            IsEnabled="False"
+                            Click="StopGame_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <Border DockPanel.Dock="Bottom" Height="26" Background="#0A0F16">
             <TextBlock x:Name="StatusText" Margin="10,4" Foreground="{StaticResource MutedBrush}" Text="Готово" />

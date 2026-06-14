@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 
 namespace NovelEngine.Editor;
@@ -8,6 +9,23 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Length is 3 or 4
+            && e.Args[0] == "--compile-project")
+        {
+            CompileProject(
+                e.Args[1],
+                e.Args[2],
+                e.Args.Length == 4 && e.Args[3] == "--debug");
+            return;
+        }
+        if (e.Args.Length is 2 or 3
+            && e.Args[0] == "--play-build")
+        {
+            RunBuild(
+                e.Args[1],
+                e.Args.Length == 3 && e.Args[2] == "--debug");
+            return;
+        }
         if (e.Args.Length == 2 && e.Args[0] == "--screenshot")
         {
             ScreenshotRenderer.RenderEditor(e.Args[1]);
@@ -32,7 +50,73 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        if (e.Args.Length == 2 && e.Args[0] == "--debug-build-screenshot")
+        {
+            ScreenshotRenderer.RenderCompiledPreview(e.Args[1]);
+            Shutdown();
+            return;
+        }
 
         new MainWindow().Show();
+    }
+
+    private void CompileProject(
+        string projectPath,
+        string outputDirectory,
+        bool debugSymbols)
+    {
+        try
+        {
+            var project = NovelEngine.Core.ProjectSerializer.Load(projectPath);
+            NovelEngine.Core.NovelBuildCompiler.Compile(
+                project,
+                projectPath,
+                outputDirectory,
+                debugSymbols);
+            Shutdown(0);
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException
+            or System.Text.Json.JsonException)
+        {
+            MessageBox.Show(
+                error.Message,
+                "Компиляция игры",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(2);
+        }
+    }
+
+    private void RunBuild(string manifestPath, bool debugMode)
+    {
+        try
+        {
+            var build = NovelEngine.Core.NovelBuildCompiler.LoadBuild(manifestPath);
+            var directory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
+            var window = new PreviewWindow(
+                build.Project,
+                null,
+                directory,
+                debugMode,
+                build.Manifest);
+            MainWindow = window;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            window.Show();
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or System.Text.Json.JsonException)
+        {
+            MessageBox.Show(
+                error.Message,
+                "Не удалось запустить build",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(2);
+        }
     }
 }

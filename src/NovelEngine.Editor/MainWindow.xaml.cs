@@ -22,7 +22,9 @@ public partial class MainWindow : Window
     private bool _syncingCode;
     private bool _codeHasPendingChanges;
     private bool _refreshingAssetFolders;
+    private bool _buildInProgress;
     private string? _selectedAssetFolder;
+    private Process? _gameProcess;
     private readonly DispatcherTimer _codeAnalysisTimer;
 
     public MainWindow()
@@ -69,7 +71,18 @@ public partial class MainWindow : Window
         base.OnPreviewKeyDown(e);
         if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None)
         {
-            RunProject();
+            _ = RunCompiledGameAsync(debugMode: false);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F6 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            _ = RunCompiledGameAsync(debugMode: true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F5
+            && Keyboard.Modifiers == ModifierKeys.Shift)
+        {
+            StopGameProcess();
             e.Handled = true;
         }
         else if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.Control)
@@ -90,6 +103,11 @@ public partial class MainWindow : Window
         else if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
         {
             SaveProject();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.B && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            _ = CompileGameAsync(debugSymbols: false, reportSuccess: true);
             e.Handled = true;
         }
     }
@@ -1315,7 +1333,9 @@ public partial class MainWindow : Window
         if (!ConfirmDiscardChanges())
         {
             e.Cancel = true;
+            return;
         }
+        StopGameProcess(silent: true);
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
@@ -1647,22 +1667,239 @@ public partial class MainWindow : Window
 
     private void ApplyProperties_Click(object sender, RoutedEventArgs e) => ApplyProperties();
 
-    private void RunProject_Click(object sender, RoutedEventArgs e) => RunProject();
+    private async void BuildGame_Click(object sender, RoutedEventArgs e) =>
+        await CompileGameAsync(debugSymbols: false, reportSuccess: true);
+
+    private async void RunProject_Click(object sender, RoutedEventArgs e) =>
+        await RunCompiledGameAsync(debugMode: false);
+
+    private async void DebugGame_Click(object sender, RoutedEventArgs e) =>
+        await RunCompiledGameAsync(debugMode: true);
+
+    private void StopGame_Click(object sender, RoutedEventArgs e) =>
+        StopGameProcess();
 
     private void PreviewNode_Click(object sender, RoutedEventArgs e) =>
         PreviewNode(Graph.SelectedNodeId);
 
-    private void RunProject()
+    private async Task RunCompiledGameAsync(bool debugMode)
     {
-        if (!EnsureCodeApplied())
+        if (IsGameRunning())
+        {
+            StatusText.Text = "Игра уже запущена";
+            return;
+        }
+        var build = await CompileGameAsync(
+            debugSymbols: debugMode,
+            reportSuccess: false);
+        if (build is null)
         {
             return;
         }
-        if (!ApplyProperties())
+        try
         {
+            StartGameProcess(build, debugMode);
+        }
+        catch (Exception error) when (
+            error is InvalidOperationException
+            or IOException
+            or System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = "Не удалось запустить игру";
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Запуск игры",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task<NovelBuildResult?> CompileGameAsync(
+        bool debugSymbols,
+        bool reportSuccess)
+    {
+        if (_buildInProgress || IsGameRunning())
+        {
+            StatusText.Text = _buildInProgress
+                ? "Компиляция уже выполняется"
+                : "Остановите игру перед новой компиляцией";
+            return null;
+        }
+        if (!EnsureCodeApplied() || !ApplyProperties() || !SaveProject())
+        {
+            return null;
+        }
+
+        _buildInProgress = true;
+        UpdateGameControls();
+        StatusText.Text = debugSymbols
+            ? "Компиляция debug build..."
+            : "Компиляция игры...";
+        try
+        {
+            var projectPath = _projectPath!;
+            var projectSnapshot = ProjectSerializer.FromJson(
+                ProjectSerializer.ToJson(_project));
+            var outputDirectory = GetBuildDirectory(projectPath);
+            var result = await Task.Run(
+                () => NovelBuildCompiler.Compile(
+                    projectSnapshot,
+                    projectPath,
+                    outputDirectory,
+                    debugSymbols));
+            StatusText.Text =
+                $"Build {result.Manifest.BuildId}: "
+                + $"{result.Manifest.NodeCount} нод, "
+                + $"{result.Manifest.AssetCount} ассетов";
+            if (reportSuccess)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Игра скомпилирована.\n\n{result.OutputDirectory}",
+                    "Сборка завершена",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            return result;
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            StatusText.Text = "Ошибка компиляции";
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Компиляция игры",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return null;
+        }
+        finally
+        {
+            _buildInProgress = false;
+            UpdateGameControls();
+        }
+    }
+
+    private void StartGameProcess(NovelBuildResult build, bool debugMode)
+    {
+        var executable = Environment.ProcessPath
+            ?? throw new InvalidOperationException(
+                "Не удалось определить исполняемый файл Novel Engine.");
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            WorkingDirectory = build.OutputDirectory,
+            UseShellExecute = false,
+        };
+        if (Path.GetFileNameWithoutExtension(executable).Equals(
+            "dotnet",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            var entryAssembly = System.Reflection.Assembly
+                .GetEntryAssembly()?.Location
+                ?? throw new InvalidOperationException(
+                    "Не удалось определить сборку player.");
+            startInfo.ArgumentList.Add(entryAssembly);
+        }
+        startInfo.ArgumentList.Add("--play-build");
+        startInfo.ArgumentList.Add(build.ManifestPath);
+        if (debugMode)
+        {
+            startInfo.ArgumentList.Add("--debug");
+        }
+
+        var process = new Process
+        {
+            StartInfo = startInfo,
+            EnableRaisingEvents = true,
+        };
+        process.Exited += GameProcess_Exited;
+        if (!process.Start())
+        {
+            process.Dispose();
+            throw new InvalidOperationException("Не удалось запустить процесс игры.");
+        }
+        _gameProcess = process;
+        UpdateGameControls();
+        StatusText.Text = debugMode
+            ? $"Debug запущен · PID {process.Id}"
+            : $"Игра запущена · PID {process.Id}";
+    }
+
+    private void GameProcess_Exited(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (sender is not Process process
+                    || !ReferenceEquals(process, _gameProcess))
+                {
+                    return;
+                }
+                var exitCode = process.ExitCode;
+                process.Dispose();
+                _gameProcess = null;
+                UpdateGameControls();
+                StatusText.Text = exitCode == 0
+                    ? "Игра остановлена"
+                    : $"Процесс игры завершился с кодом {exitCode}";
+            });
+    }
+
+    private void StopGameProcess(bool silent = false)
+    {
+        if (!IsGameRunning())
+        {
+            if (!silent)
+            {
+                StatusText.Text = "Игра не запущена";
+            }
             return;
         }
-        new PreviewWindow(_project, null, GetAssetDirectory()) { Owner = this }.ShowDialog();
+        try
+        {
+            _gameProcess!.Kill(entireProcessTree: true);
+            if (!silent)
+            {
+                StatusText.Text = "Остановка игры...";
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            _gameProcess?.Dispose();
+            _gameProcess = null;
+            UpdateGameControls();
+        }
+    }
+
+    private bool IsGameRunning() =>
+        _gameProcess is { HasExited: false };
+
+    private void UpdateGameControls()
+    {
+        var running = IsGameRunning();
+        BuildGameButton.IsEnabled = !_buildInProgress && !running;
+        RunGameButton.IsEnabled = !_buildInProgress && !running;
+        DebugGameButton.IsEnabled = !_buildInProgress && !running;
+        StopGameButton.IsEnabled = running;
+    }
+
+    private static string GetBuildDirectory(string projectPath)
+    {
+        var fileName = Path.GetFileName(projectPath);
+        var buildName = fileName.EndsWith(
+            ".novel.json",
+            StringComparison.OrdinalIgnoreCase)
+                ? fileName[..^".novel.json".Length]
+                : Path.GetFileNameWithoutExtension(fileName);
+        return Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(projectPath))!,
+            "build",
+            buildName);
     }
 
     private void PreviewNode(string? nodeId)

@@ -40,7 +40,8 @@ currently installed on this workstation.
 - A node may inherit or replace the current background and character set.
 - A node may inherit music without restarting playback.
 - Right-click a connection to configure its transition sound and fade duration.
-- Press `F5` for a full test run or `Ctrl+F5` to preview the selected node.
+- Press `F5` to compile and launch the game, `F6` for a debug build,
+  `Shift+F5` to stop it, or `Ctrl+F5` to preview the selected node.
 - Right-click any node to start its preview.
 - Open the `Код` tab to author node types, nodes, connections, inheritance,
   assets, and transitions as source code. Press `Ctrl+Enter` to compile it.
@@ -56,5 +57,9 @@ currently installed on this workstation.
   and assets. Use `Ctrl+Space` to open it explicitly, then `Tab` or `Enter`.
 - Scope guides connect matching braces and show the exact extent of nested code
   blocks while scrolling.
+- The top-right IDE controls compile the current project, launch the compiled
+  game, launch it with runtime diagnostics, or stop the separate player process.
+- Compiled packages are written to `build/<project-name>` beside the project.
+  They contain a validated runtime project, manifest, and copied assets.
 - The file manager supports nested project folders; assets can be created,
   renamed, moved, and referenced without depending on their physical path.

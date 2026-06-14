@@ -26,6 +26,37 @@
                 Opacity="0"
                 IsHitTestVisible="False" />
 
+        <Border x:Name="DebugPanel"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Width="340"
+                Margin="18"
+                Padding="14"
+                CornerRadius="10"
+                Background="#E8111823"
+                BorderBrush="#5C7CA5"
+                BorderThickness="1"
+                Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock Text="NOVEL ENGINE DEBUG"
+                           Foreground="#64DAB7"
+                           FontWeight="Bold"
+                           FontSize="12"
+                           Margin="0,0,0,9" />
+                <TextBlock x:Name="DebugBuildText"
+                           Foreground="#8292A8"
+                           FontFamily="Consolas"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,7" />
+                <TextBlock x:Name="DebugStateText"
+                           Foreground="#E8EEF6"
+                           FontFamily="Consolas"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
         <Border VerticalAlignment="Bottom"
                 Margin="42,0,42,34"
                 Padding="26,22"

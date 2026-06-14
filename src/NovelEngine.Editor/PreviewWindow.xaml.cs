@@ -14,6 +14,8 @@ public partial class PreviewWindow : Window
     private readonly NovelProject _project;
     private readonly NovelPlayer _player;
     private readonly string _assetDirectory;
+    private readonly bool _debugMode;
+    private readonly NovelBuildManifest? _buildManifest;
     private readonly MediaPlayer _musicPlayer = new();
     private readonly MediaPlayer _transitionPlayer = new();
     private string _currentMusicPath = string.Empty;
@@ -22,13 +24,24 @@ public partial class PreviewWindow : Window
     public PreviewWindow(
         NovelProject project,
         string? startNodeId,
-        string assetDirectory)
+        string assetDirectory,
+        bool debugMode = false,
+        NovelBuildManifest? buildManifest = null)
     {
         InitializeComponent();
         _project = project;
         _player = new NovelPlayer(project);
         _assetDirectory = assetDirectory;
-        Title = startNodeId is null ? "Тестовый запуск" : "Предпросмотр ноды";
+        _debugMode = debugMode;
+        _buildManifest = buildManifest;
+        DebugPanel.Visibility = debugMode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        Title = debugMode
+            ? $"{project.Title} — Debug"
+            : startNodeId is null
+                ? project.Title
+                : "Предпросмотр ноды";
 
         _musicPlayer.Volume = 0.55;
         _musicPlayer.MediaEnded += (_, _) =>
@@ -65,6 +78,7 @@ public partial class PreviewWindow : Window
         SetBackground(_player.State.CurrentBackground);
         SetCharacters(_player.State.CurrentCharacters);
         SyncMusic(_player.State.CurrentMusic);
+        RefreshDebugState(node);
 
         NodeTitleText.Text = node.Title;
         SpeakerText.Text = node.Kind == NodeKind.Dialogue ? node.Speaker : string.Empty;
@@ -94,6 +108,38 @@ public partial class PreviewWindow : Window
             ChoicesPanel.Children.Add(end);
         }
     }
+
+    private void RefreshDebugState(NovelNode node)
+    {
+        if (!_debugMode)
+        {
+            return;
+        }
+        DebugBuildText.Text = _buildManifest is null
+            ? "preview runtime"
+            : $"build {_buildManifest.BuildId} · {_buildManifest.CompiledAtUtc:O}";
+        var variables = _player.State.Variables.Count == 0
+            ? "(нет)"
+            : string.Join(
+                "\n",
+                _player.State.Variables
+                    .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(pair => $"{pair.Key} = {pair.Value ?? "null"}"));
+        var characters = _player.State.CurrentCharacters.Count == 0
+            ? "(нет)"
+            : string.Join(
+                ", ",
+                _player.State.CurrentCharacters.Select(character => character.Id));
+        DebugStateText.Text =
+            $"node: {node.Id} ({node.Kind})\n"
+            + $"background: {DisplayStateValue(_player.State.CurrentBackground)}\n"
+            + $"music: {DisplayStateValue(_player.State.CurrentMusic)}\n"
+            + $"characters: {characters}\n"
+            + $"variables:\n{variables}";
+    }
+
+    private static string DisplayStateValue(string value) =>
+        value.Length == 0 ? "(нет)" : value;
 
     private async Task ChooseAsync(string outputId)
     {

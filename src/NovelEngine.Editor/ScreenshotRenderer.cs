@@ -92,6 +92,75 @@ internal static class ScreenshotRenderer
         window.Close();
     }
 
+    public static void RenderCompiledPreview(string path)
+    {
+        var rootDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "novel-engine-compiled-preview");
+        if (Directory.Exists(rootDirectory))
+        {
+            Directory.Delete(rootDirectory, recursive: true);
+        }
+        Directory.CreateDirectory(rootDirectory);
+        var background = Path.Combine(rootDirectory, "background.png");
+        var character = Path.Combine(rootDirectory, "character.png");
+        CreateImage(background, 1280, 720, backgroundImage: true);
+        CreateImage(character, 360, 640, backgroundImage: false);
+
+        var project = NovelProject.CreateDefault();
+        var backgroundAsset = ProjectAssets.Import(
+            project,
+            Path.Combine(rootDirectory, "preview.novel.json"),
+            background,
+            "backgrounds");
+        var characterAsset = ProjectAssets.Import(
+            project,
+            Path.Combine(rootDirectory, "preview.novel.json"),
+            character,
+            "characters");
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = AssetReference.Create(backgroundAsset.Id);
+        scene.InheritBackground = false;
+        scene.InheritCharacters = false;
+        scene.Characters.Add(
+            new CharacterPlacement
+            {
+                Id = "debug-character",
+                Name = "Debug Hero",
+                Sprite = AssetReference.Create(characterAsset.Id),
+                Position = CharacterPosition.Left,
+            });
+        scene.Script = "set debug_score = 7";
+        project.SourceCode = ProjectLanguage.Format(project);
+        var projectPath = Path.Combine(rootDirectory, "preview.novel.json");
+        ProjectSerializer.Save(project, projectPath);
+        var build = NovelBuildCompiler.Compile(
+            project,
+            projectPath,
+            Path.Combine(rootDirectory, "build"),
+            debugSymbols: true);
+        var loaded = NovelBuildCompiler.LoadBuild(build.ManifestPath);
+        var dialogue = loaded.Project.Nodes.Single(
+            node => node.Kind == NodeKind.Dialogue);
+        var window = new PreviewWindow(
+            loaded.Project,
+            dialogue.Id,
+            build.OutputDirectory,
+            debugMode: true,
+            loaded.Manifest)
+        {
+            Width = 1160,
+            Height = 780,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        RenderWindow(window, path);
+        window.Close();
+    }
+
     private static void RenderWindow(Window window, string path)
     {
         window.Dispatcher.Invoke(

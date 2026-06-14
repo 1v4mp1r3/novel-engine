@@ -22,6 +22,7 @@ var tests = new (string Name, Action Run)[]
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
     ("project language suggests context completions", ProjectLanguageSuggestsCompletions),
     ("project language finds nested code scopes", ProjectLanguageFindsScopes),
+    ("build compiler emits runnable package", BuildCompilerEmitsPackage),
 };
 
 var failures = 0;
@@ -572,6 +573,84 @@ static void ProjectLanguageFindsScopes()
         scopes.Any(scope => scope.Depth == 0)
             && scopes.Any(scope => scope.Depth == 1),
         "Nested scope depths were not detected.");
+}
+
+static void BuildCompilerEmitsPackage()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-build-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var sourceAsset = Path.Combine(directory, "city.png");
+        File.WriteAllBytes(sourceAsset, [137, 80, 78, 71]);
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+        var asset = ProjectAssets.Import(
+            project,
+            projectPath,
+            sourceAsset,
+            "backgrounds");
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = AssetReference.Create(asset.Id);
+        scene.InheritBackground = false;
+        project.SourceCode = ProjectLanguage.Format(project);
+        ProjectSerializer.Save(project, projectPath);
+
+        var result = NovelBuildCompiler.Compile(
+            project,
+            projectPath,
+            Path.Combine(directory, "build", "story"),
+            debugSymbols: true);
+        var loaded = NovelBuildCompiler.LoadBuild(result.ManifestPath);
+        var builtAsset = loaded.Project.FindAsset(asset.Id)
+            ?? throw new InvalidOperationException("Built asset is missing.");
+
+        Assert(File.Exists(result.ManifestPath), "Build manifest was not emitted.");
+        Assert(
+            File.Exists(result.RuntimeProjectPath),
+            "Runtime project was not emitted.");
+        Assert(
+            File.Exists(
+                Path.Combine(
+                    result.OutputDirectory,
+                    builtAsset.Path.Replace(
+                        '/',
+                        Path.DirectorySeparatorChar))),
+            "Compiled asset was not copied.");
+        Assert(
+            loaded.Manifest.DebugSymbols,
+            "Debug build did not retain debug symbols.");
+        Assert(
+            loaded.Project.Nodes.Count == project.Nodes.Count,
+            "Runtime project changed node count.");
+
+        var foreignDirectory = Path.Combine(directory, "foreign-output");
+        Directory.CreateDirectory(foreignDirectory);
+        var foreignFile = Path.Combine(foreignDirectory, "keep.txt");
+        File.WriteAllText(foreignFile, "do not delete");
+        try
+        {
+            _ = NovelBuildCompiler.Compile(
+                project,
+                projectPath,
+                foreignDirectory,
+                debugSymbols: false);
+            throw new InvalidOperationException(
+                "Compiler overwrote a non-build directory.");
+        }
+        catch (InvalidDataException)
+        {
+            Assert(
+                File.Exists(foreignFile),
+                "Compiler deleted files from a non-build directory.");
+        }
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
 }
 
 static int CountOccurrences(string source, string value)
