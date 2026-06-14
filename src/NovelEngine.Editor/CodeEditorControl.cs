@@ -43,6 +43,7 @@ public sealed class CodeEditorControl : RichTextBox
     private ProjectLanguageCompletionContext? _completionContext;
     private IReadOnlyList<ProjectLanguageScopeSpan> _scopeSpans = [];
     private ScopeGuideAdorner? _scopeAdorner;
+    private bool _scopeGuideInvalidateQueued;
     private readonly List<EditorSnapshot> _undoHistory = [];
     private readonly List<EditorSnapshot> _redoHistory = [];
     private EditorSnapshot _currentSnapshot = new(string.Empty, 0);
@@ -193,13 +194,9 @@ public sealed class CodeEditorControl : RichTextBox
         {
             return;
         }
-        var source = SourceText;
-        if (source == _currentSnapshot.Source)
-        {
-            _currentSnapshot = new EditorSnapshot(
-                source,
-                Math.Clamp(SourceCaretOffset, 0, source.Length));
-        }
+        _currentSnapshot = new EditorSnapshot(
+            _currentSnapshot.Source,
+            Math.Clamp(SourceCaretOffset, 0, _currentSnapshot.Source.Length));
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -275,8 +272,20 @@ public sealed class CodeEditorControl : RichTextBox
         drawingContext.PushClip(
             new RectangleGeometry(
                 new Rect(0, 0, ActualWidth, ActualHeight)));
+        var visibleRange = GetVisibleSourceRange();
+        var visibleStart = Math.Max(0, (visibleRange?.Start ?? 0) - 2_000);
+        var visibleEnd = visibleRange is null
+            ? int.MaxValue
+            : visibleRange.Value.End + 2_000;
+
         foreach (var scope in _scopeSpans)
         {
+            if (scope.CloseBraceOffset < visibleStart
+                || scope.OpenBraceOffset > visibleEnd)
+            {
+                continue;
+            }
+
             var open = GetPosition(scope.OpenBraceOffset);
             var close = GetPosition(scope.CloseBraceOffset);
             if (open is null || close is null)
@@ -325,6 +334,27 @@ public sealed class CodeEditorControl : RichTextBox
         }
         drawingContext.Pop();
     }
+
+    private (int Start, int End)? GetVisibleSourceRange()
+    {
+        var top = GetPositionFromPoint(new Point(0, 0), snapToText: true);
+        var bottom = GetPositionFromPoint(
+            new Point(
+                Math.Max(0, ActualWidth - 1),
+                Math.Max(0, ActualHeight - 1)),
+            snapToText: true);
+        if (top is null || bottom is null)
+        {
+            return null;
+        }
+
+        var start = GetSourceOffset(top);
+        var end = GetSourceOffset(bottom);
+        return start <= end ? (start, end) : (end, start);
+    }
+
+    private int GetSourceOffset(TextPointer position) =>
+        NormalizeText(new TextRange(Document.ContentStart, position).Text).Length;
 
     private void ShowCompletions(bool force)
     {
@@ -677,7 +707,19 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void InvalidateScopeGuides()
     {
-        _scopeAdorner?.InvalidateVisual();
+        if (_scopeAdorner is null || _scopeGuideInvalidateQueued)
+        {
+            return;
+        }
+
+        _scopeGuideInvalidateQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _scopeGuideInvalidateQueued = false;
+                _scopeAdorner?.InvalidateVisual();
+            },
+            DispatcherPriority.Render);
     }
 
     private sealed class ScopeGuideAdorner : Adorner

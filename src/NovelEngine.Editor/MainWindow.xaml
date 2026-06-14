@@ -356,6 +356,8 @@
                                       Grid.Column="2"
                                       AutoGenerateColumns="False"
                                       SelectionChanged="AssetsGrid_SelectionChanged"
+                                      PreviewMouseRightButtonDown="AssetsGrid_PreviewMouseRightButtonDown"
+                                      ContextMenuOpening="AssetsGrid_ContextMenuOpening"
                                       MouseDoubleClick="CopyAssetReference_Click">
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Header="Имя"

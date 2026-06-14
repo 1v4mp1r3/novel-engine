@@ -32,6 +32,10 @@ public partial class MainWindow : Window
     private FileSystemWatcher? _filesWatcher;
     private readonly DispatcherTimer _codeAnalysisTimer;
     private readonly DispatcherTimer _autoSaveTimer;
+    private string _codeCursorSource = string.Empty;
+    private int[] _codeLineStarts = [0];
+    private int _lastCodeCursorOffset = -1;
+    private bool _codeCursorCacheDirty = true;
 
     public MainWindow()
         : this(null)
@@ -42,6 +46,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         CodeEditor.CompletionProvider = ProjectLanguage.GetCompletions;
+        AssetsGrid.ContextMenu = new ContextMenu();
 
         Graph.SelectionChanged += (_, _) => HandleGraphSelection();
         Graph.ProjectChanged += (_, _) => MarkDirty();
@@ -435,6 +440,7 @@ public partial class MainWindow : Window
         try
         {
             CodeEditor.SourceText = code;
+            SetCodeCursorCache(code);
             _codeHasPendingChanges = false;
             CodeStatusText.Foreground = (Brush)FindResource("MutedBrush");
             CodeStatusText.Text = "Код синхронизирован с графом";
@@ -459,6 +465,7 @@ public partial class MainWindow : Window
 
             _project = compiled;
             _project.SourceCode = source;
+            SetCodeCursorCache(source);
             _codeHasPendingChanges = false;
             Graph.SetProject(_project);
             if (_project.FindNode(selectedNodeId) is not null)
@@ -539,6 +546,7 @@ public partial class MainWindow : Window
         }
 
         _codeHasPendingChanges = true;
+        _codeCursorCacheDirty = true;
         _dirty = true;
         RefreshWindowTitle();
         CodeStatusText.Foreground = Brushes.Goldenrod;
@@ -550,25 +558,60 @@ public partial class MainWindow : Window
 
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
     {
-        var source = CodeEditor.SourceText;
+        var source = EnsureCodeCursorCache();
         var offset = Math.Clamp(CodeEditor.SourceCaretOffset, 0, source.Length);
-        var line = 1;
-        var lineStart = 0;
-        for (var index = 0; index < offset; index++)
+        if (offset == _lastCodeCursorOffset)
         {
-            if (source[index] == '\n')
+            return;
+        }
+        _lastCodeCursorOffset = offset;
+
+        var lineIndex = Array.BinarySearch(_codeLineStarts, offset);
+        if (lineIndex < 0)
+        {
+            lineIndex = Math.Max(0, ~lineIndex - 1);
+        }
+        var lineStart = _codeLineStarts[Math.Min(lineIndex, _codeLineStarts.Length - 1)];
+        CodeCursorText.Text =
+            $"Строка {lineIndex + 1}, столбец {offset - lineStart + 1}";
+    }
+
+    private string EnsureCodeCursorCache()
+    {
+        if (!_codeCursorCacheDirty)
+        {
+            return _codeCursorSource;
+        }
+
+        SetCodeCursorCache(CodeEditor.SourceText);
+        return _codeCursorSource;
+    }
+
+    private void SetCodeCursorCache(string source)
+    {
+        _codeCursorSource = source;
+        _codeLineStarts = BuildLineStarts(source);
+        _lastCodeCursorOffset = -1;
+        _codeCursorCacheDirty = false;
+    }
+
+    private static int[] BuildLineStarts(string source)
+    {
+        var starts = new List<int> { 0 };
+        for (var index = 0; index < source.Length; index++)
+        {
+            if (source[index] == '\n' && index + 1 < source.Length)
             {
-                line++;
-                lineStart = index + 1;
+                starts.Add(index + 1);
             }
         }
-        CodeCursorText.Text =
-            $"Строка {line}, столбец {offset - lineStart + 1}";
+        return starts.ToArray();
     }
 
     private void AnalyzeCode()
     {
         var source = CodeEditor.SourceText;
+        SetCodeCursorCache(source);
         try
         {
             _ = ProjectLanguage.Parse(source);
@@ -1109,6 +1152,239 @@ public partial class MainWindow : Window
     private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RefreshAssetPreview();
 
+    private void AssetsGrid_PreviewMouseRightButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            return;
+        }
+
+        row.IsSelected = true;
+        AssetsGrid.SelectedItem = row.Item;
+        row.Focus();
+    }
+
+    private void AssetsGrid_ContextMenuOpening(
+        object sender,
+        ContextMenuEventArgs e)
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        var menu = AssetsGrid.ContextMenu ?? new ContextMenu();
+        AssetsGrid.ContextMenu = menu;
+        menu.Items.Clear();
+        if (view is null)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        var selectedNode = _project.FindNode(Graph.SelectedNodeId);
+        menu.Items.Add(CreateAssetMenuItem(
+            "Скопировать ссылку",
+            () => CopyAssetReference(view)));
+
+        if (view.Asset.Kind == AssetKind.Image)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateAssetMenuItem(
+                "Привязать как фон выбранной ноды",
+                () => BindAssetAsNodeBackground(view.Asset),
+                selectedNode is not null));
+        }
+
+        if (view.Asset.Kind == AssetKind.Audio)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateAssetMenuItem(
+                "Привязать как музыку выбранной ноды",
+                () => BindAssetAsNodeMusic(view.Asset),
+                selectedNode is not null));
+            menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
+        }
+    }
+
+    private MenuItem CreateVoiceBindingMenu(NovelAsset asset, NovelNode? node)
+    {
+        var menu = new MenuItem { Header = "Привязать voice-блип к персонажу" };
+        if (node is null)
+        {
+            menu.IsEnabled = false;
+            menu.Items.Add(CreateDisabledAssetMenuItem("Сначала выберите ноду"));
+            return menu;
+        }
+
+        var characters = GetEffectiveCharacters(node).ToList();
+        if (characters.Count == 0)
+        {
+            menu.IsEnabled = false;
+            menu.Items.Add(CreateDisabledAssetMenuItem("В этой ноде нет персонажей"));
+            return menu;
+        }
+
+        foreach (var character in characters.OrderBy(
+            character => character.Name,
+            StringComparer.CurrentCultureIgnoreCase))
+        {
+            var label = string.IsNullOrWhiteSpace(character.Name)
+                ? character.Id
+                : character.Name;
+            menu.Items.Add(CreateAssetMenuItem(
+                $"Персонаж «{label}»",
+                () => BindVoiceAssetToCharacter(asset, character.Id)));
+        }
+
+        return menu;
+    }
+
+    private IReadOnlyList<CharacterPlacement> GetEffectiveCharacters(NovelNode node)
+    {
+        if (node.Kind == NodeKind.Start || !node.InheritCharacters)
+        {
+            return node.Characters;
+        }
+
+        try
+        {
+            var player = new NovelPlayer(_project);
+            _ = player.StartAt(node.Id);
+            return player.State.CurrentCharacters
+                .Select(character => character.Clone())
+                .ToList();
+        }
+        catch (Exception error) when (
+            error is InvalidDataException
+            or InvalidOperationException)
+        {
+            return node.Characters;
+        }
+    }
+
+    private void BindAssetAsNodeBackground(NovelAsset asset)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null || asset.Kind != AssetKind.Image)
+        {
+            return;
+        }
+
+        var reference = AssetReference.Create(asset.Id);
+        MarkOverrideIfChanged(node, "inheritBackground", node.InheritBackground, false);
+        MarkOverrideIfChanged(node, "background", node.Background, reference);
+        node.InheritBackground = false;
+        node.Background = reference;
+        MarkDirty();
+        StatusText.Text = $"Фон ноды «{node.Title}»: {reference}";
+    }
+
+    private void BindAssetAsNodeMusic(NovelAsset asset)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null || asset.Kind != AssetKind.Audio)
+        {
+            return;
+        }
+
+        var reference = AssetReference.Create(asset.Id);
+        MarkOverrideIfChanged(node, "inheritMusic", node.InheritMusic, false);
+        MarkOverrideIfChanged(node, "music", node.Music, reference);
+        node.InheritMusic = false;
+        node.Music = reference;
+        MarkDirty();
+        StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
+    }
+
+    private void BindVoiceAssetToCharacter(NovelAsset asset, string characterId)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null || asset.Kind != AssetKind.Audio)
+        {
+            return;
+        }
+
+        if (node.Kind != NodeKind.Start && node.InheritCharacters)
+        {
+            var effectiveCharacters = GetEffectiveCharacters(node)
+                .Select(character => character.Clone())
+                .ToList();
+            node.Characters.Clear();
+            node.Characters.AddRange(effectiveCharacters);
+            node.InheritCharacters = false;
+            if (node.UsesTypeDefaults)
+            {
+                node.PropertyOverrides.Add("inheritCharacters");
+            }
+        }
+
+        var character = node.Characters.FirstOrDefault(
+            candidate => candidate.Id == characterId);
+        if (character is null)
+        {
+            StatusText.Text = "Персонаж для привязки voice-блипа не найден";
+            return;
+        }
+
+        var reference = AssetReference.Create(asset.Id);
+        character.VoiceSound = reference;
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
+
+        MarkDirty();
+        StatusText.Text = $"Voice-блип персонажа «{character.Name}»: {reference}";
+    }
+
+    private void CopyAssetReference(AssetView view)
+    {
+        try
+        {
+            Clipboard.SetText(AssetReference.Create(view.Id));
+            StatusText.Text = $"Скопировано: @{view.Id}";
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            StatusText.Text = "Буфер обмена временно недоступен";
+        }
+    }
+
+    private static MenuItem CreateAssetMenuItem(
+        string header,
+        Action action,
+        bool isEnabled = true)
+    {
+        var item = new MenuItem
+        {
+            Header = header,
+            IsEnabled = isEnabled,
+        };
+        item.Click += (_, _) => action();
+        return item;
+    }
+
+    private static MenuItem CreateDisabledAssetMenuItem(string header) =>
+        new()
+        {
+            Header = header,
+            IsEnabled = false,
+        };
+
+    private static T? FindVisualParent<T>(DependencyObject? source)
+        where T : DependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T typed)
+            {
+                return typed;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return null;
+    }
+
     private void AssetFoldersTree_SelectedItemChanged(
         object sender,
         RoutedPropertyChangedEventArgs<object> e)
@@ -1393,15 +1669,7 @@ public partial class MainWindow : Window
         {
             return;
         }
-        try
-        {
-            Clipboard.SetText(AssetReference.Create(view.Id));
-            StatusText.Text = $"Скопировано: @{view.Id}";
-        }
-        catch (System.Runtime.InteropServices.ExternalException)
-        {
-            StatusText.Text = "Буфер обмена временно недоступен";
-        }
+        CopyAssetReference(view);
     }
 
     private void DeleteAsset_Click(object sender, RoutedEventArgs e)

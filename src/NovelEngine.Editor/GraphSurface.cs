@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
@@ -27,6 +28,7 @@ public sealed class GraphSurface : FrameworkElement
     private ConnectionDrag? _connectionDrag;
     private Point _contextWorldPosition;
     private bool _needsInitialCenter = true;
+    private bool _renderQueued;
 
     public GraphSurface()
     {
@@ -52,7 +54,7 @@ public sealed class GraphSurface : FrameworkElement
         Project = project;
         SelectedNodeId = null;
         _needsInitialCenter = true;
-        InvalidateVisual();
+        RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -68,7 +70,7 @@ public sealed class GraphSurface : FrameworkElement
         }
 
         SelectedNodeId = nodeId;
-        InvalidateVisual();
+        RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -87,12 +89,12 @@ public sealed class GraphSurface : FrameworkElement
         }
 
         SelectedNodeId = null;
-        InvalidateVisual();
+        RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public void RefreshGraph() => InvalidateVisual();
+    public void RefreshGraph() => RequestRender();
 
     public void CenterGraph()
     {
@@ -109,7 +111,7 @@ public sealed class GraphSurface : FrameworkElement
             ActualWidth / 2 - (left + right) / 2,
             ActualHeight / 2 - (top + bottom) / 2);
         _needsInitialCenter = false;
-        InvalidateVisual();
+        RequestRender();
     }
 
     protected override void OnRender(DrawingContext drawingContext)
@@ -184,7 +186,7 @@ public sealed class GraphSurface : FrameworkElement
                 outputPort.Value.OutputId,
                 position);
             CaptureMouse();
-            InvalidateVisual();
+            RequestRender();
             return;
         }
 
@@ -223,14 +225,14 @@ public sealed class GraphSurface : FrameworkElement
         if (_panning)
         {
             _viewOffset = _panOffsetStart + (position - _panStart);
-            InvalidateVisual();
+            RequestRender();
             return;
         }
 
         if (_connectionDrag is not null)
         {
             _connectionDrag = _connectionDrag with { Cursor = position };
-            InvalidateVisual();
+            RequestRender();
             return;
         }
 
@@ -253,7 +255,7 @@ public sealed class GraphSurface : FrameworkElement
         node.X = (float)(_dragNodeStart.X + position.X - _dragStart.X);
         node.Y = (float)(_dragNodeStart.Y + position.Y - _dragStart.Y);
         _dragMoved = node.X != _dragNodeStart.X || node.Y != _dragNodeStart.Y;
-        InvalidateVisual();
+        RequestRender();
     }
 
     protected override void OnMouseUp(MouseButtonEventArgs e)
@@ -290,7 +292,7 @@ public sealed class GraphSurface : FrameworkElement
                 System.Media.SystemSounds.Beep.Play();
             }
 
-            InvalidateVisual();
+            RequestRender();
             return;
         }
 
@@ -325,7 +327,7 @@ public sealed class GraphSurface : FrameworkElement
             (float)(worldPosition.X - NodeWidth / 2),
             (float)(worldPosition.Y - 80));
         SelectedNodeId = node.Id;
-        InvalidateVisual();
+        RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
         return node;
@@ -353,7 +355,7 @@ public sealed class GraphSurface : FrameworkElement
                     {
                         output.TargetNodeId = null;
                         ProjectChanged?.Invoke(this, EventArgs.Empty);
-                        InvalidateVisual();
+                        RequestRender();
                     }
                 }));
             OpenContextMenu(menu);
@@ -530,7 +532,24 @@ public sealed class GraphSurface : FrameworkElement
         SelectedNodeId = node.Id;
         ProjectChanged?.Invoke(this, EventArgs.Empty);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
-        InvalidateVisual();
+        RequestRender();
+    }
+
+    private void RequestRender()
+    {
+        if (_renderQueued)
+        {
+            return;
+        }
+
+        _renderQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _renderQueued = false;
+                InvalidateVisual();
+            },
+            DispatcherPriority.Render);
     }
 
     private void DrawGrid(DrawingContext drawingContext)
