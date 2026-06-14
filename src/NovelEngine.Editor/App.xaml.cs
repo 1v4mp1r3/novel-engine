@@ -63,7 +63,25 @@ public partial class App : Application
             return;
         }
 
-        new MainWindow().Show();
+        var startupProjectPath = GetStartupProjectPath(e.Args);
+        var window = new MainWindow(startupProjectPath);
+        MainWindow = window;
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        window.Show();
+    }
+
+    private static string? GetStartupProjectPath(string[] args)
+    {
+        if (args.Length == 1 && !args[0].StartsWith("--", StringComparison.Ordinal))
+        {
+            return args[0];
+        }
+        if (args.Length == 2
+            && args[0].Equals("--open-project", StringComparison.OrdinalIgnoreCase))
+        {
+            return args[1];
+        }
+        return null;
     }
 
     private void CompileProject(

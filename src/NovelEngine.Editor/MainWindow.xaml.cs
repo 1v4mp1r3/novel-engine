@@ -28,6 +28,11 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _codeAnalysisTimer;
 
     public MainWindow()
+        : this(null)
+    {
+    }
+
+    public MainWindow(string? startupProjectPath)
     {
         InitializeComponent();
         CodeEditor.CompletionProvider = ProjectLanguage.GetCompletions;
@@ -54,6 +59,10 @@ public partial class MainWindow : Window
         };
 
         SetProject(_project, null);
+        if (startupProjectPath is not null)
+        {
+            OpenStartupProject(startupProjectPath);
+        }
     }
 
     internal void SelectPreviewNode(NodeKind kind)
@@ -1237,11 +1246,12 @@ public partial class MainWindow : Window
 
         try
         {
-            SetProject(ProjectSerializer.Load(dialog.FileName), dialog.FileName);
+            OpenProject(dialog.FileName);
         }
         catch (Exception error) when (
             error is IOException
             or InvalidDataException
+            or UnauthorizedAccessException
             or System.Text.Json.JsonException)
         {
             MessageBox.Show(
@@ -1251,6 +1261,33 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private void OpenStartupProject(string inputPath)
+    {
+        try
+        {
+            OpenProject(inputPath);
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException
+            or System.Text.Json.JsonException)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось открыть проект:\n\n{error.Message}",
+                "Открытие проекта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void OpenProject(string inputPath)
+    {
+        var projectPath = ProjectOpenResolver.ResolveProjectPath(inputPath);
+        SetProject(ProjectSerializer.Load(projectPath), projectPath);
     }
 
     private void SaveProject_Click(object sender, RoutedEventArgs e) => SaveProject();
