@@ -35,6 +35,11 @@ public sealed class CharacterPlacement
     public string Name { get; set; } = string.Empty;
     public string Sprite { get; set; } = string.Empty;
     public CharacterPosition Position { get; set; } = CharacterPosition.Center;
+    public bool HasCustomTransform { get; set; }
+    public double X { get; set; } = CharacterLayout.StageWidth / 2;
+    public double Y { get; set; } = CharacterLayout.DefaultCenterY;
+    public double Scale { get; set; } = 1;
+    public double Rotation { get; set; }
 
     public CharacterPlacement Clone() =>
         new()
@@ -43,6 +48,28 @@ public sealed class CharacterPlacement
             Name = Name,
             Sprite = Sprite,
             Position = Position,
+            HasCustomTransform = HasCustomTransform,
+            X = X,
+            Y = Y,
+            Scale = Scale,
+            Rotation = Rotation,
+        };
+}
+
+public static class CharacterLayout
+{
+    public const double StageWidth = 1920;
+    public const double StageHeight = 1080;
+    public const double BaseWidth = 420;
+    public const double BaseHeight = 820;
+    public const double DefaultCenterY = 500;
+
+    public static double DefaultCenterX(CharacterPosition position) =>
+        position switch
+        {
+            CharacterPosition.Left => 360,
+            CharacterPosition.Right => 1560,
+            _ => StageWidth / 2,
         };
 }
 
@@ -374,6 +401,16 @@ public sealed class NovelProject
         foreach (var type in NodeTypes)
         {
             _ = ResolveTypeKind(type.Name);
+            var characterIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var character in type.Defaults.Characters)
+            {
+                if (!characterIds.Add(character.Id))
+                {
+                    throw new InvalidDataException(
+                        $"Повторяющийся id персонажа: {character.Id}");
+                }
+                ValidateCharacterTransform(character);
+            }
         }
 
         foreach (var node in Nodes)
@@ -416,6 +453,7 @@ public sealed class NovelProject
                     throw new InvalidDataException(
                         $"Повторяющийся id персонажа: {character.Id}");
                 }
+                ValidateCharacterTransform(character);
             }
         }
 
@@ -431,6 +469,23 @@ public sealed class NovelProject
         foreach (var value in EnumerateTypedAssetValues())
         {
             ValidateAssetReference(value.Value, value.ExpectedKind, value.Owner);
+        }
+    }
+
+    private static void ValidateCharacterTransform(CharacterPlacement character)
+    {
+        if (!double.IsFinite(character.X)
+            || !double.IsFinite(character.Y)
+            || !double.IsFinite(character.Scale)
+            || !double.IsFinite(character.Rotation))
+        {
+            throw new InvalidDataException(
+                $"У персонажа «{character.Name}» некорректная трансформация.");
+        }
+        if (character.Scale is < 0.05 or > 8)
+        {
+            throw new InvalidDataException(
+                $"Масштаб персонажа «{character.Name}» должен быть от 0.05 до 8.");
         }
     }
 

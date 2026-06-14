@@ -13,13 +13,12 @@
     <Grid x:Name="RootGrid">
         <Image x:Name="BackgroundImage" Stretch="UniformToFill" />
 
-        <Grid x:Name="CharacterLayer" Margin="30,30,30,0" VerticalAlignment="Stretch">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-        </Grid>
+        <Viewbox Stretch="UniformToFill" IsHitTestVisible="False">
+            <Canvas x:Name="CharacterLayer"
+                    Width="1920"
+                    Height="1080"
+                    Background="Transparent" />
+        </Viewbox>
 
         <Border x:Name="FadeOverlay"
                 Background="Black"

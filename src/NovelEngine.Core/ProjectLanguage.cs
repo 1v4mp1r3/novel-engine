@@ -95,6 +95,9 @@ public static class ProjectLanguage
             "name",
             "sprite",
             "position",
+            "placement",
+            "scale",
+            "rotation",
             "script",
             "next",
             "choice",
@@ -372,6 +375,10 @@ public static class ProjectLanguage
         else if (GetBraceDepth(source, replacementStart, spans) == 0)
         {
             candidates.AddRange(TopLevelCompletions);
+        }
+        else if (IsInsideCharacterScope(source, replacementStart))
+        {
+            candidates.AddRange(CharacterBodyCompletions);
         }
         else
         {
@@ -887,6 +894,21 @@ public static class ProjectLanguage
         builder.Append(indent)
             .Append("    position ")
             .AppendLine(character.Position.ToString().ToLowerInvariant());
+        if (character.HasCustomTransform)
+        {
+            builder.Append(indent)
+                .Append("    placement (")
+                .Append(character.X.ToString("0.###", CultureInfo.InvariantCulture))
+                .Append(", ")
+                .Append(character.Y.ToString("0.###", CultureInfo.InvariantCulture))
+                .AppendLine(")");
+            builder.Append(indent)
+                .Append("    scale ")
+                .AppendLine(character.Scale.ToString("0.###", CultureInfo.InvariantCulture));
+            builder.Append(indent)
+                .Append("    rotation ")
+                .AppendLine(character.Rotation.ToString("0.###", CultureInfo.InvariantCulture));
+        }
         builder.Append(indent).AppendLine("}");
     }
 
@@ -959,6 +981,30 @@ public static class ProjectLanguage
 
     private static bool IsSyntaxIdentifierPart(char value) =>
         value is '_' or '-' || char.IsLetterOrDigit(value);
+
+    private static bool IsInsideCharacterScope(string source, int caretOffset)
+    {
+        var scope = GetScopeSpans(source)
+            .Where(
+                candidate => candidate.OpenBraceOffset < caretOffset
+                    && candidate.CloseBraceOffset >= caretOffset)
+            .OrderByDescending(candidate => candidate.OpenBraceOffset)
+            .FirstOrDefault();
+        if (scope is null)
+        {
+            return false;
+        }
+
+        var lineStart = source.LastIndexOf(
+            '\n',
+            Math.Max(0, scope.OpenBraceOffset - 1));
+        lineStart = lineStart < 0 ? 0 : lineStart + 1;
+        var header = source[lineStart..scope.OpenBraceOffset];
+        return Regex.IsMatch(
+            header,
+            @"^[ \t]*character[ \t]+[\p{L}_][\p{L}\p{N}_-]*[ \t]*$",
+            RegexOptions.CultureInvariant);
+    }
 
     private static readonly IReadOnlyList<ProjectLanguageCompletion>
         TopLevelCompletions =
@@ -1050,6 +1096,42 @@ public static class ProjectLanguage
                 "Задать название ноды",
                 ProjectLanguageCompletionKind.Snippet,
                 7),
+        ];
+
+    private static readonly IReadOnlyList<ProjectLanguageCompletion>
+        CharacterBodyCompletions =
+        [
+            new(
+                "name",
+                "name \"\"",
+                "Задать имя персонажа",
+                ProjectLanguageCompletionKind.Snippet,
+                6),
+            new(
+                "placement",
+                "placement (960, 500)",
+                "Задать свободную позицию персонажа на сцене",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "position",
+                "position center",
+                "Задать базовую позицию персонажа",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "rotation",
+                "rotation 0",
+                "Задать поворот персонажа в градусах",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "scale",
+                "scale 1",
+                "Задать масштаб персонажа",
+                ProjectLanguageCompletionKind.Snippet),
+            new(
+                "sprite",
+                "sprite @",
+                "Задать спрайт персонажа",
+                ProjectLanguageCompletionKind.Snippet),
         ];
 
     private static void AddTypeCompletions(
@@ -1568,6 +1650,11 @@ public static class ProjectLanguage
             var name = id.Text;
             var sprite = string.Empty;
             var position = CharacterPosition.Center;
+            var hasCustomTransform = false;
+            var x = CharacterLayout.StageWidth / 2;
+            var y = CharacterLayout.DefaultCenterY;
+            var scale = 1d;
+            var rotation = 0d;
             while (!Match(TokenKind.RightBrace))
             {
                 var property = ExpectIdentifier("Ожидалось свойство персонажа.");
@@ -1593,6 +1680,25 @@ public static class ProjectLanguage
                             "Позиция должна быть left, center или right."),
                     };
                 }
+                else if (Keyword(property, "placement"))
+                {
+                    Expect(TokenKind.LeftParenthesis, "Ожидалась «(» после placement.");
+                    x = ExpectFloat("Ожидалась координата X.");
+                    Expect(TokenKind.Comma, "Ожидалась запятая между координатами.");
+                    y = ExpectFloat("Ожидалась координата Y.");
+                    Expect(TokenKind.RightParenthesis, "Ожидалась «)» после координат.");
+                    hasCustomTransform = true;
+                }
+                else if (Keyword(property, "scale"))
+                {
+                    scale = ExpectFloat("Ожидался масштаб персонажа.");
+                    hasCustomTransform = true;
+                }
+                else if (Keyword(property, "rotation"))
+                {
+                    rotation = ExpectFloat("Ожидался угол поворота персонажа.");
+                    hasCustomTransform = true;
+                }
                 else
                 {
                     throw Error(
@@ -1606,6 +1712,11 @@ public static class ProjectLanguage
                 Name = name,
                 Sprite = sprite,
                 Position = position,
+                HasCustomTransform = hasCustomTransform,
+                X = x,
+                Y = y,
+                Scale = scale,
+                Rotation = rotation,
             };
         }
 

@@ -57,8 +57,9 @@ A node with `inheritBackground: true` keeps the current background. A node with
 
 A node with `inheritCharacters: true` keeps all characters from the previous
 node. A node with `inheritCharacters: false` replaces them with its own
-`characters` list. Each character stores a name, sprite path, and left, center,
-or right screen position.
+`characters` list. Each character stores a name, sprite path, a left, center,
+or right preset, and an optional free transform with stage coordinates, scale,
+and rotation.
 
 A node with `inheritMusic: true` keeps the current audio player and playback
 position. A node with `inheritMusic: false` replaces or stops the track.

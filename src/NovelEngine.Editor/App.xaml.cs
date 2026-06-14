@@ -50,6 +50,12 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        if (e.Args.Length == 2 && e.Args[0] == "--scene-editor-screenshot")
+        {
+            ScreenshotRenderer.RenderSceneEditor(e.Args[1]);
+            Shutdown();
+            return;
+        }
         if (e.Args.Length == 2 && e.Args[0] == "--debug-build-screenshot")
         {
             ScreenshotRenderer.RenderCompiledPreview(e.Args[1]);

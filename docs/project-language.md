@@ -133,13 +133,20 @@ character alice {
     name "Alice"
     sprite "characters/alice.png"
     position left
+    placement (620, 500)
+    scale 1.15
+    rotation -4
 }
 
 script "set met_alice = true\nadd score 1"
 ```
 
-Character positions are `left`, `center`, and `right`. Strings use JSON escape
-rules. Triple-quoted strings are also accepted for multiline text:
+Character positions are `left`, `center`, and `right`. A character may also
+use a free transform: `placement (x, y)` stores its center on the 1920x1080
+stage, `scale` changes its size, and `rotation` uses degrees. These values are
+written automatically by the scene editor opened from a node's context menu.
+Strings use JSON escape rules. Triple-quoted strings are also accepted for
+multiline text:
 
 ```text
 text """First line

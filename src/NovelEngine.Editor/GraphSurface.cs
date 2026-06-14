@@ -42,6 +42,7 @@ public sealed class GraphSurface : FrameworkElement
     public event EventHandler? ProjectChanged;
     public event Action<string>? AddChoiceRequested;
     public event Action<string>? PreviewNodeRequested;
+    public event Action<string>? EditNodeSceneRequested;
     public event Action<string>? OpenNodeCodeRequested;
     public event Action<string, string>? TransitionSettingsRequested;
 
@@ -362,6 +363,9 @@ public sealed class GraphSurface : FrameworkElement
             menu.Items.Add(CreateMenuItem(
                 "Предпросмотр с этой ноды",
                 () => PreviewNodeRequested?.Invoke(node.Id)));
+            menu.Items.Add(CreateMenuItem(
+                "Редактировать сцену и персонажей",
+                () => EditNodeSceneRequested?.Invoke(node.Id)));
             if (node.Kind == NodeKind.Dialogue)
             {
                 menu.Items.Add(new Separator());

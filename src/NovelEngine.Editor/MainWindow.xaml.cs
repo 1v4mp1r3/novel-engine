@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         Graph.ProjectChanged += (_, _) => MarkDirty();
         Graph.AddChoiceRequested += nodeId => AddOutput(nodeId);
         Graph.PreviewNodeRequested += PreviewNode;
+        Graph.EditNodeSceneRequested += EditNodeScene;
         Graph.OpenNodeCodeRequested += NavigateToNodeCode;
         Graph.TransitionSettingsRequested += EditTransition;
         Closing += MainWindow_Closing;
@@ -1490,6 +1491,12 @@ public partial class MainWindow : Window
 
         character.Name = dialog.CharacterName;
         character.Sprite = NormalizeAssetPath(dialog.Sprite);
+        if (character.Position != dialog.Position)
+        {
+            character.HasCustomTransform = false;
+            character.Scale = 1;
+            character.Rotation = 0;
+        }
         character.Position = dialog.Position;
         var node = _project.FindNode(Graph.SelectedNodeId);
         if (node?.UsesTypeDefaults == true)
@@ -1923,6 +1930,40 @@ public partial class MainWindow : Window
             return;
         }
         new PreviewWindow(_project, nodeId, GetAssetDirectory()) { Owner = this }.ShowDialog();
+    }
+
+    private void EditNodeScene(string nodeId)
+    {
+        if (!EnsureCodeApplied() || !ApplyProperties())
+        {
+            return;
+        }
+        var node = _project.FindNode(nodeId);
+        if (node is null)
+        {
+            return;
+        }
+
+        var editor = new SceneEditorWindow(_project, node, GetAssetDirectory())
+        {
+            Owner = this,
+        };
+        if (editor.ShowDialog() != true)
+        {
+            return;
+        }
+
+        node.InheritCharacters = false;
+        node.Characters.Clear();
+        node.Characters.AddRange(
+            editor.Characters.Select(character => character.Clone()));
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("inheritCharacters");
+            node.PropertyOverrides.Add("characters");
+        }
+        MarkDirty();
+        StatusText.Text = $"Сцена «{node.Title}» обновлена";
     }
 
     private string GetAssetDirectory() =>

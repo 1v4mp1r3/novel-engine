@@ -223,54 +223,72 @@ public partial class PreviewWindow : Window
         foreach (var character in characters)
         {
             var element = CreateCharacterElement(character);
-            Grid.SetColumn(
-                element,
-                character.Position switch
-                {
-                    CharacterPosition.Left => 0,
-                    CharacterPosition.Right => 2,
-                    _ => 1,
-                });
             CharacterLayer.Children.Add(element);
         }
     }
 
     private FrameworkElement CreateCharacterElement(CharacterPlacement character)
     {
+        var root = new Grid
+        {
+            Width = CharacterLayout.BaseWidth,
+            Height = CharacterLayout.BaseHeight,
+            RenderTransformOrigin = new Point(0.5, 0.5),
+        };
         var image = LoadBitmap(ResolveAsset(character.Sprite));
         if (image is not null)
         {
-            return new Image
-            {
-                Source = image,
-                Stretch = Stretch.Uniform,
-                VerticalAlignment = VerticalAlignment.Bottom,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                MaxHeight = 560,
-                Margin = new Thickness(8, 10, 8, 190),
-            };
+            root.Children.Add(
+                new Image
+                {
+                    Source = image,
+                    Stretch = Stretch.Uniform,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                });
+        }
+        else
+        {
+            root.Children.Add(
+                new Border
+                {
+                    Width = 330,
+                    Height = 650,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    CornerRadius = new CornerRadius(24),
+                    Background = new SolidColorBrush(Color.FromArgb(190, 40, 54, 74)),
+                    BorderBrush = (Brush)Application.Current.Resources["AccentBrush"],
+                    BorderThickness = new Thickness(3),
+                    Child = new TextBlock
+                    {
+                        Text = character.Name,
+                        FontSize = 28,
+                        FontWeight = FontWeights.SemiBold,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                    },
+                });
         }
 
-        return new Border
+        var x = character.HasCustomTransform
+            ? character.X
+            : CharacterLayout.DefaultCenterX(character.Position);
+        var y = character.HasCustomTransform
+            ? character.Y
+            : CharacterLayout.DefaultCenterY;
+        var scale = character.HasCustomTransform ? character.Scale : 1;
+        var rotation = character.HasCustomTransform ? character.Rotation : 0;
+        Canvas.SetLeft(root, x - CharacterLayout.BaseWidth / 2);
+        Canvas.SetTop(root, y - CharacterLayout.BaseHeight / 2);
+        root.RenderTransform = new TransformGroup
         {
-            Width = 190,
-            Height = 290,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(8, 10, 8, 190),
-            CornerRadius = new CornerRadius(18),
-            Background = new SolidColorBrush(Color.FromArgb(170, 40, 54, 74)),
-            BorderBrush = (Brush)Application.Current.Resources["AccentBrush"],
-            BorderThickness = new Thickness(2),
-            Child = new TextBlock
+            Children =
             {
-                Text = character.Name,
-                FontSize = 16,
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
+                new ScaleTransform(scale, scale),
+                new RotateTransform(rotation),
             },
         };
+        return root;
     }
 
     private void SyncMusic(string path)

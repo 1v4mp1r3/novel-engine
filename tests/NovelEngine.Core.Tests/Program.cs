@@ -13,6 +13,7 @@ var tests = new (string Name, Action Run)[]
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
     ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
     ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
+    ("character transforms survive code and JSON", CharacterTransformsRoundTrip),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
@@ -288,6 +289,39 @@ static void ProjectLanguageFormatterRoundTrips()
         "Formatted scene connection changed.");
 }
 
+static void CharacterTransformsRoundTrip()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.InheritCharacters = false;
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой",
+            Position = CharacterPosition.Left,
+            HasCustomTransform = true,
+            X = 742.5,
+            Y = 476,
+            Scale = 1.35,
+            Rotation = -7.5,
+        });
+
+    var code = ProjectLanguage.Format(project);
+    var fromCode = ProjectLanguage.Parse(code)
+        .FindNode(scene.Id)!
+        .Characters.Single();
+    var fromJson = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project))
+        .FindNode(scene.Id)!
+        .Characters.Single();
+
+    Assert(code.Contains("placement (742.5, 476)", StringComparison.Ordinal), "Placement was not formatted.");
+    Assert(fromCode.HasCustomTransform, "Code parser lost the custom transform flag.");
+    Assert(Math.Abs(fromCode.Scale - 1.35) < 0.001, "Code parser changed character scale.");
+    Assert(Math.Abs(fromCode.Rotation + 7.5) < 0.001, "Code parser changed character rotation.");
+    Assert(Math.Abs(fromJson.X - 742.5) < 0.001, "JSON changed character position.");
+}
+
 static void ProjectLanguageRejectsCycles()
 {
     const string source = """
@@ -538,6 +572,9 @@ static void ProjectLanguageSuggestsCompletions()
             next "Go" -> dia
         }
         node dialogue-1 : dialogue {
+            character hero {
+                pla
+            }
             choice "End" -> none
         }
         """;
@@ -553,6 +590,13 @@ static void ProjectLanguageSuggestsCompletions()
     Assert(
         nodeCompletions.Items.Any(item => item.InsertText == "dialogue-1"),
         "Node completion was not suggested after an arrow.");
+
+    var characterCaret = source.IndexOf("pla", StringComparison.Ordinal) + 3;
+    var characterCompletions = ProjectLanguage.GetCompletions(source, characterCaret);
+    Assert(
+        characterCompletions.Items.Any(
+            item => item.InsertText == "placement (960, 500)"),
+        "Character transform completion was not suggested.");
 }
 
 static void ProjectLanguageFindsScopes()

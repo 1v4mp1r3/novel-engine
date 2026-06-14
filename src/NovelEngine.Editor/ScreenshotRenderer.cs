@@ -92,6 +92,51 @@ internal static class ScreenshotRenderer
         window.Close();
     }
 
+    public static void RenderSceneEditor(string path)
+    {
+        var assetDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "novel-engine-scene-editor-preview");
+        Directory.CreateDirectory(assetDirectory);
+        var background = Path.Combine(assetDirectory, "background.png");
+        var character = Path.Combine(assetDirectory, "character.png");
+        CreateImage(background, 1280, 720, backgroundImage: true);
+        CreateImage(character, 360, 640, backgroundImage: false);
+
+        var project = NovelProject.CreateDefault();
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = background;
+        scene.InheritBackground = false;
+        scene.InheritCharacters = false;
+        scene.Characters.Add(
+            new CharacterPlacement
+            {
+                Id = "scene-editor-character",
+                Name = "Герой",
+                Sprite = character,
+                Position = CharacterPosition.Center,
+                HasCustomTransform = true,
+                X = 1040,
+                Y = 510,
+                Scale = 0.86,
+                Rotation = -4,
+            });
+
+        var window = new SceneEditorWindow(project, scene, assetDirectory)
+        {
+            Width = 1320,
+            Height = 820,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        window.EnableTransformModeForScreenshot();
+        RenderWindow(window, path);
+        window.Close();
+    }
+
     public static void RenderCompiledPreview(string path)
     {
         var rootDirectory = Path.Combine(
