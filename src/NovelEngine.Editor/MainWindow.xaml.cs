@@ -27,15 +27,18 @@ public partial class MainWindow : Window
     private string? _selectedAssetFolder;
     private string? _workspaceDirectory;
     private bool _workspaceNeedsProjectFile;
-    private bool _refreshingFilesFromWatcher;
     private Process? _gameProcess;
     private FileSystemWatcher? _filesWatcher;
     private readonly DispatcherTimer _codeAnalysisTimer;
     private readonly DispatcherTimer _autoSaveTimer;
+    private readonly DispatcherTimer _filesRefreshTimer;
     private string _codeCursorSource = string.Empty;
     private int[] _codeLineStarts = [0];
     private int _lastCodeCursorOffset = -1;
     private bool _codeCursorCacheDirty = true;
+    private bool _codeRefreshPending = true;
+    private bool _codeRefreshUseStoredSource = true;
+    private bool _syncingFilesFromDisk;
 
     public MainWindow()
         : this(null)
@@ -74,6 +77,18 @@ public partial class MainWindow : Window
         };
         _autoSaveTimer.Tick += (_, _) => AutoSaveProject();
         _autoSaveTimer.Start();
+        _filesRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(350),
+        };
+        _filesRefreshTimer.Tick += (_, _) =>
+        {
+            _filesRefreshTimer.Stop();
+            if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
+            {
+                RefreshAssets();
+            }
+        };
 
         SetProject(_project, null);
         if (startupProjectPath is not null)
@@ -174,12 +189,13 @@ public partial class MainWindow : Window
         _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
+        var filesChanged = SyncFilesFromDisk(refreshCode: false);
         ConfigureFilesWatcher();
         Graph.SetProject(project);
         RefreshExplorer();
         RefreshProperties();
-        RefreshAssets();
-        RefreshCodeFromProject(useStoredSource: true);
+        RefreshAssets(syncFromDisk: false);
+        RequestCodeRefresh(useStoredSource: !filesChanged);
         RefreshWindowTitle();
         StatusText.Text = path is null
             ? _workspaceDirectory is null
@@ -420,13 +436,34 @@ public partial class MainWindow : Window
         _dirty = true;
         if (!_codeHasPendingChanges)
         {
-            RefreshCodeFromProject(useStoredSource: false);
+            RequestCodeRefresh(useStoredSource: false);
         }
         RefreshWindowTitle();
         RefreshExplorer();
         RefreshProperties();
         Graph.RefreshGraph();
         StatusText.Text = "Проект изменён";
+    }
+
+    private void RequestCodeRefresh(bool useStoredSource)
+    {
+        if (ReferenceEquals(WorkspaceTabs.SelectedItem, CodeTab))
+        {
+            RefreshCodeFromProject(useStoredSource);
+            return;
+        }
+
+        var wasPending = _codeRefreshPending;
+        _codeRefreshPending = true;
+        _codeRefreshUseStoredSource = wasPending
+            ? _codeRefreshUseStoredSource && useStoredSource
+            : useStoredSource;
+        if (!useStoredSource && !_codeHasPendingChanges)
+        {
+            _project.SourceCode = string.Empty;
+        }
+        CodeStatusText.Foreground = (Brush)FindResource("MutedBrush");
+        CodeStatusText.Text = "Код обновится при открытии вкладки";
     }
 
     private void RefreshCodeFromProject(bool useStoredSource)
@@ -441,6 +478,8 @@ public partial class MainWindow : Window
         {
             CodeEditor.SourceText = code;
             SetCodeCursorCache(code);
+            _codeRefreshPending = false;
+            _codeRefreshUseStoredSource = true;
             _codeHasPendingChanges = false;
             CodeStatusText.Foreground = (Brush)FindResource("MutedBrush");
             CodeStatusText.Text = "Код синхронизирован с графом";
@@ -474,7 +513,7 @@ public partial class MainWindow : Window
             }
             RefreshExplorer();
             RefreshProperties();
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
             _dirty = true;
             RefreshWindowTitle();
             CodeStatusText.Foreground = (Brush)FindResource("AccentBrush");
@@ -681,9 +720,9 @@ public partial class MainWindow : Window
 
     private void NavigateToNodeCode(string nodeId)
     {
-        if (!_codeHasPendingChanges)
+        if (!_codeHasPendingChanges && _codeRefreshPending)
         {
-            RefreshCodeFromProject(useStoredSource: false);
+            RefreshCodeFromProject(false);
         }
         var location = ProjectLanguage.FindNodeDeclaration(
             CodeEditor.SourceText,
@@ -721,7 +760,10 @@ public partial class MainWindow : Window
         if (ReferenceEquals(WorkspaceTabs.SelectedItem, CodeTab)
             && !_codeHasPendingChanges)
         {
-            RefreshCodeFromProject(useStoredSource: false);
+            if (_codeRefreshPending)
+            {
+                RefreshCodeFromProject(_codeRefreshUseStoredSource);
+            }
         }
         else if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
         {
@@ -733,9 +775,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshAssets()
+    private void RefreshAssets(bool syncFromDisk = true)
     {
-        SyncFilesFromDisk();
+        if (syncFromDisk)
+        {
+            SyncFilesFromDisk();
+        }
         RefreshAssetFolders();
         RefreshAssetList();
     }
@@ -749,11 +794,6 @@ public partial class MainWindow : Window
             MusicFolderBox.ItemsSource = Array.Empty<NodeAssetFolderOption>();
             MusicAssetBox.ItemsSource = Array.Empty<NodeAssetChoice>();
             return;
-        }
-
-        if (_projectPath is not null)
-        {
-            SyncFilesFromDisk();
         }
 
         var backgroundEnabled = node.Kind == NodeKind.Start
@@ -882,30 +922,36 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SyncFilesFromDisk()
+    private bool SyncFilesFromDisk(bool refreshCode = true)
     {
-        if (_projectPath is null)
+        if (_projectPath is null || _syncingFilesFromDisk)
         {
-            return;
+            return false;
         }
+        _syncingFilesFromDisk = true;
         try
         {
             var changes = ProjectAssets.SyncFromDisk(_project, _projectPath);
             if (changes == 0)
             {
-                return;
+                return false;
             }
 
+            if (!_codeHasPendingChanges)
+            {
+                _project.SourceCode = string.Empty;
+            }
             PreservePendingSourceCode();
             ProjectSerializer.Save(_project, _projectPath);
             _dirty = false;
             _workspaceNeedsProjectFile = false;
-            if (!_codeHasPendingChanges)
+            if (refreshCode && !_codeHasPendingChanges)
             {
-                RefreshCodeFromProject(useStoredSource: false);
+                RequestCodeRefresh(useStoredSource: false);
             }
             RefreshWindowTitle();
             StatusText.Text = $"Файлы синхронизированы: найдено новых записей {changes}";
+            return true;
         }
         catch (Exception error) when (
             error is IOException
@@ -913,6 +959,11 @@ public partial class MainWindow : Window
             or UnauthorizedAccessException)
         {
             StatusText.Text = $"Не удалось синхронизировать files: {error.Message}";
+            return false;
+        }
+        finally
+        {
+            _syncingFilesFromDisk = false;
         }
     }
 
@@ -943,24 +994,10 @@ public partial class MainWindow : Window
 
     private void ScheduleFilesRefresh()
     {
-        if (_refreshingFilesFromWatcher)
-        {
-            return;
-        }
-        _refreshingFilesFromWatcher = true;
         _ = Dispatcher.BeginInvoke(() =>
         {
-            try
-            {
-                if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
-                {
-                    RefreshAssets();
-                }
-            }
-            finally
-            {
-                _refreshingFilesFromWatcher = false;
-            }
+            _filesRefreshTimer.Stop();
+            _filesRefreshTimer.Start();
         });
     }
 
@@ -1137,6 +1174,7 @@ public partial class MainWindow : Window
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 900;
             image.UriSource = new Uri(path, UriKind.Absolute);
             image.EndInit();
             image.Freeze();

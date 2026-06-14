@@ -26,21 +26,29 @@ public partial class App : Application
                 e.Args.Length == 3 && e.Args[2] == "--debug");
             return;
         }
-        if (e.Args.Length == 2 && e.Args[0] == "--screenshot")
+        if (e.Args.Length is 2 or 3 && e.Args[0] == "--screenshot")
         {
-            ScreenshotRenderer.RenderEditor(e.Args[1]);
+            ScreenshotRenderer.RenderEditor(
+                e.Args[1],
+                startupProjectPath: e.Args.Length == 3 ? e.Args[2] : null);
             Shutdown();
             return;
         }
-        if (e.Args.Length == 2 && e.Args[0] == "--code-screenshot")
+        if (e.Args.Length is 2 or 3 && e.Args[0] == "--code-screenshot")
         {
-            ScreenshotRenderer.RenderEditor(e.Args[1], showCode: true);
+            ScreenshotRenderer.RenderEditor(
+                e.Args[1],
+                showCode: true,
+                startupProjectPath: e.Args.Length == 3 ? e.Args[2] : null);
             Shutdown();
             return;
         }
-        if (e.Args.Length == 2 && e.Args[0] == "--files-screenshot")
+        if (e.Args.Length is 2 or 3 && e.Args[0] == "--files-screenshot")
         {
-            ScreenshotRenderer.RenderEditor(e.Args[1], showFiles: true);
+            ScreenshotRenderer.RenderEditor(
+                e.Args[1],
+                showFiles: true,
+                startupProjectPath: e.Args.Length == 3 ? e.Args[2] : null);
             Shutdown();
             return;
         }
@@ -59,6 +67,12 @@ public partial class App : Application
         if (e.Args.Length == 2 && e.Args[0] == "--debug-build-screenshot")
         {
             ScreenshotRenderer.RenderCompiledPreview(e.Args[1]);
+            Shutdown();
+            return;
+        }
+        if (e.Args.Length == 1 && e.Args[0] == "--context-menu-smoke")
+        {
+            ScreenshotRenderer.SmokeContextMenus();
             Shutdown();
             return;
         }

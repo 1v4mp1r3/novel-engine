@@ -569,18 +569,20 @@ public sealed class GraphSurface : FrameworkElement
 
     private void DrawConnections(DrawingContext drawingContext)
     {
+        var nodesById = Project.Nodes.ToDictionary(node => node.Id);
         foreach (var node in Project.Nodes)
         {
-            foreach (var output in node.Outputs)
+            for (var outputIndex = 0; outputIndex < node.Outputs.Count; outputIndex++)
             {
-                var target = Project.FindNode(output.TargetNodeId);
-                var source = GetOutputPort(node.Id, output.Id);
-                if (target is null || source is null)
+                var output = node.Outputs[outputIndex];
+                if (output.TargetNodeId is null
+                    || !nodesById.TryGetValue(output.TargetNodeId, out var target))
                 {
                     continue;
                 }
 
-                var geometry = CreateCurveGeometry(source.Value.Center, GetInputPort(target).Center);
+                var source = GetOutputPort(node, output, outputIndex);
+                var geometry = CreateCurveGeometry(source.Center, GetInputPort(target).Center);
                 drawingContext.DrawGeometry(
                     null,
                     new Pen(new SolidColorBrush(Color.FromRgb(100, 218, 183)), 2.4),

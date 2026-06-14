@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -12,9 +13,10 @@ internal static class ScreenshotRenderer
     public static void RenderEditor(
         string path,
         bool showCode = false,
-        bool showFiles = false)
+        bool showFiles = false,
+        string? startupProjectPath = null)
     {
-        var window = new MainWindow
+        var window = new MainWindow(startupProjectPath)
         {
             Width = 1480,
             Height = 900,
@@ -203,6 +205,39 @@ internal static class ScreenshotRenderer
         };
         window.Show();
         RenderWindow(window, path);
+        window.Close();
+    }
+
+    public static void SmokeContextMenus()
+    {
+        var window = new MainWindow
+        {
+            Width = 900,
+            Height = 600,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+
+        var submenu = new MenuItem { Header = "Подменю" };
+        submenu.Items.Add(new MenuItem { Header = "Вложенный пункт" });
+        var menu = new ContextMenu
+        {
+            PlacementTarget = window,
+            Items =
+            {
+                new MenuItem { Header = "Проверка пункта" },
+                new Separator(),
+                submenu,
+            },
+        };
+        menu.IsOpen = true;
+        window.Dispatcher.Invoke(
+            () => { },
+            DispatcherPriority.ApplicationIdle);
+        menu.IsOpen = false;
         window.Close();
     }
 
