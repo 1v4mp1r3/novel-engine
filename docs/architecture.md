@@ -5,6 +5,7 @@
 The WPF editor owns authoring concerns:
 
 - node graph interaction;
+- full-project code authoring and code-to-graph compilation;
 - scene, dialogue, and choice property editing;
 - asset paths;
 - JSON project storage;
@@ -13,6 +14,34 @@ The WPF editor owns authoring concerns:
 Connections belong to outputs. A scene has one linear output; a dialogue has
 zero or more choice outputs. Each output stores its target node, condition, and
 script executed when selected.
+
+## Project language
+
+Novel Project Language is a lexer/parser/compiler implemented in
+`NovelEngine.Core`. It is not JSON with tags: it has declarations, user-defined
+types, inheritance, node instances, properties, and transition blocks.
+
+Built-in types are `start`, `scene`, and `dialogue`. User types may derive from
+scene/dialogue types through multiple inheritance levels. Compilation resolves
+the type chain, applies overridden defaults, and emits concrete runtime nodes.
+The graph and code editor are two representations of the same project model.
+
+## Asset catalog
+
+Each project owns a typed asset catalog. Imported files are copied into
+nested logical folders below `assets` next to the project file. The catalog
+stores folder declarations separately from assets so empty folders survive
+serialization. Code uses stable `@asset_id` references instead of physical
+paths. Runtime preview resolves those references through the catalog before
+loading media. Renaming an asset rewrites all references; moving or renaming a
+folder updates the catalog and corresponding files together.
+
+## Code diagnostics
+
+The WPF code editor derives syntax spans and source locations from the project
+language service in `NovelEngine.Core`. It performs debounced parsing while the
+user types, highlights the token at a parser error, and exposes node declaration
+locations so graph nodes can navigate directly to their source.
 
 ## Inherited runtime state
 

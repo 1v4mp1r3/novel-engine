@@ -11,6 +11,15 @@ var tests = new (string Name, Action Run)[]
     ("transition settings survive JSON round trip", TransitionSettingsRoundTrip),
     ("node preview restores inherited state", NodePreviewRestoresState),
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
+    ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
+    ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
+    ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
+    ("project language resolves asset references", ProjectLanguageResolvesAssets),
+    ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
+    ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
+    ("asset folders move and rename physical files", AssetFoldersMoveFiles),
+    ("project language preserves asset folders", ProjectLanguagePreservesFolders),
+    ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
 };
 
 var failures = 0;
@@ -191,6 +200,331 @@ static void TransitionSettingsRoundTrip()
         restoredOutput?.TransitionSound == "sounds/whoosh.wav",
         "Transition sound changed.");
     Assert(restoredOutput?.FadeDurationMs == 725, "Fade duration changed.");
+}
+
+static void ProjectLanguageCompilesGraph()
+{
+    const string source = """
+        novel "Ночная история"
+
+        type NightScene extends scene {
+            background "backgrounds/night.png"
+            inherit background false
+        }
+
+        type DramaticNight extends NightScene {
+            music "music/drama.mp3"
+            inherit music false
+        }
+
+        node start : start at (20, 180) {
+            title "Начало"
+            next "Дальше" -> intro
+        }
+
+        node intro : DramaticNight at (280, 120) {
+            title "Ночная улица"
+            text "Город уснул."
+            next "К выбору" -> choice {
+                fade 600
+                sound "sounds/whoosh.wav"
+            }
+        }
+
+        node choice : dialogue at (560, 120) {
+            speaker "Герой"
+            text "Куда идти?"
+            choice "Домой" -> none {
+                when "score >= 2"
+                script "add score 1"
+            }
+        }
+        """;
+
+    var project = ProjectLanguage.Parse(source);
+    var intro = project.FindNode("intro");
+    var choice = project.FindNode("choice");
+
+    Assert(project.Title == "Ночная история", "Project title was not compiled.");
+    Assert(project.NodeTypes.Count == 2, "Custom node types were not retained.");
+    Assert(intro?.Kind == NodeKind.Scene, "Derived scene type lost its polymorphic kind.");
+    Assert(intro?.TypeName == "DramaticNight", "Node type name was not retained.");
+    Assert(
+        intro?.Background == "backgrounds/night.png",
+        "Background was not inherited through the type chain.");
+    Assert(intro?.Music == "music/drama.mp3", "Derived type did not override music.");
+    Assert(intro?.Outputs[0].TargetNodeId == choice?.Id, "Connection was not compiled.");
+    Assert(intro?.Outputs[0].FadeDurationMs == 600, "Fade setting was not compiled.");
+    Assert(
+        choice?.Outputs[0].Condition == "score >= 2",
+        "Choice condition was not compiled.");
+
+    intro!.X += 10;
+    var formatted = ProjectLanguage.Format(project);
+    Assert(
+        CountOccurrences(formatted, "background \"backgrounds/night.png\"") == 1,
+        "Graph synchronization flattened an inherited background into the node.");
+    Assert(
+        CountOccurrences(formatted, "music \"music/drama.mp3\"") == 1,
+        "Graph synchronization flattened inherited music into the node.");
+}
+
+static void ProjectLanguageFormatterRoundTrips()
+{
+    var original = NovelProject.CreateDefault();
+    var code = ProjectLanguage.Format(original);
+    var restored = ProjectLanguage.Parse(code);
+
+    Assert(code.Contains("Новая новелла", StringComparison.Ordinal), "Unicode text was escaped.");
+    Assert(restored.Nodes.Count == original.Nodes.Count, "Formatted node count changed.");
+    Assert(
+        restored.FindNode("start")?.Outputs[0].TargetNodeId == "scene-1",
+        "Formatted start connection changed.");
+    Assert(
+        restored.FindNode("scene-1")?.Outputs[0].TargetNodeId == "dialogue-1",
+        "Formatted scene connection changed.");
+}
+
+static void ProjectLanguageRejectsCycles()
+{
+    const string source = """
+        novel "Cycle"
+        type A extends B {
+        }
+        type B extends A {
+        }
+        node start : start {
+            next "Дальше" -> none
+        }
+        """;
+
+    try
+    {
+        _ = ProjectLanguage.Parse(source);
+        throw new InvalidOperationException("Cyclic inheritance was accepted.");
+    }
+    catch (ProjectLanguageException error)
+    {
+        Assert(
+            error.Message.Contains("Циклическое наследование", StringComparison.Ordinal),
+            "Cycle diagnostic was not specific.");
+    }
+}
+
+static void ProjectLanguageResolvesAssets()
+{
+    const string source = """
+        novel "Assets"
+
+        asset night : image "assets/images/night.png"
+        asset theme : audio "assets/audio/theme.mp3"
+
+        node start : start {
+            title "Start"
+            next "Go" -> scene
+        }
+
+        node scene : scene {
+            title "Night"
+            inherit background false
+            background @night
+            inherit music false
+            music @theme
+            next "End" -> none
+        }
+        """;
+
+    var project = ProjectLanguage.Parse(source);
+    var scene = project.FindNode("scene");
+
+    Assert(project.Assets.Count == 2, "Asset declarations were not compiled.");
+    Assert(
+        project.ResolveAssetReference(scene!.Background) == "assets/images/night.png",
+        "Background asset reference was not resolved.");
+    Assert(
+        project.ResolveAssetReference(scene.Music) == "assets/audio/theme.mp3",
+        "Music asset reference was not resolved.");
+
+    project.ReplaceAssetReference("night", "@city_night");
+    project.FindAsset("night")!.Id = "city_night";
+    Assert(scene.Background == "@city_night", "Asset rename did not update usages.");
+    var formatted = ProjectLanguage.Format(project);
+    Assert(formatted.Contains("background @city_night"), "Asset reference was quoted.");
+}
+
+static void ProjectLanguageRejectsWrongAssetKind()
+{
+    const string source = """
+        novel "Wrong asset"
+        asset theme : audio "assets/audio/theme.mp3"
+        node start : start {
+            next "Go" -> scene
+        }
+        node scene : scene {
+            inherit background false
+            background @theme
+            next "End" -> none
+        }
+        """;
+
+    try
+    {
+        _ = ProjectLanguage.Parse(source);
+        throw new InvalidOperationException("Audio asset was accepted as a background.");
+    }
+    catch (ProjectLanguageException error)
+    {
+        Assert(
+            error.Message.Contains("требуется image", StringComparison.Ordinal),
+            "Wrong asset kind diagnostic was not specific.");
+    }
+}
+
+static void ProjectAssetImportCopiesFiles()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-assets-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var source = Path.Combine(directory, "Ночной фон.png");
+        File.WriteAllBytes(source, [137, 80, 78, 71]);
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+
+        var asset = ProjectAssets.Import(project, projectPath, source);
+        var target = ProjectAssets.ResolvePath(projectPath, asset);
+
+        Assert(asset.Kind == AssetKind.Image, "Imported image kind was not detected.");
+        Assert(AssetReference.IsValidId(asset.Id), "Generated asset id is invalid.");
+        Assert(File.Exists(target), "Imported file was not copied into the project.");
+        Assert(
+            target.Contains(
+                Path.Combine("assets", "images"),
+                StringComparison.OrdinalIgnoreCase),
+            "Imported image was placed in the wrong folder.");
+        Assert(
+            ReferenceEquals(
+                asset,
+                ProjectAssets.Import(project, projectPath, target)),
+            "Importing the registered file created a duplicate asset.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void AssetFoldersMoveFiles()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-folders-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var source = Path.Combine(directory, "hero.png");
+        File.WriteAllBytes(source, [137, 80, 78, 71]);
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+        var asset = ProjectAssets.Import(project, projectPath, source);
+
+        ProjectAssets.CreateFolder(project, "characters/heroes");
+        ProjectAssets.MoveAsset(
+            project,
+            projectPath,
+            asset,
+            "characters/heroes");
+        Assert(
+            asset.Folder == "characters/heroes",
+            "Asset was not moved into the nested folder.");
+        Assert(
+            File.Exists(ProjectAssets.ResolvePath(projectPath, asset)),
+            "Physical asset disappeared after moving.");
+
+        ProjectAssets.RenameFolder(
+            project,
+            projectPath,
+            "characters",
+            "cast");
+        Assert(
+            asset.Folder == "cast/heroes",
+            "Nested asset folder was not updated after rename.");
+        Assert(
+            File.Exists(ProjectAssets.ResolvePath(projectPath, asset)),
+            "Physical asset disappeared after folder rename.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectLanguagePreservesFolders()
+{
+    const string source = """
+        novel "Folders"
+        folder "characters"
+        folder "characters/heroes"
+        asset hero : image "assets/characters/heroes/hero.png" in "characters/heroes"
+        node start : start {
+            next "End" -> none
+        }
+        """;
+
+    var project = ProjectLanguage.Parse(source);
+    var formatted = ProjectLanguage.Format(project);
+    var restored = ProjectLanguage.Parse(formatted);
+
+    Assert(
+        restored.AssetFolders.Contains("characters/heroes"),
+        "Nested folder was lost during language round trip.");
+    Assert(
+        restored.FindAsset("hero")?.Folder == "characters/heroes",
+        "Asset folder assignment was lost.");
+}
+
+static void ProjectLanguageSyntaxAndLocations()
+{
+    const string source = """
+        novel "Syntax"
+        # comment
+        asset bg : image "assets/bg.png"
+        node start : start {
+            background @bg
+            next "End" -> none
+        }
+        """;
+
+    var spans = ProjectLanguage.GetSyntaxSpans(source);
+    var location = ProjectLanguage.FindNodeDeclaration(source, "start");
+
+    Assert(
+        spans.Any(span => span.Kind == ProjectLanguageSyntaxKind.Keyword),
+        "Keyword syntax spans were not produced.");
+    Assert(
+        spans.Any(span => span.Kind == ProjectLanguageSyntaxKind.Comment),
+        "Comment syntax spans were not produced.");
+    Assert(
+        spans.Any(span => span.Kind == ProjectLanguageSyntaxKind.AssetReference),
+        "Asset reference syntax spans were not produced.");
+    Assert(location is not null, "Node declaration location was not found.");
+    Assert(
+        source.Substring(location!.Start, location.Length) == "start",
+        "Node declaration location points to the wrong text.");
+}
+
+static int CountOccurrences(string source, string value)
+{
+    var count = 0;
+    var offset = 0;
+    while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+    {
+        count++;
+        offset += value.Length;
+    }
+    return count;
 }
 
 static void Assert(bool condition, string message)

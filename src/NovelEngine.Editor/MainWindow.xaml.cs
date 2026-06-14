@@ -1,8 +1,12 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using NovelEngine.Core;
 
@@ -15,6 +19,11 @@ public partial class MainWindow : Window
     private bool _dirty;
     private bool _syncingSelection;
     private bool _refreshingProperties;
+    private bool _syncingCode;
+    private bool _codeHasPendingChanges;
+    private bool _refreshingAssetFolders;
+    private string? _selectedAssetFolder;
+    private readonly DispatcherTimer _codeAnalysisTimer;
 
     public MainWindow()
     {
@@ -24,9 +33,20 @@ public partial class MainWindow : Window
         Graph.ProjectChanged += (_, _) => MarkDirty();
         Graph.AddChoiceRequested += nodeId => AddOutput(nodeId);
         Graph.PreviewNodeRequested += PreviewNode;
+        Graph.OpenNodeCodeRequested += NavigateToNodeCode;
         Graph.TransitionSettingsRequested += EditTransition;
         Closing += MainWindow_Closing;
         Loaded += (_, _) => Graph.CenterGraph();
+
+        _codeAnalysisTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(280),
+        };
+        _codeAnalysisTimer.Tick += (_, _) =>
+        {
+            _codeAnalysisTimer.Stop();
+            AnalyzeCode();
+        };
 
         SetProject(_project, null);
     }
@@ -36,6 +56,12 @@ public partial class MainWindow : Window
         var node = _project.Nodes.FirstOrDefault(candidate => candidate.Kind == kind);
         Graph.SelectNode(node?.Id);
     }
+
+    internal void SelectCodeWorkspace() =>
+        WorkspaceTabs.SelectedItem = CodeTab;
+
+    internal void SelectFilesWorkspace() =>
+        WorkspaceTabs.SelectedItem = FilesTab;
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
@@ -68,16 +94,19 @@ public partial class MainWindow : Window
     }
 
     private static bool IsTextEditing() =>
-        Keyboard.FocusedElement is TextBox;
+        Keyboard.FocusedElement is TextBox or RichTextBox;
 
     private void SetProject(NovelProject project, string? path)
     {
         _project = project;
         _projectPath = path;
         _dirty = false;
+        _selectedAssetFolder = null;
         Graph.SetProject(project);
         RefreshExplorer();
         RefreshProperties();
+        RefreshAssets();
+        RefreshCodeFromProject(useStoredSource: true);
         RefreshWindowTitle();
         StatusText.Text = path is null ? "Новый проект" : $"Открыт {Path.GetFileName(path)}";
     }
@@ -244,31 +273,914 @@ public partial class MainWindow : Window
             return false;
         }
 
-        node.Title = title;
-        node.Speaker = node.Kind == NodeKind.Dialogue ? SpeakerBox.Text.Trim() : string.Empty;
-        node.Text = BodyTextBox.Text;
-        node.InheritBackground = node.Kind != NodeKind.Start
+        var speaker = node.Kind == NodeKind.Dialogue
+            ? SpeakerBox.Text.Trim()
+            : string.Empty;
+        var text = BodyTextBox.Text;
+        var inheritBackground = node.Kind != NodeKind.Start
             && InheritBackgroundCheck.IsChecked == true;
-        node.Background = BackgroundBox.Text.Trim();
-        node.InheritMusic = node.Kind != NodeKind.Start
+        var background = BackgroundBox.Text.Trim();
+        var inheritMusic = node.Kind != NodeKind.Start
             && InheritMusicCheck.IsChecked == true;
-        node.Music = MusicBox.Text.Trim();
-        node.InheritCharacters = node.Kind != NodeKind.Start
+        var music = MusicBox.Text.Trim();
+        var inheritCharacters = node.Kind != NodeKind.Start
             && InheritCharactersCheck.IsChecked == true;
-        node.Script = ScriptBox.Text.Trim();
+        var script = ScriptBox.Text.Trim();
+
+        MarkOverrideIfChanged(node, "title", node.Title, title);
+        MarkOverrideIfChanged(node, "speaker", node.Speaker, speaker);
+        MarkOverrideIfChanged(node, "text", node.Text, text);
+        MarkOverrideIfChanged(
+            node,
+            "inheritBackground",
+            node.InheritBackground,
+            inheritBackground);
+        MarkOverrideIfChanged(node, "background", node.Background, background);
+        MarkOverrideIfChanged(node, "inheritMusic", node.InheritMusic, inheritMusic);
+        MarkOverrideIfChanged(node, "music", node.Music, music);
+        MarkOverrideIfChanged(
+            node,
+            "inheritCharacters",
+            node.InheritCharacters,
+            inheritCharacters);
+        MarkOverrideIfChanged(node, "script", node.Script, script);
+
+        node.Title = title;
+        node.Speaker = speaker;
+        node.Text = text;
+        node.InheritBackground = inheritBackground;
+        node.Background = background;
+        node.InheritMusic = inheritMusic;
+        node.Music = music;
+        node.InheritCharacters = inheritCharacters;
+        node.Script = script;
         Graph.RefreshGraph();
         MarkDirty();
         return true;
     }
 
+    private static void MarkOverrideIfChanged<T>(
+        NovelNode node,
+        string property,
+        T previous,
+        T current)
+    {
+        if (node.UsesTypeDefaults
+            && !EqualityComparer<T>.Default.Equals(previous, current))
+        {
+            node.PropertyOverrides.Add(property);
+        }
+    }
+
     private void MarkDirty()
     {
         _dirty = true;
+        if (!_codeHasPendingChanges)
+        {
+            RefreshCodeFromProject(useStoredSource: false);
+        }
         RefreshWindowTitle();
         RefreshExplorer();
         RefreshProperties();
         Graph.RefreshGraph();
         StatusText.Text = "Проект изменён";
+    }
+
+    private void RefreshCodeFromProject(bool useStoredSource)
+    {
+        var code = useStoredSource && !string.IsNullOrWhiteSpace(_project.SourceCode)
+            ? _project.SourceCode
+            : ProjectLanguage.Format(_project);
+        _project.SourceCode = code;
+
+        _syncingCode = true;
+        try
+        {
+            CodeEditor.SourceText = code;
+            _codeHasPendingChanges = false;
+            CodeStatusText.Foreground = (Brush)FindResource("MutedBrush");
+            CodeStatusText.Text = "Код синхронизирован с графом";
+        }
+        finally
+        {
+            _syncingCode = false;
+        }
+        AnalyzeCode();
+    }
+
+    private bool EnsureCodeApplied() =>
+        !_codeHasPendingChanges || TryApplyCode();
+
+    private bool TryApplyCode()
+    {
+        try
+        {
+            var selectedNodeId = Graph.SelectedNodeId;
+            var source = CodeEditor.SourceText;
+            var compiled = ProjectLanguage.Parse(source);
+
+            _project = compiled;
+            _project.SourceCode = source;
+            _codeHasPendingChanges = false;
+            Graph.SetProject(_project);
+            if (_project.FindNode(selectedNodeId) is not null)
+            {
+                Graph.SelectNode(selectedNodeId);
+            }
+            RefreshExplorer();
+            RefreshProperties();
+            RefreshAssets();
+            _dirty = true;
+            RefreshWindowTitle();
+            CodeStatusText.Foreground = (Brush)FindResource("AccentBrush");
+            CodeStatusText.Text =
+                $"Код применён: {_project.NodeTypes.Count} типов, {_project.Nodes.Count} нод";
+            ApplyCodeHighlighting(source, null);
+            StatusText.Text = "Код скомпилирован, граф обновлён";
+            Graph.CenterGraph();
+            return true;
+        }
+        catch (ProjectLanguageException error)
+        {
+            ShowCodeError(error);
+            return false;
+        }
+        catch (Exception error) when (
+            error is InvalidDataException
+            or InvalidOperationException)
+        {
+            CodeStatusText.Foreground = Brushes.IndianRed;
+            CodeStatusText.Text = error.Message;
+            WorkspaceTabs.SelectedItem = CodeTab;
+            CodeEditor.Focus();
+            return false;
+        }
+    }
+
+    private void ShowCodeError(ProjectLanguageException error)
+    {
+        var source = CodeEditor.SourceText;
+        var errorStart = ProjectLanguage.GetOffset(
+            source,
+            error.Line,
+            error.Column);
+        ApplyCodeHighlighting(source, error);
+        CodeStatusText.Foreground = Brushes.IndianRed;
+        CodeStatusText.Text = error.Message;
+        WorkspaceTabs.SelectedItem = CodeTab;
+        CodeEditor.SelectSourceRange(errorStart, ErrorTokenLength(source, errorStart));
+    }
+
+    private void ApplyCode_Click(object sender, RoutedEventArgs e) =>
+        TryApplyCode();
+
+    private void UpdateCodeFromGraph_Click(object sender, RoutedEventArgs e)
+    {
+        if (_codeHasPendingChanges)
+        {
+            var result = MessageBox.Show(
+                this,
+                "Неприменённый код будет заменён текущим состоянием графа.",
+                "Обновить код из графа",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Warning);
+            if (result != MessageBoxResult.OK)
+            {
+                return;
+            }
+        }
+        RefreshCodeFromProject(useStoredSource: false);
+        StatusText.Text = "Код обновлён из графа";
+    }
+
+    private void CodeEditor_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_syncingCode)
+        {
+            return;
+        }
+
+        _codeHasPendingChanges = true;
+        _dirty = true;
+        RefreshWindowTitle();
+        CodeStatusText.Foreground = Brushes.Goldenrod;
+        CodeStatusText.Text = "Проверка кода...";
+        StatusText.Text = "Код проекта изменён";
+        _codeAnalysisTimer.Stop();
+        _codeAnalysisTimer.Start();
+    }
+
+    private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
+    {
+        var source = CodeEditor.SourceText;
+        var offset = Math.Clamp(CodeEditor.SourceCaretOffset, 0, source.Length);
+        var line = 1;
+        var lineStart = 0;
+        for (var index = 0; index < offset; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+                lineStart = index + 1;
+            }
+        }
+        CodeCursorText.Text =
+            $"Строка {line}, столбец {offset - lineStart + 1}";
+    }
+
+    private void AnalyzeCode()
+    {
+        var source = CodeEditor.SourceText;
+        try
+        {
+            _ = ProjectLanguage.Parse(source);
+            ApplyCodeHighlighting(source, null);
+            CodeStatusText.Foreground = _codeHasPendingChanges
+                ? (Brush)FindResource("AccentBrush")
+                : (Brush)FindResource("MutedBrush");
+            CodeStatusText.Text = _codeHasPendingChanges
+                ? "Ошибок нет — Ctrl+Enter применит изменения"
+                : "Код синхронизирован с графом";
+        }
+        catch (ProjectLanguageException error)
+        {
+            ApplyCodeHighlighting(source, error);
+            CodeStatusText.Foreground = Brushes.IndianRed;
+            CodeStatusText.Text = error.Message;
+        }
+        catch (Exception error) when (
+            error is InvalidDataException
+            or InvalidOperationException)
+        {
+            ApplyCodeHighlighting(source, null);
+            CodeStatusText.Foreground = Brushes.IndianRed;
+            CodeStatusText.Text = error.Message;
+        }
+    }
+
+    private void ApplyCodeHighlighting(
+        string source,
+        ProjectLanguageException? error)
+    {
+        var errorStart = error is null
+            ? (int?)null
+            : ProjectLanguage.GetOffset(source, error.Line, error.Column);
+        var wasSyncing = _syncingCode;
+        _syncingCode = true;
+        try
+        {
+            CodeEditor.ApplySyntax(
+                ProjectLanguage.GetSyntaxSpans(source),
+                errorStart,
+                errorStart.HasValue
+                    ? ErrorTokenLength(source, errorStart.Value)
+                    : 0);
+        }
+        finally
+        {
+            _syncingCode = wasSyncing;
+        }
+    }
+
+    private static int ErrorTokenLength(string source, int start)
+    {
+        if (start >= source.Length)
+        {
+            return 1;
+        }
+        var end = start;
+        while (end < source.Length
+            && !char.IsWhiteSpace(source[end])
+            && source[end] is not '{' and not '}')
+        {
+            end++;
+        }
+        return Math.Max(1, end - start);
+    }
+
+    private void NavigateToNodeCode(string nodeId)
+    {
+        if (!_codeHasPendingChanges)
+        {
+            RefreshCodeFromProject(useStoredSource: false);
+        }
+        var location = ProjectLanguage.FindNodeDeclaration(
+            CodeEditor.SourceText,
+            nodeId);
+        if (location is null)
+        {
+            StatusText.Text = $"Объявление ноды «{nodeId}» не найдено в коде";
+            WorkspaceTabs.SelectedItem = CodeTab;
+            return;
+        }
+
+        WorkspaceTabs.SelectedItem = CodeTab;
+        CodeEditor.SelectSourceRange(location.Start, location.Length);
+        StatusText.Text =
+            $"Нода «{nodeId}»: строка {location.Line}, столбец {location.Column}";
+    }
+
+    private void CodeEditor_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            TryApplyCode();
+            e.Handled = true;
+        }
+    }
+
+    private void WorkspaceTabs_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(sender, WorkspaceTabs))
+        {
+            return;
+        }
+        if (ReferenceEquals(WorkspaceTabs.SelectedItem, CodeTab)
+            && !_codeHasPendingChanges)
+        {
+            RefreshCodeFromProject(useStoredSource: false);
+        }
+        else if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
+        {
+            if (_codeHasPendingChanges && !TryApplyCode())
+            {
+                return;
+            }
+            RefreshAssets();
+        }
+    }
+
+    private void RefreshAssets()
+    {
+        RefreshAssetFolders();
+        RefreshAssetList();
+    }
+
+    private void RefreshAssetList()
+    {
+        var selectedId = (AssetsGrid.SelectedItem as AssetView)?.Id;
+        var assets = _selectedAssetFolder is null
+            ? _project.Assets
+            : _project.Assets.Where(
+                asset => asset.Folder.Equals(
+                    _selectedAssetFolder,
+                    StringComparison.OrdinalIgnoreCase));
+        AssetsGrid.ItemsSource = assets
+            .OrderBy(asset => asset.Kind)
+            .ThenBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+            .Select(
+                asset => new AssetView(
+                    asset,
+                    _project.CountAssetReferences(asset.Id),
+                    AssetSize(asset)))
+            .ToList();
+        if (selectedId is not null)
+        {
+            AssetsGrid.SelectedItem = AssetsGrid.Items
+                .OfType<AssetView>()
+                .FirstOrDefault(
+                    view => view.Id.Equals(
+                        selectedId,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+        RefreshAssetPreview();
+    }
+
+    private void RefreshAssetFolders()
+    {
+        _refreshingAssetFolders = true;
+        try
+        {
+            AssetFoldersTree.Items.Clear();
+            var all = new TreeViewItem
+            {
+                Header = $"Все файлы ({_project.Assets.Count})",
+                Tag = null,
+                IsExpanded = true,
+                IsSelected = _selectedAssetFolder is null,
+            };
+            AssetFoldersTree.Items.Add(all);
+
+            var items = new Dictionary<string, TreeViewItem>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in _project.AssetFolders
+                .OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
+            {
+                var parentPath = string.Empty;
+                TreeViewItem? parent = null;
+                foreach (var segment in folder.Split('/'))
+                {
+                    var path = parentPath.Length == 0
+                        ? segment
+                        : $"{parentPath}/{segment}";
+                    if (!items.TryGetValue(path, out var item))
+                    {
+                        var count = _project.Assets.Count(
+                            asset => asset.Folder.Equals(
+                                path,
+                                StringComparison.OrdinalIgnoreCase));
+                        item = new TreeViewItem
+                        {
+                            Header = $"{segment} ({count})",
+                            Tag = path,
+                            IsExpanded = true,
+                            IsSelected = path.Equals(
+                                _selectedAssetFolder,
+                                StringComparison.OrdinalIgnoreCase),
+                        };
+                        if (parent is null)
+                        {
+                            AssetFoldersTree.Items.Add(item);
+                        }
+                        else
+                        {
+                            parent.Items.Add(item);
+                        }
+                        items[path] = item;
+                    }
+                    parent = item;
+                    parentPath = path;
+                }
+            }
+        }
+        finally
+        {
+            _refreshingAssetFolders = false;
+        }
+        var hasFolder = _selectedAssetFolder is not null;
+        RenameFolderButton.IsEnabled = hasFolder;
+        DeleteFolderButton.IsEnabled = hasFolder;
+    }
+
+    private string AssetSize(NovelAsset asset)
+    {
+        var path = ResolveAssetPath(asset);
+        if (!File.Exists(path))
+        {
+            return "нет файла";
+        }
+        var bytes = new FileInfo(path).Length;
+        return bytes switch
+        {
+            >= 1024L * 1024L =>
+                $"{bytes / (1024d * 1024d):0.##} МБ",
+            >= 1024L => $"{bytes / 1024d:0.##} КБ",
+            _ => $"{bytes} Б",
+        };
+    }
+
+    private void RefreshAssetPreview()
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        var selected = view is not null;
+        RenameAssetButton.IsEnabled = selected;
+        MoveAssetButton.IsEnabled = selected;
+        CopyAssetReferenceButton.IsEnabled = selected;
+        DeleteAssetButton.IsEnabled = selected;
+        AssetPreviewImage.Source = null;
+        AssetReferenceText.Text = selected
+            ? AssetReference.Create(view!.Id)
+            : string.Empty;
+        AssetPathText.Text = selected ? view!.Path : string.Empty;
+        AssetUsageText.Text = selected
+            ? $"Использований в проекте: {view!.UsageCount}"
+            : string.Empty;
+        AssetPreviewPlaceholder.Text = selected
+            ? view!.Asset.Kind == AssetKind.Audio
+                ? "Аудиофайл"
+                : view.Asset.Kind == AssetKind.Other
+                    ? "Файл без предпросмотра"
+                    : "Изображение не найдено"
+            : "Выберите ассет";
+        AssetPreviewPlaceholder.Visibility = Visibility.Visible;
+
+        if (view?.Asset.Kind != AssetKind.Image)
+        {
+            return;
+        }
+        var path = ResolveAssetPath(view.Asset);
+        if (!File.Exists(path))
+        {
+            return;
+        }
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+            AssetPreviewImage.Source = image;
+            AssetPreviewPlaceholder.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception)
+        {
+            AssetPreviewPlaceholder.Text = "Не удалось открыть изображение";
+        }
+    }
+
+    private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshAssetPreview();
+
+    private void AssetFoldersTree_SelectedItemChanged(
+        object sender,
+        RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (_refreshingAssetFolders)
+        {
+            return;
+        }
+        _selectedAssetFolder = (e.NewValue as TreeViewItem)?.Tag as string;
+        RefreshAssetList();
+    }
+
+    private void OpenAssetManager_Click(object sender, RoutedEventArgs e) =>
+        WorkspaceTabs.SelectedItem = FilesTab;
+
+    private void ImportAssets_Click(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Импортировать ассеты в проект",
+            Filter =
+                "Ассеты|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac|"
+                + "Все файлы|*.*",
+            Multiselect = true,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var before = _project.Assets.Count;
+            foreach (var file in dialog.FileNames)
+            {
+                _ = ImportAssetFile(file);
+            }
+            if (_project.Assets.Count != before)
+            {
+                MarkDirty();
+            }
+            RefreshAssets();
+            StatusText.Text = $"Импортировано файлов: {dialog.FileNames.Length}";
+        }
+        catch (IOException error)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось импортировать ассет:\n\n{error.Message}",
+                "Импорт файлов",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void CreateAssetFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new AssetFolderEditorWindow("Новая папка") { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+        var folder = _selectedAssetFolder is null
+            ? dialog.FolderName
+            : $"{_selectedAssetFolder}/{dialog.FolderName}";
+        try
+        {
+            ProjectAssets.CreateFolder(_project, folder);
+            _selectedAssetFolder = ProjectAssets.NormalizeFolder(folder);
+            if (_projectPath is not null)
+            {
+                Directory.CreateDirectory(
+                    Path.Combine(
+                        ProjectAssets.GetAssetsDirectory(_projectPath),
+                        _selectedAssetFolder.Replace(
+                            '/',
+                            Path.DirectorySeparatorChar)));
+            }
+            MarkDirty();
+            RefreshAssets();
+        }
+        catch (InvalidDataException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Новая папка",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void RenameAssetFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedAssetFolder is null || !EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+        var currentName = _selectedAssetFolder.Split('/')[^1];
+        var dialog = new AssetFolderEditorWindow(
+            "Переименовать папку",
+            currentName)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true || dialog.FolderName == currentName)
+        {
+            return;
+        }
+        try
+        {
+            var parentSeparator = _selectedAssetFolder.LastIndexOf('/');
+            var parent = parentSeparator < 0
+                ? string.Empty
+                : _selectedAssetFolder[..parentSeparator];
+            ProjectAssets.RenameFolder(
+                _project,
+                _projectPath!,
+                _selectedAssetFolder,
+                dialog.FolderName);
+            _selectedAssetFolder = parent.Length == 0
+                ? dialog.FolderName
+                : $"{parent}/{dialog.FolderName}";
+            MarkDirty();
+            RefreshAssets();
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Переименование папки",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void DeleteAssetFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedAssetFolder is null || !EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+        var result = MessageBox.Show(
+            this,
+            $"Удалить пустую папку «{_selectedAssetFolder}»?",
+            "Удаление папки",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning);
+        if (result != MessageBoxResult.OK)
+        {
+            return;
+        }
+        try
+        {
+            ProjectAssets.DeleteFolder(
+                _project,
+                _projectPath!,
+                _selectedAssetFolder);
+            _selectedAssetFolder = null;
+            MarkDirty();
+            RefreshAssets();
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidOperationException)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Удаление папки",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void MoveAsset_Click(object sender, RoutedEventArgs e)
+    {
+        var asset = (AssetsGrid.SelectedItem as AssetView)?.Asset;
+        if (asset is null || !EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+        var dialog = new AssetFolderPickerWindow(
+            _project.AssetFolders,
+            asset.Folder)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+        try
+        {
+            ProjectAssets.MoveAsset(
+                _project,
+                _projectPath!,
+                asset,
+                dialog.SelectedFolder);
+            _selectedAssetFolder = dialog.SelectedFolder;
+            MarkDirty();
+            RefreshAssets();
+        }
+        catch (IOException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Перемещение ассета",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private string ImportAssetFile(string sourcePath)
+    {
+        if (_projectPath is null)
+        {
+            throw new InvalidOperationException(
+                "Сначала сохраните проект, чтобы импортировать ассеты.");
+        }
+        var asset = ProjectAssets.Import(
+            _project,
+            _projectPath,
+            sourcePath,
+            _selectedAssetFolder);
+        return AssetReference.Create(asset.Id);
+    }
+
+    private void RenameAsset_Click(object sender, RoutedEventArgs e)
+    {
+        var asset = (AssetsGrid.SelectedItem as AssetView)?.Asset;
+        if (asset is null)
+        {
+            return;
+        }
+        var dialog = new AssetIdEditorWindow(asset.Id) { Owner = this };
+        if (dialog.ShowDialog() != true
+            || asset.Id.Equals(dialog.AssetId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        if (_project.FindAsset(dialog.AssetId) is not null)
+        {
+            MessageBox.Show(
+                this,
+                "Ассет с таким именем уже существует.",
+                "Переименование ассета",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var oldId = asset.Id;
+        _project.ReplaceAssetReference(
+            oldId,
+            AssetReference.Create(dialog.AssetId));
+        asset.Id = dialog.AssetId;
+        MarkDirty();
+        RefreshAssets();
+        AssetsGrid.SelectedItem = AssetsGrid.Items
+            .OfType<AssetView>()
+            .FirstOrDefault(view => view.Id == dialog.AssetId);
+    }
+
+    private void CopyAssetReference_Click(object sender, RoutedEventArgs e)
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        if (view is null)
+        {
+            return;
+        }
+        try
+        {
+            Clipboard.SetText(AssetReference.Create(view.Id));
+            StatusText.Text = $"Скопировано: @{view.Id}";
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            StatusText.Text = "Буфер обмена временно недоступен";
+        }
+    }
+
+    private void DeleteAsset_Click(object sender, RoutedEventArgs e)
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        if (view is null)
+        {
+            return;
+        }
+        var result = MessageBox.Show(
+            this,
+            $"Удалить ассет «@{view.Id}»?\n\n"
+            + $"Использований: {view.UsageCount}.\n"
+            + "Да — удалить запись и физический файл.\n"
+            + "Нет — удалить только запись из проекта.",
+            "Удаление ассета",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Warning);
+        if (result == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        _project.ReplaceAssetReference(view.Id, string.Empty);
+        _project.Assets.Remove(view.Asset);
+        if (result == MessageBoxResult.Yes)
+        {
+            try
+            {
+                DeleteManagedAssetFile(view.Asset);
+            }
+            catch (Exception error) when (
+                error is IOException
+                or UnauthorizedAccessException)
+            {
+                MessageBox.Show(
+                    this,
+                    $"Запись удалена из проекта, но файл удалить не удалось:\n\n{error.Message}",
+                    "Удаление ассета",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        MarkDirty();
+        RefreshAssets();
+    }
+
+    private void DeleteManagedAssetFile(NovelAsset asset)
+    {
+        if (_projectPath is null)
+        {
+            return;
+        }
+        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(_projectPath))!;
+        var assetsDirectory = Path.GetFullPath(
+            Path.Combine(projectDirectory, "assets"))
+            + Path.DirectorySeparatorChar;
+        var path = ResolveAssetPath(asset);
+        if (path.StartsWith(
+                assetsDirectory,
+                StringComparison.OrdinalIgnoreCase)
+            && File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    private void OpenAssetsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+        var directory = Path.Combine(GetAssetDirectory(), "assets");
+        Directory.CreateDirectory(directory);
+        Process.Start(
+            new ProcessStartInfo
+            {
+                FileName = directory,
+                UseShellExecute = true,
+            });
+    }
+
+    private bool EnsureProjectSavedForAssets()
+    {
+        if (!EnsureCodeApplied())
+        {
+            return false;
+        }
+        if (_projectPath is not null)
+        {
+            return true;
+        }
+        MessageBox.Show(
+            this,
+            "Сначала сохраните проект. Ассеты будут скопированы в папку assets рядом с ним.",
+            "Файлы проекта",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+        return SaveProjectAs();
+    }
+
+    private string ResolveAssetPath(NovelAsset asset)
+    {
+        return _projectPath is null
+            ? Path.GetFullPath(asset.Path)
+            : ProjectAssets.ResolvePath(_projectPath, asset);
     }
 
     private void RefreshWindowTitle()
@@ -326,6 +1238,10 @@ public partial class MainWindow : Window
 
     private bool SaveProject()
     {
+        if (!EnsureCodeApplied())
+        {
+            return false;
+        }
         if (_projectPath is null)
         {
             return SaveProjectAs();
@@ -335,6 +1251,10 @@ public partial class MainWindow : Window
 
     private bool SaveProjectAs()
     {
+        if (!EnsureCodeApplied())
+        {
+            return false;
+        }
         var dialog = new SaveFileDialog
         {
             Title = "Сохранить проект новеллы",
@@ -464,24 +1384,41 @@ public partial class MainWindow : Window
 
     private string? BrowseAsset(string title, string filter)
     {
+        if (!EnsureProjectSavedForAssets())
+        {
+            return null;
+        }
         var dialog = new OpenFileDialog
         {
             Title = title,
             Filter = $"{filter}|Все файлы|*.*",
+            InitialDirectory = Path.Combine(GetAssetDirectory(), "assets"),
         };
-        return dialog.ShowDialog(this) == true
-            ? MakeProjectRelative(dialog.FileName)
-            : null;
-    }
-
-    private string MakeProjectRelative(string path)
-    {
-        if (_projectPath is null)
+        if (dialog.ShowDialog(this) != true)
         {
-            return path;
+            return null;
         }
-        var directory = Path.GetDirectoryName(_projectPath);
-        return directory is null ? path : Path.GetRelativePath(directory, path);
+        try
+        {
+            var count = _project.Assets.Count;
+            var reference = ImportAssetFile(dialog.FileName);
+            if (_project.Assets.Count != count)
+            {
+                MarkDirty();
+                RefreshAssets();
+            }
+            return reference;
+        }
+        catch (IOException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Импорт ассета",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return null;
+        }
     }
 
     private void AddCharacter_Click(object sender, RoutedEventArgs e)
@@ -499,6 +1436,11 @@ public partial class MainWindow : Window
         }
 
         node.InheritCharacters = false;
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("inheritCharacters");
+            node.PropertyOverrides.Add("characters");
+        }
         InheritCharactersCheck.IsChecked = false;
         node.Characters.Add(
             new CharacterPlacement
@@ -528,6 +1470,11 @@ public partial class MainWindow : Window
         character.Name = dialog.CharacterName;
         character.Sprite = NormalizeAssetPath(dialog.Sprite);
         character.Position = dialog.Position;
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node?.UsesTypeDefaults == true)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
         MarkDirty();
     }
 
@@ -540,6 +1487,10 @@ public partial class MainWindow : Window
             return;
         }
         node.Characters.Remove(character);
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
         MarkDirty();
     }
 
@@ -702,6 +1653,10 @@ public partial class MainWindow : Window
 
     private void RunProject()
     {
+        if (!EnsureCodeApplied())
+        {
+            return;
+        }
         if (!ApplyProperties())
         {
             return;
@@ -721,6 +1676,10 @@ public partial class MainWindow : Window
                 MessageBoxImage.Information);
             return;
         }
+        if (!EnsureCodeApplied())
+        {
+            return;
+        }
         if (!ApplyProperties())
         {
             return;
@@ -734,13 +1693,38 @@ public partial class MainWindow : Window
             : Path.GetDirectoryName(Path.GetFullPath(_projectPath))
                 ?? Environment.CurrentDirectory;
 
-    private string NormalizeAssetPath(string path) =>
-        path.Length == 0 || !Path.IsPathRooted(path)
-            ? path
-            : MakeProjectRelative(path);
+    private string NormalizeAssetPath(string path)
+    {
+        if (path.Length == 0 || !Path.IsPathRooted(path))
+        {
+            return path;
+        }
+        if (!EnsureProjectSavedForAssets())
+        {
+            return path;
+        }
+        try
+        {
+            return ImportAssetFile(path);
+        }
+        catch (IOException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Импорт ассета",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return path;
+        }
+    }
 
     private void ValidateProject_Click(object sender, RoutedEventArgs e)
     {
+        if (!EnsureCodeApplied())
+        {
+            return;
+        }
         try
         {
             _project.Validate();
@@ -806,5 +1790,21 @@ public partial class MainWindow : Window
         public string Id => Output.Id;
         public string Label => Output.Label;
         public string Condition => Output.Condition.Length == 0 ? "всегда" : Output.Condition;
+    }
+
+    private sealed record AssetView(
+        NovelAsset Asset,
+        int UsageCount,
+        string Size)
+    {
+        public string Id => Asset.Id;
+        public string Kind => Asset.Kind switch
+        {
+            AssetKind.Image => "Изображение",
+            AssetKind.Audio => "Аудио",
+            _ => "Файл",
+        };
+        public string Folder => Asset.Folder;
+        public string Path => Asset.Path;
     }
 }

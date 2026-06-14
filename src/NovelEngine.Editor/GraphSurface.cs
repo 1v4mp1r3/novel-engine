@@ -42,6 +42,7 @@ public sealed class GraphSurface : FrameworkElement
     public event EventHandler? ProjectChanged;
     public event Action<string>? AddChoiceRequested;
     public event Action<string>? PreviewNodeRequested;
+    public event Action<string>? OpenNodeCodeRequested;
     public event Action<string, string>? TransitionSettingsRequested;
 
     public void SetProject(NovelProject project)
@@ -189,6 +190,12 @@ public sealed class GraphSurface : FrameworkElement
         SelectNode(node?.Id);
         if (node is null)
         {
+            return;
+        }
+        if (e.ClickCount >= 2)
+        {
+            OpenNodeCodeRequested?.Invoke(node.Id);
+            e.Handled = true;
             return;
         }
 
@@ -476,12 +483,24 @@ public sealed class GraphSurface : FrameworkElement
         {
             case InheritanceResource.Music:
                 node.InheritMusic = true;
+                if (node.UsesTypeDefaults)
+                {
+                    node.PropertyOverrides.Add("inheritMusic");
+                }
                 break;
             case InheritanceResource.Background:
                 node.InheritBackground = true;
+                if (node.UsesTypeDefaults)
+                {
+                    node.PropertyOverrides.Add("inheritBackground");
+                }
                 break;
             case InheritanceResource.Characters:
                 node.InheritCharacters = true;
+                if (node.UsesTypeDefaults)
+                {
+                    node.PropertyOverrides.Add("inheritCharacters");
+                }
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(resource), resource, null);

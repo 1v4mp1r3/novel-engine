@@ -230,6 +230,154 @@ public sealed class TransitionEditorWindow : Window
     }
 }
 
+public sealed class AssetIdEditorWindow : Window
+{
+    private readonly TextBox _idBox;
+
+    public AssetIdEditorWindow(string assetId)
+    {
+        Title = "Переименовать ассет";
+        Width = 480;
+        Height = 210;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.NoResize;
+
+        _idBox = DialogUi.TextBox(assetId);
+        _idBox.SelectAll();
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(DialogUi.Label("Имя для ссылки @имя"));
+        panel.Children.Add(_idBox);
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "Допустимы буквы, цифры, _, -. Имя не может начинаться с цифры.",
+                Foreground = (System.Windows.Media.Brush)Application.Current.Resources["MutedBrush"],
+                TextWrapping = TextWrapping.Wrap,
+            });
+        panel.Children.Add(DialogUi.Buttons(Save, this));
+        Content = panel;
+    }
+
+    public string AssetId => _idBox.Text.Trim();
+
+    private void Save()
+    {
+        if (!AssetReference.IsValidId(AssetId))
+        {
+            MessageBox.Show(
+                this,
+                "Укажите корректное имя ассета.",
+                "Переименование ассета",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        DialogResult = true;
+    }
+}
+
+public sealed class AssetFolderEditorWindow : Window
+{
+    private readonly TextBox _nameBox;
+
+    public AssetFolderEditorWindow(string title, string initialName = "")
+    {
+        Title = title;
+        Width = 480;
+        Height = 200;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.NoResize;
+
+        _nameBox = DialogUi.TextBox(initialName);
+        _nameBox.SelectAll();
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(DialogUi.Label("Имя папки"));
+        panel.Children.Add(_nameBox);
+        panel.Children.Add(DialogUi.Buttons(Save, this));
+        Content = panel;
+    }
+
+    public string FolderName => _nameBox.Text.Trim();
+
+    private void Save()
+    {
+        try
+        {
+            var folder = ProjectAssets.NormalizeFolder(FolderName);
+            if (folder.Length == 0 || folder.Contains('/'))
+            {
+                throw new InvalidDataException(
+                    "Укажите одно корректное имя папки.");
+            }
+            DialogResult = true;
+        }
+        catch (InvalidDataException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+}
+
+public sealed class AssetFolderPickerWindow : Window
+{
+    private readonly ComboBox _folderBox;
+
+    public AssetFolderPickerWindow(
+        IEnumerable<string> folders,
+        string currentFolder)
+    {
+        Title = "Переместить ассет";
+        Width = 520;
+        Height = 220;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.NoResize;
+
+        var values = folders
+            .OrderBy(folder => folder, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        _folderBox = new ComboBox
+        {
+            ItemsSource = values,
+            SelectedItem = values.FirstOrDefault(
+                folder => folder.Equals(
+                    currentFolder,
+                    StringComparison.OrdinalIgnoreCase)),
+            Margin = new Thickness(0, 4, 0, 12),
+        };
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(DialogUi.Label("Целевая папка"));
+        panel.Children.Add(_folderBox);
+        panel.Children.Add(DialogUi.Buttons(Save, this));
+        Content = panel;
+    }
+
+    public string SelectedFolder =>
+        _folderBox.SelectedItem as string ?? string.Empty;
+
+    private void Save()
+    {
+        if (_folderBox.SelectedItem is not string)
+        {
+            MessageBox.Show(
+                this,
+                "Выберите папку.",
+                Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        DialogResult = true;
+    }
+}
+
 internal static class DialogUi
 {
     public static StackPanel Panel() =>

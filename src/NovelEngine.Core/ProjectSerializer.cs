@@ -18,11 +18,13 @@ public static class ProjectSerializer
         var project = JsonSerializer.Deserialize<NovelProject>(stream, Options)
             ?? throw new InvalidDataException("Файл проекта пуст.");
         project.Validate();
+        project.FormatVersion = 4;
         return project;
     }
 
     public static void Save(NovelProject project, string path)
     {
+        project.FormatVersion = 4;
         project.Validate();
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -38,6 +40,7 @@ public static class ProjectSerializer
 
     public static string ToJson(NovelProject project)
     {
+        project.FormatVersion = 4;
         project.Validate();
         return JsonSerializer.Serialize(project, Options);
     }
@@ -47,6 +50,7 @@ public static class ProjectSerializer
         var project = JsonSerializer.Deserialize<NovelProject>(json, Options)
             ?? throw new InvalidDataException("JSON проекта пуст.");
         project.Validate();
+        project.FormatVersion = 4;
         return project;
     }
 }

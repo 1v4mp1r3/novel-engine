@@ -11,6 +11,7 @@ namespace NovelEngine.Editor;
 
 public partial class PreviewWindow : Window
 {
+    private readonly NovelProject _project;
     private readonly NovelPlayer _player;
     private readonly string _assetDirectory;
     private readonly MediaPlayer _musicPlayer = new();
@@ -24,6 +25,7 @@ public partial class PreviewWindow : Window
         string assetDirectory)
     {
         InitializeComponent();
+        _project = project;
         _player = new NovelPlayer(project);
         _assetDirectory = assetDirectory;
         Title = startNodeId is null ? "Тестовый запуск" : "Предпросмотр ноды";
@@ -274,6 +276,7 @@ public partial class PreviewWindow : Window
 
     private string ResolveAsset(string path)
     {
+        path = _project.ResolveAssetReference(path);
         if (path.Length == 0 || Path.IsPathRooted(path))
         {
             return path;

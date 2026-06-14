@@ -9,7 +9,10 @@ namespace NovelEngine.Editor;
 
 internal static class ScreenshotRenderer
 {
-    public static void RenderEditor(string path)
+    public static void RenderEditor(
+        string path,
+        bool showCode = false,
+        bool showFiles = false)
     {
         var window = new MainWindow
         {
@@ -21,7 +24,18 @@ internal static class ScreenshotRenderer
             WindowStartupLocation = WindowStartupLocation.Manual,
         };
         window.Show();
-        window.SelectPreviewNode(NodeKind.Dialogue);
+        if (showFiles)
+        {
+            window.SelectFilesWorkspace();
+        }
+        else if (showCode)
+        {
+            window.SelectCodeWorkspace();
+        }
+        else
+        {
+            window.SelectPreviewNode(NodeKind.Dialogue);
+        }
         RenderWindow(window, path);
         window.Close();
     }
@@ -36,8 +50,22 @@ internal static class ScreenshotRenderer
         CreateImage(character, 360, 640, backgroundImage: false);
 
         var project = NovelProject.CreateDefault();
+        project.Assets.Add(
+            new NovelAsset
+            {
+                Id = "preview_background",
+                Kind = AssetKind.Image,
+                Path = background,
+            });
+        project.Assets.Add(
+            new NovelAsset
+            {
+                Id = "preview_character",
+                Kind = AssetKind.Image,
+                Path = character,
+            });
         var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
-        scene.Background = background;
+        scene.Background = "@preview_background";
         scene.InheritBackground = false;
         scene.InheritCharacters = false;
         scene.Characters.Add(
@@ -45,7 +73,7 @@ internal static class ScreenshotRenderer
             {
                 Id = "preview-character",
                 Name = "Герой",
-                Sprite = character,
+                Sprite = "@preview_character",
                 Position = CharacterPosition.Left,
             });
         var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
