@@ -21,6 +21,121 @@ public enum AssetKind
     Other,
 }
 
+public enum MainMenuElementKind
+{
+    Label,
+    Button,
+    ImageLabel,
+    ImageButton,
+}
+
+public enum MainMenuAction
+{
+    None,
+    NewGame,
+    Continue,
+    LoadGame,
+    Settings,
+    Exit,
+}
+
+public sealed class MainMenuElement
+{
+    public required string Id { get; init; }
+    public MainMenuElementKind Kind { get; set; }
+    public MainMenuAction Action { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public string Image { get; set; } = string.Empty;
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Width { get; set; } = 260;
+    public double Height { get; set; } = 58;
+    public string FontFamily { get; set; } = "Segoe UI";
+    public double FontSize { get; set; } = 26;
+    public string Foreground { get; set; } = "#F6F8FB";
+    public string Background { get; set; } = "#D025354A";
+    public string Border { get; set; } = "#50657F";
+    public string CustomStyleCode { get; set; } = string.Empty;
+
+    public MainMenuElement Clone() =>
+        new()
+        {
+            Id = Id,
+            Kind = Kind,
+            Action = Action,
+            Text = Text,
+            Image = Image,
+            X = X,
+            Y = Y,
+            Width = Width,
+            Height = Height,
+            FontFamily = FontFamily,
+            FontSize = FontSize,
+            Foreground = Foreground,
+            Background = Background,
+            Border = Border,
+            CustomStyleCode = CustomStyleCode,
+        };
+}
+
+public sealed class MainMenuDesign
+{
+    public string Background { get; set; } = string.Empty;
+    public List<MainMenuElement> Elements { get; init; } =
+    [
+        new()
+        {
+            Id = "title",
+            Kind = MainMenuElementKind.Label,
+            Text = "Новая новелла",
+            X = 120,
+            Y = 100,
+            Width = 760,
+            Height = 72,
+            FontSize = 44,
+            Background = "Transparent",
+        },
+        new()
+        {
+            Id = "new-game",
+            Kind = MainMenuElementKind.Button,
+            Action = MainMenuAction.NewGame,
+            Text = "Новая игра",
+            X = 140,
+            Y = 260,
+        },
+        new()
+        {
+            Id = "load-game",
+            Kind = MainMenuElementKind.Button,
+            Action = MainMenuAction.LoadGame,
+            Text = "Загрузить",
+            X = 140,
+            Y = 335,
+        },
+        new()
+        {
+            Id = "exit",
+            Kind = MainMenuElementKind.Button,
+            Action = MainMenuAction.Exit,
+            Text = "Выход",
+            X = 140,
+            Y = 410,
+        },
+    ];
+
+    public MainMenuDesign Clone()
+    {
+        var clone = new MainMenuDesign
+        {
+            Background = Background,
+        };
+        clone.Elements.Clear();
+        clone.Elements.AddRange(Elements.Select(element => element.Clone()));
+        return clone;
+    }
+}
+
 public sealed class NovelAsset
 {
     public required string Id { get; set; }
@@ -40,6 +155,9 @@ public sealed class CharacterPlacement
     public double Y { get; set; } = CharacterLayout.DefaultCenterY;
     public double Scale { get; set; } = 1;
     public double Rotation { get; set; }
+    public string VoiceSound { get; set; } = string.Empty;
+    public double VoicePitch { get; set; } = 1;
+    public int VoiceEveryNthCharacter { get; set; } = 2;
 
     public CharacterPlacement Clone() =>
         new()
@@ -53,6 +171,9 @@ public sealed class CharacterPlacement
             Y = Y,
             Scale = Scale,
             Rotation = Rotation,
+            VoiceSound = VoiceSound,
+            VoicePitch = VoicePitch,
+            VoiceEveryNthCharacter = VoiceEveryNthCharacter,
         };
 }
 
@@ -130,9 +251,10 @@ public sealed class NovelNode
 
 public sealed class NovelProject
 {
-    public int FormatVersion { get; set; } = 4;
+    public int FormatVersion { get; set; } = 5;
     public string Title { get; set; } = "Новая новелла";
     public string SourceCode { get; set; } = string.Empty;
+    public MainMenuDesign MainMenu { get; init; } = new();
     public List<string> AssetFolders { get; init; } = [];
     public List<NovelAsset> Assets { get; init; } = [];
     public List<NodeTypeDefinition> NodeTypes { get; init; } = [];
@@ -174,6 +296,10 @@ public sealed class NovelProject
             foreach (var character in node.Characters)
             {
                 character.Sprite = Replace(character.Sprite, reference, replacement);
+                character.VoiceSound = Replace(
+                    character.VoiceSound,
+                    reference,
+                    replacement);
             }
             foreach (var output in node.Outputs)
             {
@@ -182,6 +308,11 @@ public sealed class NovelProject
                     reference,
                     replacement);
             }
+        }
+        MainMenu.Background = Replace(MainMenu.Background, reference, replacement);
+        foreach (var element in MainMenu.Elements)
+        {
+            element.Image = Replace(element.Image, reference, replacement);
         }
     }
 
@@ -293,7 +424,7 @@ public sealed class NovelProject
 
     public void Validate()
     {
-        if (FormatVersion is < 2 or > 4)
+        if (FormatVersion is < 2 or > 5)
         {
             throw new InvalidDataException($"Версия формата {FormatVersion} не поддерживается.");
         }
@@ -410,7 +541,20 @@ public sealed class NovelProject
                         $"Повторяющийся id персонажа: {character.Id}");
                 }
                 ValidateCharacterTransform(character);
+                ValidateCharacterVoice(character);
             }
+        }
+
+        var mainMenuIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var element in MainMenu.Elements)
+        {
+            if (string.IsNullOrWhiteSpace(element.Id)
+                || !mainMenuIds.Add(element.Id))
+            {
+                throw new InvalidDataException(
+                    $"Повторяющийся или пустой id элемента главного меню: {element.Id}");
+            }
+            ValidateMainMenuElement(element);
         }
 
         foreach (var node in Nodes)
@@ -454,6 +598,7 @@ public sealed class NovelProject
                         $"Повторяющийся id персонажа: {character.Id}");
                 }
                 ValidateCharacterTransform(character);
+                ValidateCharacterVoice(character);
             }
         }
 
@@ -486,6 +631,44 @@ public sealed class NovelProject
         {
             throw new InvalidDataException(
                 $"Масштаб персонажа «{character.Name}» должен быть от 0.05 до 8.");
+        }
+    }
+
+    private static void ValidateCharacterVoice(CharacterPlacement character)
+    {
+        if (!double.IsFinite(character.VoicePitch)
+            || character.VoicePitch is < 0.25 or > 4)
+        {
+            throw new InvalidDataException(
+                $"Высота голоса персонажа «{character.Name}» должна быть от 0.25 до 4.");
+        }
+        if (character.VoiceEveryNthCharacter is < 1 or > 12)
+        {
+            throw new InvalidDataException(
+                $"Частота голоса персонажа «{character.Name}» должна быть от 1 до 12.");
+        }
+    }
+
+    private static void ValidateMainMenuElement(MainMenuElement element)
+    {
+        if (!double.IsFinite(element.X)
+            || !double.IsFinite(element.Y)
+            || !double.IsFinite(element.Width)
+            || !double.IsFinite(element.Height)
+            || !double.IsFinite(element.FontSize))
+        {
+            throw new InvalidDataException(
+                $"У элемента главного меню «{element.Id}» некорректная геометрия.");
+        }
+        if (element.Width is < 8 or > 4000 || element.Height is < 8 or > 4000)
+        {
+            throw new InvalidDataException(
+                $"Размер элемента главного меню «{element.Id}» должен быть от 8 до 4000.");
+        }
+        if (element.FontSize is < 6 or > 180)
+        {
+            throw new InvalidDataException(
+                $"Размер шрифта элемента главного меню «{element.Id}» должен быть от 6 до 180.");
         }
     }
 
@@ -581,7 +764,23 @@ public sealed class NovelProject
                     character.Sprite,
                     AssetKind.Image,
                     $"тип {type.Name}, персонаж {character.Name}");
+                yield return new AssetValue(
+                    character.VoiceSound,
+                    AssetKind.Audio,
+                    $"тип {type.Name}, голос персонажа {character.Name}");
             }
+        }
+
+        yield return new AssetValue(
+            MainMenu.Background,
+            AssetKind.Image,
+            "главное меню, фон");
+        foreach (var element in MainMenu.Elements)
+        {
+            yield return new AssetValue(
+                element.Image,
+                AssetKind.Image,
+                $"главное меню, элемент {element.Id}");
         }
 
         foreach (var node in Nodes)
@@ -600,6 +799,10 @@ public sealed class NovelProject
                     character.Sprite,
                     AssetKind.Image,
                     $"нода {node.Title}, персонаж {character.Name}");
+                yield return new AssetValue(
+                    character.VoiceSound,
+                    AssetKind.Audio,
+                    $"нода {node.Title}, голос персонажа {character.Name}");
             }
             foreach (var output in node.Outputs)
             {
@@ -644,6 +847,10 @@ public sealed class NovelProject
         foreach (var character in defaults.Characters)
         {
             character.Sprite = Replace(character.Sprite, reference, replacement);
+            character.VoiceSound = Replace(
+                character.VoiceSound,
+                reference,
+                replacement);
         }
     }
 

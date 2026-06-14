@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -67,6 +68,9 @@ public sealed class CharacterEditorWindow : Window
 {
     private readonly TextBox _nameBox;
     private readonly TextBox _spriteBox;
+    private readonly TextBox _voiceBox;
+    private readonly TextBox _voicePitchBox;
+    private readonly TextBox _voiceEveryBox;
     private readonly ComboBox _positionBox;
     private readonly string _assetDirectory;
 
@@ -75,12 +79,17 @@ public sealed class CharacterEditorWindow : Window
         _assetDirectory = assetDirectory;
         Title = character is null ? "Добавить персонажа" : "Изменить персонажа";
         Width = 560;
-        Height = 350;
+        Height = 540;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
         _nameBox = DialogUi.TextBox(character?.Name ?? string.Empty);
         _spriteBox = DialogUi.TextBox(character?.Sprite ?? string.Empty);
+        _voiceBox = DialogUi.TextBox(character?.VoiceSound ?? string.Empty);
+        _voicePitchBox = DialogUi.TextBox(
+            (character?.VoicePitch ?? 1).ToString(CultureInfo.InvariantCulture));
+        _voiceEveryBox = DialogUi.TextBox(
+            (character?.VoiceEveryNthCharacter ?? 2).ToString(CultureInfo.InvariantCulture));
         _positionBox = new ComboBox
         {
             ItemsSource = new[] { "Слева", "По центру", "Справа" },
@@ -112,12 +121,45 @@ public sealed class CharacterEditorWindow : Window
         panel.Children.Add(spritePanel);
         panel.Children.Add(DialogUi.Label("Позиция"));
         panel.Children.Add(_positionBox);
+        panel.Children.Add(DialogUi.Label("Голос персонажа"));
+        var voicePanel = new DockPanel();
+        var browseVoice = new Button
+        {
+            Content = "...",
+            Width = 42,
+            Margin = new Thickness(7, 4, 0, 12),
+        };
+        browseVoice.Click += (_, _) => BrowseVoice();
+        DockPanel.SetDock(browseVoice, Dock.Right);
+        _voiceBox.Margin = new Thickness(0, 4, 0, 12);
+        voicePanel.Children.Add(browseVoice);
+        voicePanel.Children.Add(_voiceBox);
+        panel.Children.Add(voicePanel);
+        panel.Children.Add(DialogUi.Label("Pitch голоса (0.25 - 4)"));
+        panel.Children.Add(_voicePitchBox);
+        panel.Children.Add(DialogUi.Label("Озвучивать каждый N-й символ (1 - 12)"));
+        panel.Children.Add(_voiceEveryBox);
         panel.Children.Add(DialogUi.Buttons(Save, this));
         Content = panel;
     }
 
     public string CharacterName => _nameBox.Text.Trim();
     public string Sprite => _spriteBox.Text.Trim();
+    public string VoiceSound => _voiceBox.Text.Trim();
+    public double VoicePitch => double.TryParse(
+        _voicePitchBox.Text,
+        NumberStyles.Float,
+        CultureInfo.InvariantCulture,
+        out var value)
+            ? value
+            : 1;
+    public int VoiceEveryNthCharacter => int.TryParse(
+        _voiceEveryBox.Text,
+        NumberStyles.Integer,
+        CultureInfo.InvariantCulture,
+        out var value)
+            ? value
+            : 2;
     public CharacterPosition Position => _positionBox.SelectedIndex switch
     {
         0 => CharacterPosition.Left,
@@ -139,6 +181,20 @@ public sealed class CharacterEditorWindow : Window
         }
     }
 
+    private void BrowseVoice()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Выберите звук голоса персонажа",
+            Filter = "Аудио|*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac|Все файлы|*.*",
+            InitialDirectory = Directory.Exists(_assetDirectory) ? _assetDirectory : null,
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            _voiceBox.Text = dialog.FileName;
+        }
+    }
+
     private void Save()
     {
         if (CharacterName.Length == 0)
@@ -146,6 +202,26 @@ public sealed class CharacterEditorWindow : Window
             MessageBox.Show(
                 this,
                 "Укажите имя персонажа.",
+                "Персонаж",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        if (VoicePitch is < 0.25 or > 4)
+        {
+            MessageBox.Show(
+                this,
+                "Pitch голоса должен быть от 0.25 до 4.",
+                "Персонаж",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        if (VoiceEveryNthCharacter is < 1 or > 12)
+        {
+            MessageBox.Show(
+                this,
+                "Частота голоса должна быть от 1 до 12.",
                 "Персонаж",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);

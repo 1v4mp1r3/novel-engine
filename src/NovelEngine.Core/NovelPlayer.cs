@@ -1,4 +1,16 @@
+using System.Text.Json;
+
 namespace NovelEngine.Core;
+
+public sealed class RuntimeSaveState
+{
+    public required string NodeId { get; init; }
+    public Dictionary<string, JsonElement> Variables { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public string CurrentBackground { get; set; } = string.Empty;
+    public string CurrentMusic { get; set; } = string.Empty;
+    public List<CharacterPlacement> CurrentCharacters { get; init; } = [];
+}
 
 public sealed class NovelPlayer
 {
@@ -54,6 +66,43 @@ public sealed class NovelPlayer
             .ToList()
         ?? [];
 
+    public RuntimeSaveState CreateSaveState()
+    {
+        var node = CurrentNode
+            ?? throw new InvalidOperationException("Проигрывание ещё не начато.");
+        return new RuntimeSaveState
+        {
+            NodeId = node.Id,
+            CurrentBackground = State.CurrentBackground,
+            CurrentMusic = State.CurrentMusic,
+            CurrentCharacters =
+            [
+                .. State.CurrentCharacters.Select(character => character.Clone()),
+            ],
+            Variables = State.Variables.ToDictionary(
+                pair => pair.Key,
+                pair => JsonSerializer.SerializeToElement(pair.Value),
+                StringComparer.OrdinalIgnoreCase),
+        };
+    }
+
+    public NovelNode Restore(RuntimeSaveState saveState)
+    {
+        var node = _project.FindNode(saveState.NodeId)
+            ?? throw new InvalidOperationException("Сохранённая нода не найдена.");
+        State.Reset();
+        State.CurrentBackground = saveState.CurrentBackground;
+        State.CurrentMusic = saveState.CurrentMusic;
+        State.CurrentCharacters.AddRange(
+            saveState.CurrentCharacters.Select(character => character.Clone()));
+        foreach (var variable in saveState.Variables)
+        {
+            State.Variables[variable.Key] = RestoreVariable(variable.Value);
+        }
+        CurrentNode = node;
+        return node;
+    }
+
     public NovelNode Choose(string outputId)
     {
         var node = CurrentNode
@@ -93,6 +142,19 @@ public sealed class NovelPlayer
         CurrentNode = node;
         return node;
     }
+
+    private static object? RestoreVariable(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number => element.TryGetInt64(out var integer)
+                ? integer
+                : element.GetDouble(),
+            JsonValueKind.String => element.GetString(),
+            _ => element.GetRawText(),
+        };
 
     private List<PathStep>? FindPath(string startNodeId, string targetNodeId)
     {

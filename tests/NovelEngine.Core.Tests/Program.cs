@@ -8,12 +8,15 @@ var tests = new (string Name, Action Run)[]
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
+    ("runtime save restores node and script state", RuntimeSaveRestoresState),
     ("transition settings survive JSON round trip", TransitionSettingsRoundTrip),
     ("node preview restores inherited state", NodePreviewRestoresState),
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
     ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
     ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
     ("character transforms survive code and JSON", CharacterTransformsRoundTrip),
+    ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
+    ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
@@ -189,6 +192,33 @@ static void InheritedMusicDoesNotChangeTrack()
         "Inherited music changed while entering dialogue.");
 }
 
+static void RuntimeSaveRestoresState()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.Background = "backgrounds/room.png";
+    scene.InheritBackground = false;
+    scene.Script = "set score = 5";
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    dialogue.Script = "add score 2";
+
+    var player = new NovelPlayer(project);
+    var start = player.Start();
+    player.Choose(start.Outputs[0].Id);
+    var save = player.CreateSaveState();
+    player.Choose(scene.Outputs[0].Id);
+    Assert(player.CurrentNode?.Id == dialogue.Id, "Runtime did not advance before restore.");
+
+    var restored = player.Restore(save);
+    Assert(restored.Id == scene.Id, "Save did not restore current node.");
+    Assert(
+        Convert.ToDouble(player.State.Variables["score"]) == 5,
+        "Save did not restore variables.");
+    Assert(
+        player.State.CurrentBackground == "backgrounds/room.png",
+        "Save did not restore background.");
+}
+
 static void TransitionSettingsRoundTrip()
 {
     var project = NovelProject.CreateDefault();
@@ -320,6 +350,98 @@ static void CharacterTransformsRoundTrip()
     Assert(Math.Abs(fromCode.Scale - 1.35) < 0.001, "Code parser changed character scale.");
     Assert(Math.Abs(fromCode.Rotation + 7.5) < 0.001, "Code parser changed character rotation.");
     Assert(Math.Abs(fromJson.X - 742.5) < 0.001, "JSON changed character position.");
+}
+
+static void MainMenuAndVoiceRoundTrip()
+{
+    var project = NovelProject.CreateDefault();
+    project.MainMenu.Background = "backgrounds/menu.png";
+    project.MainMenu.Elements.Add(
+        new MainMenuElement
+        {
+            Id = "logo",
+            Kind = MainMenuElementKind.ImageLabel,
+            Text = "Logo",
+            Image = "ui/logo.png",
+            X = 320,
+            Y = 80,
+            Width = 420,
+            Height = 120,
+            CustomStyleCode = "fontWeight = bold",
+        });
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.InheritCharacters = false;
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой",
+            VoiceSound = "voices/hero.wav",
+            VoicePitch = 1.15,
+            VoiceEveryNthCharacter = 3,
+        });
+
+    var restored = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
+    var restoredLogo = restored.MainMenu.Elements.Single(element => element.Id == "logo");
+    var restoredHero = restored.Nodes
+        .Single(node => node.Id == scene.Id)
+        .Characters
+        .Single();
+
+    Assert(restored.FormatVersion == 5, "New project format version was not written.");
+    Assert(restored.MainMenu.Background == "backgrounds/menu.png", "Main menu background changed.");
+    Assert(restoredLogo.Kind == MainMenuElementKind.ImageLabel, "Main menu element kind changed.");
+    Assert(restoredLogo.Image == "ui/logo.png", "Main menu element image changed.");
+    Assert(restoredHero.VoiceSound == "voices/hero.wav", "Character voice sound changed.");
+    Assert(Math.Abs(restoredHero.VoicePitch - 1.15) < 0.001, "Character voice pitch changed.");
+    Assert(restoredHero.VoiceEveryNthCharacter == 3, "Character voice frequency changed.");
+}
+
+static void MainMenuAndVoiceAssetReferences()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "menu_bg",
+            Kind = AssetKind.Image,
+            Path = "assets/images/menu.png",
+        });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "voice_hero",
+            Kind = AssetKind.Audio,
+            Path = "assets/audio/hero.wav",
+        });
+    project.MainMenu.Background = "@menu_bg";
+    project.MainMenu.Elements.Add(
+        new MainMenuElement
+        {
+            Id = "banner",
+            Kind = MainMenuElementKind.ImageLabel,
+            Image = "@menu_bg",
+            Width = 420,
+            Height = 160,
+        });
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.InheritCharacters = false;
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой",
+            VoiceSound = "@voice_hero",
+        });
+
+    project.Validate();
+    Assert(project.CountAssetReferences("menu_bg") == 2, "Main menu image refs were not counted.");
+    Assert(project.CountAssetReferences("voice_hero") == 1, "Voice refs were not counted.");
+
+    project.ReplaceAssetReference("voice_hero", "@voice_main");
+    Assert(
+        scene.Characters.Single().VoiceSound == "@voice_main",
+        "Voice asset reference was not replaced.");
 }
 
 static void ProjectLanguageRejectsCycles()

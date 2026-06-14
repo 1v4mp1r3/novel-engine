@@ -37,6 +37,7 @@ public partial class MainWindow : Window
         Graph.AddChoiceRequested += nodeId => AddOutput(nodeId);
         Graph.PreviewNodeRequested += PreviewNode;
         Graph.EditNodeSceneRequested += EditNodeScene;
+        Graph.EditMainMenuRequested += EditMainMenu;
         Graph.OpenNodeCodeRequested += NavigateToNodeCode;
         Graph.TransitionSettingsRequested += EditTransition;
         Closing += MainWindow_Closing;
@@ -1471,6 +1472,9 @@ public partial class MainWindow : Window
                 Name = dialog.CharacterName,
                 Sprite = NormalizeAssetPath(dialog.Sprite),
                 Position = dialog.Position,
+                VoiceSound = NormalizeAssetPath(dialog.VoiceSound),
+                VoicePitch = dialog.VoicePitch,
+                VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter,
             });
         MarkDirty();
     }
@@ -1491,6 +1495,9 @@ public partial class MainWindow : Window
 
         character.Name = dialog.CharacterName;
         character.Sprite = NormalizeAssetPath(dialog.Sprite);
+        character.VoiceSound = NormalizeAssetPath(dialog.VoiceSound);
+        character.VoicePitch = dialog.VoicePitch;
+        character.VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter;
         if (character.Position != dialog.Position)
         {
             character.HasCustomTransform = false;
@@ -1964,6 +1971,32 @@ public partial class MainWindow : Window
         }
         MarkDirty();
         StatusText.Text = $"Сцена «{node.Title}» обновлена";
+    }
+
+    private void EditMainMenu()
+    {
+        if (!EnsureCodeApplied() || !ApplyProperties())
+        {
+            return;
+        }
+        var editor = new MainMenuEditorWindow(
+            _project,
+            _project.MainMenu,
+            GetAssetDirectory())
+        {
+            Owner = this,
+        };
+        if (editor.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _project.MainMenu.Background = editor.Design.Background;
+        _project.MainMenu.Elements.Clear();
+        _project.MainMenu.Elements.AddRange(
+            editor.Design.Elements.Select(element => element.Clone()));
+        MarkDirty();
+        StatusText.Text = "Главное меню обновлено";
     }
 
     private string GetAssetDirectory() =>

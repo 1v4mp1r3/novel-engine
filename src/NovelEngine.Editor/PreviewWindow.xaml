@@ -9,6 +9,7 @@
         WindowStartupLocation="CenterOwner"
         Background="#080C12"
         KeyDown="Window_KeyDown"
+        MouseRightButtonUp="Window_MouseRightButtonUp"
         Closed="Window_Closed">
     <Grid x:Name="RootGrid">
         <Image x:Name="BackgroundImage" Stretch="UniformToFill" />
@@ -20,9 +21,20 @@
                     Background="Transparent" />
         </Viewbox>
 
+        <Viewbox x:Name="MainMenuHost"
+                 Stretch="UniformToFill"
+                 Panel.ZIndex="20"
+                 Visibility="Collapsed">
+            <Canvas x:Name="MainMenuStage"
+                    Width="960"
+                    Height="540"
+                    Background="#080C12" />
+        </Viewbox>
+
         <Border x:Name="FadeOverlay"
                 Background="Black"
                 Opacity="0"
+                Panel.ZIndex="30"
                 IsHitTestVisible="False" />
 
         <Border x:Name="DebugPanel"
@@ -35,6 +47,7 @@
                 Background="#E8111823"
                 BorderBrush="#5C7CA5"
                 BorderThickness="1"
+                Panel.ZIndex="40"
                 Visibility="Collapsed">
             <StackPanel>
                 <TextBlock Text="NOVEL ENGINE DEBUG"

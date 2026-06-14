@@ -43,6 +43,7 @@ public sealed class GraphSurface : FrameworkElement
     public event Action<string>? AddChoiceRequested;
     public event Action<string>? PreviewNodeRequested;
     public event Action<string>? EditNodeSceneRequested;
+    public event Action? EditMainMenuRequested;
     public event Action<string>? OpenNodeCodeRequested;
     public event Action<string, string>? TransitionSettingsRequested;
 
@@ -195,7 +196,14 @@ public sealed class GraphSurface : FrameworkElement
         }
         if (e.ClickCount >= 2)
         {
-            OpenNodeCodeRequested?.Invoke(node.Id);
+            if (node.Kind == NodeKind.Start)
+            {
+                EditMainMenuRequested?.Invoke();
+            }
+            else
+            {
+                OpenNodeCodeRequested?.Invoke(node.Id);
+            }
             e.Handled = true;
             return;
         }
@@ -363,9 +371,18 @@ public sealed class GraphSurface : FrameworkElement
             menu.Items.Add(CreateMenuItem(
                 "Предпросмотр с этой ноды",
                 () => PreviewNodeRequested?.Invoke(node.Id)));
-            menu.Items.Add(CreateMenuItem(
-                "Редактировать сцену и персонажей",
-                () => EditNodeSceneRequested?.Invoke(node.Id)));
+            if (node.Kind == NodeKind.Start)
+            {
+                menu.Items.Add(CreateMenuItem(
+                    "Редактировать главное меню",
+                    () => EditMainMenuRequested?.Invoke()));
+            }
+            else
+            {
+                menu.Items.Add(CreateMenuItem(
+                    "Редактировать сцену и персонажей",
+                    () => EditNodeSceneRequested?.Invoke(node.Id)));
+            }
             if (node.Kind == NodeKind.Dialogue)
             {
                 menu.Items.Add(new Separator());
