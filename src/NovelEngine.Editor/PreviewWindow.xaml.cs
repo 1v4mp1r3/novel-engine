@@ -29,6 +29,7 @@ public partial class PreviewWindow : Window
     private readonly MediaPlayer _musicPlayer = new();
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly MediaPlayer _voicePlayer = new();
+    private readonly GameRuntimeSettings _settings = new();
     private string _currentMusicPath = string.Empty;
     private bool _transitioning;
     private bool _paused;
@@ -57,14 +58,12 @@ public partial class PreviewWindow : Window
                 ? project.Title
                 : "Предпросмотр ноды";
 
-        _musicPlayer.Volume = 0.55;
         _musicPlayer.MediaEnded += (_, _) =>
         {
             _musicPlayer.Position = TimeSpan.Zero;
             _musicPlayer.Play();
         };
-        _transitionPlayer.Volume = 0.8;
-        _voicePlayer.Volume = 0.65;
+        ApplyRuntimeSettings();
 
         try
         {
@@ -290,7 +289,7 @@ public partial class PreviewWindow : Window
                 LoadGameFromDialog();
                 break;
             case MainMenuAction.Settings:
-                ShowSettingsPlaceholder();
+                ShowSettings();
                 break;
             case MainMenuAction.Exit:
                 Close();
@@ -576,7 +575,10 @@ public partial class PreviewWindow : Window
                         PlayCharacterVoice(voice);
                     }
                 }
-                await Task.Delay(18, cancellationToken);
+                if (_settings.TextDelayMs > 0)
+                {
+                    await Task.Delay(_settings.TextDelayMs, cancellationToken);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -629,6 +631,7 @@ public partial class PreviewWindow : Window
         {
             _voicePlayer.Stop();
             _voicePlayer.Close();
+            _voicePlayer.Volume = _settings.VoiceVolume;
             _voicePlayer.SpeedRatio = voice.Pitch;
             _voicePlayer.Open(new Uri(voice.SoundPath, UriKind.Absolute));
             _voicePlayer.Play();
@@ -656,7 +659,7 @@ public partial class PreviewWindow : Window
         menu.Items.Add(pause);
         menu.Items.Add(CreateGameMenuItem(
             "Настройки...",
-            ShowSettingsPlaceholder));
+            ShowSettings));
         menu.Items.Add(new Separator());
         var save = CreateGameMenuItem(
             "Сохранить...",
@@ -717,14 +720,28 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void ShowSettingsPlaceholder()
+    private void ShowSettings()
     {
-        MessageBox.Show(
-            this,
-            "Здесь будет окно настроек громкости, скорости текста и отображения.",
-            "Настройки",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+        var dialog = new GameSettingsWindow(_settings.Clone())
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            _settings.CopyFrom(dialog.Settings);
+            ApplyRuntimeSettings();
+        }
+    }
+
+    private void ApplyRuntimeSettings()
+    {
+        _settings.MusicVolume = Math.Clamp(_settings.MusicVolume, 0, 1);
+        _settings.EffectsVolume = Math.Clamp(_settings.EffectsVolume, 0, 1);
+        _settings.VoiceVolume = Math.Clamp(_settings.VoiceVolume, 0, 1);
+        _settings.TextDelayMs = Math.Clamp(_settings.TextDelayMs, 0, 120);
+        _musicPlayer.Volume = _settings.MusicVolume;
+        _transitionPlayer.Volume = _settings.EffectsVolume;
+        _voicePlayer.Volume = _settings.VoiceVolume;
     }
 
     private void SaveGameAs()

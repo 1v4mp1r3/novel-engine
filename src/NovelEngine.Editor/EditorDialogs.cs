@@ -89,7 +89,7 @@ public sealed class CharacterEditorWindow : Window
         _voicePitchBox = DialogUi.TextBox(
             (character?.VoicePitch ?? 1).ToString(CultureInfo.InvariantCulture));
         _voiceEveryBox = DialogUi.TextBox(
-            (character?.VoiceEveryNthCharacter ?? 2).ToString(CultureInfo.InvariantCulture));
+            (character?.VoiceEveryNthCharacter ?? 1).ToString(CultureInfo.InvariantCulture));
         _positionBox = new ComboBox
         {
             ItemsSource = new[] { "Слева", "По центру", "Справа" },
@@ -155,11 +155,11 @@ public sealed class CharacterEditorWindow : Window
             : 1;
     public int VoiceEveryNthCharacter => int.TryParse(
         _voiceEveryBox.Text,
-        NumberStyles.Integer,
-        CultureInfo.InvariantCulture,
-        out var value)
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out var value)
             ? value
-            : 2;
+            : 1;
     public CharacterPosition Position => _positionBox.SelectedIndex switch
     {
         0 => CharacterPosition.Left,

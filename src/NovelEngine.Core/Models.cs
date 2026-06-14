@@ -157,7 +157,7 @@ public sealed class CharacterPlacement
     public double Rotation { get; set; }
     public string VoiceSound { get; set; } = string.Empty;
     public double VoicePitch { get; set; } = 1;
-    public int VoiceEveryNthCharacter { get; set; } = 2;
+    public int VoiceEveryNthCharacter { get; set; } = 1;
 
     public CharacterPlacement Clone() =>
         new()
