@@ -162,40 +162,103 @@
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="3" />
-            <Style.Resources>
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#182231" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E8EEF6" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#29445D" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
-            </Style.Resources>
-        </Style>
-        <Style TargetType="MenuItem">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="MinHeight" Value="30" />
-            <Style.Resources>
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#182231" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E8EEF6" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#29445D" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#29445D" />
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
-            </Style.Resources>
-            <Style.Triggers>
-                <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="#29445D" />
-                    <Setter Property="Foreground" Value="White" />
-                    <Setter Property="BorderBrush" Value="#42627E" />
-                </Trigger>
-                <Trigger Property="IsSubmenuOpen" Value="True">
-                    <Setter Property="Background" Value="#29445D" />
-                    <Setter Property="Foreground" Value="White" />
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="#78879A" />
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <ItemsPresenter Margin="{TemplateBinding Padding}"
+                                            KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Resources">
+                <Setter.Value>
+                    <ResourceDictionary>
+                        <Style TargetType="Separator">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Separator">
+                                        <Border Height="1"
+                                                Margin="10,4"
+                                                Background="#3A506C" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            <Setter Property="MinWidth" Value="290" />
+                            <Setter Property="MinHeight" Value="31" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="MenuItem">
+                                        <Border x:Name="ItemChrome"
+                                                Background="Transparent"
+                                                SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="22" />
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  ContentSource="Header"
+                                                                  Margin="12,6,8,6"
+                                                                  RecognizesAccessKey="True"
+                                                                  TextElement.Foreground="{TemplateBinding Foreground}"
+                                                                  VerticalAlignment="Center" />
+                                                <Path x:Name="SubmenuArrow"
+                                                      Grid.Column="1"
+                                                      Width="6"
+                                                      Height="10"
+                                                      Margin="0,0,8,0"
+                                                      HorizontalAlignment="Right"
+                                                      VerticalAlignment="Center"
+                                                      Data="M 0 0 L 0 10 L 6 5 Z"
+                                                      Fill="{TemplateBinding Foreground}"
+                                                      Visibility="Collapsed" />
+                                                <Popup x:Name="PART_Popup"
+                                                       AllowsTransparency="True"
+                                                       Focusable="False"
+                                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                                       Placement="Right"
+                                                       PopupAnimation="Fade">
+                                                    <Border Background="#182231"
+                                                            BorderBrush="#3A506C"
+                                                            BorderThickness="1"
+                                                            Padding="3"
+                                                            SnapsToDevicePixels="True">
+                                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                                    </Border>
+                                                </Popup>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="Role" Value="SubmenuHeader">
+                                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                                            </Trigger>
+                                            <Trigger Property="IsHighlighted" Value="True">
+                                                <Setter TargetName="ItemChrome" Property="Background" Value="#29445D" />
+                                                <Setter Property="Foreground" Value="White" />
+                                            </Trigger>
+                                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                                <Setter TargetName="ItemChrome" Property="Background" Value="#29445D" />
+                                                <Setter Property="Foreground" Value="White" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Foreground" Value="#78879A" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ResourceDictionary>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="Separator">
             <Setter Property="Margin" Value="8,4" />
