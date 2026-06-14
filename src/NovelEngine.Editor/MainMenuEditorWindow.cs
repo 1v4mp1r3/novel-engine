@@ -365,15 +365,21 @@ public sealed class MainMenuEditorWindow : Window
 
     private FrameworkElement CreateElementVisual(MainMenuElement element)
     {
+        var style = MainMenuElementStyle.From(
+            element,
+            Color.FromArgb(208, 37, 53, 74),
+            Color.FromRgb(80, 101, 127));
         var root = new Border
         {
             Tag = element,
             Width = element.Width,
             Height = element.Height,
             BorderThickness = new Thickness(1),
-            BorderBrush = Brush(element.Border, Color.FromRgb(80, 101, 127)),
-            Background = Brush(element.Background, Color.FromArgb(208, 37, 53, 74)),
-            Child = CreateElementContent(element),
+            BorderBrush = style.Border,
+            Background = style.Background,
+            CornerRadius = style.CornerRadius,
+            Opacity = style.Opacity,
+            Child = CreateElementContent(element, style),
         };
         if (ReferenceEquals(element, _selected))
         {
@@ -386,20 +392,18 @@ public sealed class MainMenuEditorWindow : Window
         return root;
     }
 
-    private UIElement CreateElementContent(MainMenuElement element)
+    private UIElement CreateElementContent(MainMenuElement element, MainMenuElementStyle style)
     {
         var text = new TextBlock
         {
             Text = element.Text,
-            Foreground = Brush(element.Foreground, Colors.White),
+            Foreground = style.Foreground,
             FontFamily = new FontFamily(element.FontFamily),
-            FontSize = element.FontSize,
-            FontWeight = element.CustomStyleCode.Contains(
-                "bold",
-                StringComparison.OrdinalIgnoreCase)
-                    ? FontWeights.Bold
-                    : FontWeights.Normal,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = style.FontSize,
+            FontWeight = style.FontWeight,
+            FontStyle = style.FontStyle,
+            TextAlignment = style.TextAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
         };
@@ -597,22 +601,6 @@ public sealed class MainMenuEditorWindow : Window
         catch (Exception)
         {
             return null;
-        }
-    }
-
-    private static Brush Brush(string value, Color fallback)
-    {
-        if (value.Equals("transparent", StringComparison.OrdinalIgnoreCase))
-        {
-            return Brushes.Transparent;
-        }
-        try
-        {
-            return (Brush)new BrushConverter().ConvertFromString(value)!;
-        }
-        catch (Exception)
-        {
-            return new SolidColorBrush(fallback);
         }
     }
 

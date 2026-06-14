@@ -204,18 +204,25 @@ public partial class PreviewWindow : Window
     private FrameworkElement CreateMainMenuElement(MainMenuElement element)
     {
         var isButton = element.Kind is MainMenuElementKind.Button or MainMenuElementKind.ImageButton;
+        var style = MainMenuElementStyle.From(
+            element,
+            Color.FromArgb(208, 37, 53, 74),
+            Color.FromRgb(80, 101, 127));
         var border = new Border
         {
             Width = element.Width,
             Height = element.Height,
-            Background = ParseBrush(element.Background, Color.FromArgb(208, 37, 53, 74)),
-            BorderBrush = ParseBrush(element.Border, Color.FromRgb(80, 101, 127)),
+            Background = style.Background,
+            BorderBrush = style.Border,
             BorderThickness = isButton ? new Thickness(1) : new Thickness(0),
-            Child = CreateMainMenuElementContent(element),
+            CornerRadius = style.CornerRadius,
+            Opacity = style.Opacity,
+            Child = CreateMainMenuElementContent(element, style),
             Cursor = isButton ? Cursors.Hand : Cursors.Arrow,
         };
         if (isButton)
         {
+            var normalBackground = style.Background;
             border.MouseLeftButtonUp += (_, _) => ExecuteMainMenuAction(element.Action);
             border.MouseEnter += (_, _) =>
             {
@@ -223,28 +230,26 @@ public partial class PreviewWindow : Window
             };
             border.MouseLeave += (_, _) =>
             {
-                border.Background = ParseBrush(
-                    element.Background,
-                    Color.FromArgb(208, 37, 53, 74));
+                border.Background = normalBackground;
             };
         }
         return border;
     }
 
-    private UIElement CreateMainMenuElementContent(MainMenuElement element)
+    private UIElement CreateMainMenuElementContent(
+        MainMenuElement element,
+        MainMenuElementStyle style)
     {
         var text = new TextBlock
         {
             Text = element.Text,
-            Foreground = ParseBrush(element.Foreground, Colors.White),
+            Foreground = style.Foreground,
             FontFamily = new FontFamily(element.FontFamily),
-            FontSize = element.FontSize,
-            FontWeight = element.CustomStyleCode.Contains(
-                "bold",
-                StringComparison.OrdinalIgnoreCase)
-                    ? FontWeights.Bold
-                    : FontWeights.Normal,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = style.FontSize,
+            FontWeight = style.FontWeight,
+            FontStyle = style.FontStyle,
+            TextAlignment = style.TextAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
         };
@@ -584,22 +589,6 @@ public partial class PreviewWindow : Window
         catch (OperationCanceledException)
         {
             // A new node started rendering.
-        }
-    }
-
-    private static Brush ParseBrush(string value, Color fallback)
-    {
-        if (value.Equals("transparent", StringComparison.OrdinalIgnoreCase))
-        {
-            return Brushes.Transparent;
-        }
-        try
-        {
-            return (Brush)new BrushConverter().ConvertFromString(value)!;
-        }
-        catch (Exception)
-        {
-            return new SolidColorBrush(fallback);
         }
     }
 
