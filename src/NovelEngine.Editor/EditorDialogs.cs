@@ -67,25 +67,32 @@ public sealed class OutputEditorWindow : Window
 public sealed class CharacterEditorWindow : Window
 {
     private readonly TextBox _nameBox;
-    private readonly TextBox _spriteBox;
-    private readonly TextBox _voiceBox;
+    private readonly ComboBox _spriteBox;
+    private readonly ComboBox _voiceBox;
     private readonly TextBox _voicePitchBox;
     private readonly TextBox _voiceEveryBox;
     private readonly ComboBox _positionBox;
-    private readonly string _assetDirectory;
 
-    public CharacterEditorWindow(CharacterPlacement? character, string assetDirectory)
+    public CharacterEditorWindow(
+        CharacterPlacement? character,
+        IEnumerable<NovelAsset> spriteAssets,
+        IEnumerable<NovelAsset> voiceAssets)
     {
-        _assetDirectory = assetDirectory;
         Title = character is null ? "Добавить персонажа" : "Изменить персонажа";
         Width = 560;
-        Height = 540;
+        Height = 470;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
         _nameBox = DialogUi.TextBox(character?.Name ?? string.Empty);
-        _spriteBox = DialogUi.TextBox(character?.Sprite ?? string.Empty);
-        _voiceBox = DialogUi.TextBox(character?.VoiceSound ?? string.Empty);
+        _spriteBox = CreateAssetBox(
+            spriteAssets,
+            character?.Sprite ?? string.Empty,
+            "Без спрайта");
+        _voiceBox = CreateAssetBox(
+            voiceAssets,
+            character?.VoiceSound ?? string.Empty,
+            "Без voice-блипа");
         _voicePitchBox = DialogUi.TextBox(
             (character?.VoicePitch ?? 1).ToString(CultureInfo.InvariantCulture));
         _voiceEveryBox = DialogUi.TextBox(
@@ -105,36 +112,12 @@ public sealed class CharacterEditorWindow : Window
         var panel = DialogUi.Panel();
         panel.Children.Add(DialogUi.Label("Имя персонажа"));
         panel.Children.Add(_nameBox);
-        panel.Children.Add(DialogUi.Label("Спрайт"));
-        var spritePanel = new DockPanel();
-        var browse = new Button
-        {
-            Content = "...",
-            Width = 42,
-            Margin = new Thickness(7, 4, 0, 12),
-        };
-        browse.Click += (_, _) => BrowseSprite();
-        DockPanel.SetDock(browse, Dock.Right);
-        _spriteBox.Margin = new Thickness(0, 4, 0, 12);
-        spritePanel.Children.Add(browse);
-        spritePanel.Children.Add(_spriteBox);
-        panel.Children.Add(spritePanel);
+        panel.Children.Add(DialogUi.Label("Спрайт из files/characters"));
+        panel.Children.Add(_spriteBox);
         panel.Children.Add(DialogUi.Label("Позиция"));
         panel.Children.Add(_positionBox);
-        panel.Children.Add(DialogUi.Label("Голос персонажа"));
-        var voicePanel = new DockPanel();
-        var browseVoice = new Button
-        {
-            Content = "...",
-            Width = 42,
-            Margin = new Thickness(7, 4, 0, 12),
-        };
-        browseVoice.Click += (_, _) => BrowseVoice();
-        DockPanel.SetDock(browseVoice, Dock.Right);
-        _voiceBox.Margin = new Thickness(0, 4, 0, 12);
-        voicePanel.Children.Add(browseVoice);
-        voicePanel.Children.Add(_voiceBox);
-        panel.Children.Add(voicePanel);
+        panel.Children.Add(DialogUi.Label("Voice-блип из files/voices"));
+        panel.Children.Add(_voiceBox);
         panel.Children.Add(DialogUi.Label("Pitch голоса (0.25 - 4)"));
         panel.Children.Add(_voicePitchBox);
         panel.Children.Add(DialogUi.Label("Озвучивать каждый N-й символ (1 - 12)"));
@@ -144,8 +127,8 @@ public sealed class CharacterEditorWindow : Window
     }
 
     public string CharacterName => _nameBox.Text.Trim();
-    public string Sprite => _spriteBox.Text.Trim();
-    public string VoiceSound => _voiceBox.Text.Trim();
+    public string Sprite => (_spriteBox.SelectedItem as AssetChoice)?.Reference ?? string.Empty;
+    public string VoiceSound => (_voiceBox.SelectedItem as AssetChoice)?.Reference ?? string.Empty;
     public double VoicePitch => double.TryParse(
         _voicePitchBox.Text,
         NumberStyles.Float,
@@ -167,32 +150,38 @@ public sealed class CharacterEditorWindow : Window
         _ => CharacterPosition.Center,
     };
 
-    private void BrowseSprite()
+    private static ComboBox CreateAssetBox(
+        IEnumerable<NovelAsset> assets,
+        string currentReference,
+        string emptyLabel)
     {
-        var dialog = new OpenFileDialog
+        var values = assets
+            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+            .Select(asset => new AssetChoice(
+                AssetReference.Create(asset.Id),
+                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
+            .Prepend(new AssetChoice(string.Empty, emptyLabel))
+            .ToList();
+        if (currentReference.Length > 0
+            && !values.Any(value => value.Reference.Equals(
+                currentReference,
+                StringComparison.OrdinalIgnoreCase)))
         {
-            Title = "Выберите спрайт персонажа",
-            Filter = "Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp|Все файлы|*.*",
-            InitialDirectory = Directory.Exists(_assetDirectory) ? _assetDirectory : null,
-        };
-        if (dialog.ShowDialog(this) == true)
-        {
-            _spriteBox.Text = dialog.FileName;
+            values.Add(new AssetChoice(
+                currentReference,
+                $"Текущее значение: {currentReference}"));
         }
-    }
-
-    private void BrowseVoice()
-    {
-        var dialog = new OpenFileDialog
+        return new ComboBox
         {
-            Title = "Выберите звук голоса персонажа",
-            Filter = "Аудио|*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac|Все файлы|*.*",
-            InitialDirectory = Directory.Exists(_assetDirectory) ? _assetDirectory : null,
+            ItemsSource = values,
+            DisplayMemberPath = nameof(AssetChoice.Name),
+            SelectedItem = values.FirstOrDefault(value =>
+                    value.Reference.Equals(
+                        currentReference,
+                        StringComparison.OrdinalIgnoreCase))
+                ?? values[0],
+            Margin = new Thickness(0, 4, 0, 12),
         };
-        if (dialog.ShowDialog(this) == true)
-        {
-            _voiceBox.Text = dialog.FileName;
-        }
     }
 
     private void Save()
@@ -229,6 +218,8 @@ public sealed class CharacterEditorWindow : Window
         }
         DialogResult = true;
     }
+
+    private sealed record AssetChoice(string Reference, string Name);
 }
 
 public sealed class TransitionEditorWindow : Window

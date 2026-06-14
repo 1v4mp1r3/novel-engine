@@ -2355,7 +2355,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new CharacterEditorWindow(null, GetAssetDirectory()) { Owner = this };
+        var dialog = new CharacterEditorWindow(
+            null,
+            GetCharacterSpriteAssets(),
+            GetVoiceBlipAssets())
+        {
+            Owner = this,
+        };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -2390,7 +2396,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new CharacterEditorWindow(character, GetAssetDirectory()) { Owner = this };
+        var dialog = new CharacterEditorWindow(
+            character,
+            GetCharacterSpriteAssets(),
+            GetVoiceBlipAssets())
+        {
+            Owner = this,
+        };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -2438,6 +2450,18 @@ public partial class MainWindow : Window
         var view = CharactersGrid.SelectedItem as CharacterView;
         return node?.Characters.FirstOrDefault(character => character.Id == view?.Id);
     }
+
+    private IReadOnlyList<NovelAsset> GetCharacterSpriteAssets() =>
+        _project.Assets
+            .Where(asset => asset.Kind == AssetKind.Image)
+            .Where(asset => IsInAssetFolder(asset, "characters"))
+            .ToList();
+
+    private IReadOnlyList<NovelAsset> GetVoiceBlipAssets() =>
+        _project.Assets
+            .Where(asset => asset.Kind == AssetKind.Audio)
+            .Where(asset => IsInAssetFolder(asset, "voices"))
+            .ToList();
 
     private void CharactersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -3137,7 +3161,6 @@ public partial class MainWindow : Window
     {
         public string Id => Character.Id;
         public string Name => Character.Name;
-        public string Sprite => Character.Sprite;
         public string Position => Character.Position switch
         {
             CharacterPosition.Left => "Слева",
