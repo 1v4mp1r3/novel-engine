@@ -11,6 +11,8 @@ namespace NovelEngine.Editor;
 
 public sealed class CodeEditorControl : RichTextBox
 {
+    private const int HistoryLimit = 200;
+
     private static readonly IReadOnlyDictionary<ProjectLanguageSyntaxKind, Brush>
         SyntaxBrushes = new Dictionary<ProjectLanguageSyntaxKind, Brush>
         {
@@ -41,12 +43,17 @@ public sealed class CodeEditorControl : RichTextBox
     private ProjectLanguageCompletionContext? _completionContext;
     private IReadOnlyList<ProjectLanguageScopeSpan> _scopeSpans = [];
     private ScopeGuideAdorner? _scopeAdorner;
+    private readonly List<EditorSnapshot> _undoHistory = [];
+    private readonly List<EditorSnapshot> _redoHistory = [];
+    private EditorSnapshot _currentSnapshot = new(string.Empty, 0);
     private bool _updatingDocument;
+    private bool _restoringHistory;
 
     public CodeEditorControl()
     {
         AcceptsReturn = true;
         AcceptsTab = true;
+        IsUndoEnabled = false;
         SetResourceReference(BackgroundProperty, "FieldBrush");
         SetResourceReference(ForegroundProperty, "TextBrush");
         BorderThickness = new Thickness(0);
@@ -132,6 +139,8 @@ public sealed class CodeEditorControl : RichTextBox
         {
             CloseCompletions();
             ReplaceDocument(value, [], null, 0);
+            SetCaretOffset(0);
+            ResetHistory(value, 0);
         }
     }
 
@@ -171,13 +180,45 @@ public sealed class CodeEditorControl : RichTextBox
         {
             return;
         }
+        RecordUserChange();
         Dispatcher.BeginInvoke(
             () => ShowCompletions(force: false),
             DispatcherPriority.Background);
     }
 
+    protected override void OnSelectionChanged(RoutedEventArgs e)
+    {
+        base.OnSelectionChanged(e);
+        if (_updatingDocument || _restoringHistory)
+        {
+            return;
+        }
+        var source = SourceText;
+        if (source == _currentSnapshot.Source)
+        {
+            _currentSnapshot = new EditorSnapshot(
+                source,
+                Math.Clamp(SourceCaretOffset, 0, source.Length));
+        }
+    }
+
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            UndoUserChange();
+            e.Handled = true;
+            return;
+        }
+        if ((e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control)
+            || e.Key == Key.Z
+                && Keyboard.Modifiers
+                    == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            RedoUserChange();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Space && Keyboard.Modifiers == ModifierKeys.Control)
         {
             ShowCompletions(force: true);
@@ -343,8 +384,7 @@ public sealed class CodeEditorControl : RichTextBox
             ? completion.InsertText.Length
             : Math.Min(completion.CaretOffset, completion.InsertText.Length));
         CloseCompletions();
-        ReplaceDocument(updated, [], null, 0);
-        SetCaretOffset(caret);
+        ApplyUserSnapshot(new EditorSnapshot(updated, caret));
         Focus();
     }
 
@@ -353,6 +393,110 @@ public sealed class CodeEditorControl : RichTextBox
         _completionPopup.IsOpen = false;
         _completionList.ItemsSource = null;
         _completionContext = null;
+    }
+
+    private void RecordUserChange()
+    {
+        if (_restoringHistory)
+        {
+            return;
+        }
+        var source = SourceText;
+        if (source == _currentSnapshot.Source)
+        {
+            return;
+        }
+        PushHistory(_undoHistory, _currentSnapshot);
+        _redoHistory.Clear();
+        _currentSnapshot = new EditorSnapshot(
+            source,
+            Math.Clamp(SourceCaretOffset, 0, source.Length));
+    }
+
+    private void UndoUserChange()
+    {
+        if (_undoHistory.Count == 0)
+        {
+            return;
+        }
+        CloseCompletions();
+        PushHistory(_redoHistory, CaptureSnapshot());
+        var snapshot = PopHistory(_undoHistory);
+        RestoreSnapshot(snapshot);
+    }
+
+    private void RedoUserChange()
+    {
+        if (_redoHistory.Count == 0)
+        {
+            return;
+        }
+        CloseCompletions();
+        PushHistory(_undoHistory, CaptureSnapshot());
+        var snapshot = PopHistory(_redoHistory);
+        RestoreSnapshot(snapshot);
+    }
+
+    private void ApplyUserSnapshot(EditorSnapshot snapshot)
+    {
+        PushHistory(_undoHistory, CaptureSnapshot());
+        _redoHistory.Clear();
+        RestoreSnapshot(snapshot);
+    }
+
+    private void RestoreSnapshot(EditorSnapshot snapshot)
+    {
+        _restoringHistory = true;
+        try
+        {
+            ReplaceDocument(snapshot.Source, [], null, 0);
+            SetCaretOffset(snapshot.CaretOffset);
+            _currentSnapshot = snapshot;
+        }
+        finally
+        {
+            _restoringHistory = false;
+        }
+    }
+
+    private EditorSnapshot CaptureSnapshot()
+    {
+        var source = SourceText;
+        return new EditorSnapshot(
+            source,
+            Math.Clamp(SourceCaretOffset, 0, source.Length));
+    }
+
+    private void ResetHistory(string source, int caretOffset)
+    {
+        _undoHistory.Clear();
+        _redoHistory.Clear();
+        _currentSnapshot = new EditorSnapshot(
+            source,
+            Math.Clamp(caretOffset, 0, source.Length));
+    }
+
+    private static void PushHistory(
+        List<EditorSnapshot> history,
+        EditorSnapshot snapshot)
+    {
+        if (history.Count > 0 && history[^1] == snapshot)
+        {
+            return;
+        }
+        history.Add(snapshot);
+        if (history.Count > HistoryLimit)
+        {
+            history.RemoveAt(0);
+        }
+    }
+
+    private static EditorSnapshot PopHistory(List<EditorSnapshot> history)
+    {
+        var index = history.Count - 1;
+        var snapshot = history[index];
+        history.RemoveAt(index);
+        return snapshot;
     }
 
     private void ReplaceDocument(
@@ -553,4 +697,6 @@ public sealed class CodeEditorControl : RichTextBox
             _editor.DrawScopeGuides(drawingContext);
         }
     }
+
+    private sealed record EditorSnapshot(string Source, int CaretOffset);
 }
