@@ -339,6 +339,11 @@ static void CharacterTransformsRoundTrip()
             Scale = 1.35,
             Rotation = -7.5,
             VoiceSound = "voices/hero.wav",
+            VoiceSounds =
+            [
+                "voices/hero.wav",
+                "voices/hero-alt.wav",
+            ],
             VoicePitch = 1.25,
             VoiceEveryNthCharacter = 3,
         });
@@ -353,15 +358,20 @@ static void CharacterTransformsRoundTrip()
 
     Assert(code.Contains("placement (742.5, 476)", StringComparison.Ordinal), "Placement was not formatted.");
     Assert(code.Contains("voice \"voices/hero.wav\"", StringComparison.Ordinal), "Voice sound was not formatted.");
+    Assert(code.Contains("voice \"voices/hero-alt.wav\"", StringComparison.Ordinal), "Second voice sound was not formatted.");
+    Assert(CountOccurrences(code, "voice \"voices/") == 2, "Voice sounds were duplicated or lost.");
     Assert(code.Contains("voice-pitch 1.25", StringComparison.Ordinal), "Voice pitch was not formatted.");
     Assert(code.Contains("voice-every 3", StringComparison.Ordinal), "Voice frequency was not formatted.");
     Assert(fromCode.HasCustomTransform, "Code parser lost the custom transform flag.");
     Assert(Math.Abs(fromCode.Scale - 1.35) < 0.001, "Code parser changed character scale.");
     Assert(Math.Abs(fromCode.Rotation + 7.5) < 0.001, "Code parser changed character rotation.");
     Assert(fromCode.VoiceSound == "voices/hero.wav", "Code parser lost character voice sound.");
+    Assert(fromCode.VoiceSounds.Count == 2, "Code parser lost multiple character voice sounds.");
+    Assert(fromCode.VoiceSounds.Contains("voices/hero-alt.wav"), "Code parser lost second character voice sound.");
     Assert(Math.Abs(fromCode.VoicePitch - 1.25) < 0.001, "Code parser changed character voice pitch.");
     Assert(fromCode.VoiceEveryNthCharacter == 3, "Code parser changed character voice frequency.");
     Assert(Math.Abs(fromJson.X - 742.5) < 0.001, "JSON changed character position.");
+    Assert(fromJson.VoiceSounds.Count == 2, "JSON changed character voice sound list.");
 }
 
 static void MainMenuAndVoiceRoundTrip()
@@ -389,6 +399,11 @@ static void MainMenuAndVoiceRoundTrip()
             Id = "hero",
             Name = "Герой",
             VoiceSound = "voices/hero.wav",
+            VoiceSounds =
+            [
+                "voices/hero.wav",
+                "voices/hero-soft.wav",
+            ],
             VoicePitch = 1.15,
             VoiceEveryNthCharacter = 3,
         });
@@ -405,6 +420,7 @@ static void MainMenuAndVoiceRoundTrip()
     Assert(restoredLogo.Kind == MainMenuElementKind.ImageLabel, "Main menu element kind changed.");
     Assert(restoredLogo.Image == "ui/logo.png", "Main menu element image changed.");
     Assert(restoredHero.VoiceSound == "voices/hero.wav", "Character voice sound changed.");
+    Assert(restoredHero.VoiceSounds.Count == 2, "Character voice sound list changed.");
     Assert(Math.Abs(restoredHero.VoicePitch - 1.15) < 0.001, "Character voice pitch changed.");
     Assert(restoredHero.VoiceEveryNthCharacter == 3, "Character voice frequency changed.");
 }
@@ -426,6 +442,13 @@ static void MainMenuAndVoiceAssetReferences()
             Kind = AssetKind.Audio,
             Path = "assets/audio/hero.wav",
         });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "voice_hero_alt",
+            Kind = AssetKind.Audio,
+            Path = "assets/audio/hero-alt.wav",
+        });
     project.MainMenu.Background = "@menu_bg";
     project.MainMenu.Elements.Add(
         new MainMenuElement
@@ -444,16 +467,25 @@ static void MainMenuAndVoiceAssetReferences()
             Id = "hero",
             Name = "Герой",
             VoiceSound = "@voice_hero",
+            VoiceSounds =
+            [
+                "@voice_hero",
+                "@voice_hero_alt",
+            ],
         });
 
     project.Validate();
     Assert(project.CountAssetReferences("menu_bg") == 2, "Main menu image refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero") == 1, "Voice refs were not counted.");
+    Assert(project.CountAssetReferences("voice_hero_alt") == 1, "Second voice refs were not counted.");
 
     project.ReplaceAssetReference("voice_hero", "@voice_main");
     Assert(
         scene.Characters.Single().VoiceSound == "@voice_main",
         "Voice asset reference was not replaced.");
+    Assert(
+        scene.Characters.Single().VoiceSounds.Contains("@voice_main"),
+        "Voice asset list reference was not replaced.");
 }
 
 static void VoiceBlipGeneratorEmitsWav()
@@ -874,6 +906,8 @@ static void BuildCompilerEmitsPackage()
         File.WriteAllBytes(sourceAsset, [137, 80, 78, 71]);
         var sourceVoice = Path.Combine(directory, "voice.mp3");
         File.WriteAllBytes(sourceVoice, [73, 68, 51, 3]);
+        var sourceVoiceAlt = Path.Combine(directory, "voice-alt.wav");
+        File.WriteAllBytes(sourceVoiceAlt, [82, 73, 70, 70, 40, 0, 0, 0]);
         var projectPath = Path.Combine(directory, "story.novel.json");
         var project = NovelProject.CreateDefault();
         var asset = ProjectAssets.Import(
@@ -886,6 +920,11 @@ static void BuildCompilerEmitsPackage()
             projectPath,
             sourceVoice,
             "voices");
+        var voiceAltAsset = ProjectAssets.Import(
+            project,
+            projectPath,
+            sourceVoiceAlt,
+            "voices");
         var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
         scene.Background = AssetReference.Create(asset.Id);
         scene.InheritBackground = false;
@@ -896,6 +935,11 @@ static void BuildCompilerEmitsPackage()
                 Id = "hero",
                 Name = "Hero",
                 VoiceSound = AssetReference.Create(voiceAsset.Id),
+                VoiceSounds =
+                [
+                    AssetReference.Create(voiceAsset.Id),
+                    AssetReference.Create(voiceAltAsset.Id),
+                ],
                 VoicePitch = 1.1,
                 VoiceEveryNthCharacter = 2,
             });
@@ -912,6 +956,8 @@ static void BuildCompilerEmitsPackage()
             ?? throw new InvalidOperationException("Built asset is missing.");
         var builtVoiceAsset = loaded.Project.FindAsset(voiceAsset.Id)
             ?? throw new InvalidOperationException("Built voice asset is missing.");
+        var builtVoiceAltAsset = loaded.Project.FindAsset(voiceAltAsset.Id)
+            ?? throw new InvalidOperationException("Built alternate voice asset is missing.");
         var builtCharacter = loaded.Project
             .FindNode(scene.Id)!
             .Characters
@@ -938,8 +984,21 @@ static void BuildCompilerEmitsPackage()
                         Path.DirectorySeparatorChar))),
             "Compiled voice asset was not copied.");
         Assert(
+            File.Exists(
+                Path.Combine(
+                    result.OutputDirectory,
+                    builtVoiceAltAsset.Path.Replace(
+                        '/',
+                        Path.DirectorySeparatorChar))),
+            "Compiled alternate voice asset was not copied.");
+        Assert(
             builtCharacter.VoiceSound == AssetReference.Create(voiceAsset.Id),
             "Runtime project lost character voice sound.");
+        Assert(
+            builtCharacter.VoiceSounds.Count == 2
+                && builtCharacter.VoiceSounds.Contains(
+                    AssetReference.Create(voiceAltAsset.Id)),
+            "Runtime project lost character voice sound list.");
         Assert(
             Math.Abs(builtCharacter.VoicePitch - 1.1) < 0.001,
             "Runtime project changed character voice pitch.");

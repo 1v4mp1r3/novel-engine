@@ -69,7 +69,7 @@ public sealed class CharacterEditorWindow : Window
 {
     private readonly TextBox _nameBox;
     private readonly ComboBox _spriteBox;
-    private readonly ComboBox _voiceBox;
+    private readonly ListBox _voiceList;
     private readonly TextBox _voicePitchBox;
     private readonly TextBox _voiceEveryBox;
     private readonly ComboBox _positionBox;
@@ -81,7 +81,7 @@ public sealed class CharacterEditorWindow : Window
     {
         Title = character is null ? "Добавить персонажа" : "Изменить персонажа";
         Width = 560;
-        Height = 470;
+        Height = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
@@ -90,10 +90,9 @@ public sealed class CharacterEditorWindow : Window
             spriteAssets,
             character?.Sprite ?? string.Empty,
             "Без спрайта");
-        _voiceBox = CreateAssetBox(
+        _voiceList = CreateAssetList(
             voiceAssets,
-            character?.VoiceSound ?? string.Empty,
-            "Без voice-блипа");
+            CharacterVoiceReferences(character));
         _voicePitchBox = DialogUi.TextBox(
             (character?.VoicePitch ?? 1).ToString(CultureInfo.InvariantCulture));
         _voiceEveryBox = DialogUi.TextBox(
@@ -117,8 +116,8 @@ public sealed class CharacterEditorWindow : Window
         panel.Children.Add(_spriteBox);
         panel.Children.Add(DialogUi.Label("Позиция"));
         panel.Children.Add(_positionBox);
-        panel.Children.Add(DialogUi.Label("Voice-блип из files/voices"));
-        panel.Children.Add(_voiceBox);
+        panel.Children.Add(DialogUi.Label("Voice-блипы из files/voices (можно несколько)"));
+        panel.Children.Add(_voiceList);
         panel.Children.Add(DialogUi.Label("Pitch голоса (0.25 - 4)"));
         panel.Children.Add(_voicePitchBox);
         panel.Children.Add(DialogUi.Label("Озвучивать каждый N-й символ (1 - 12)"));
@@ -129,7 +128,13 @@ public sealed class CharacterEditorWindow : Window
 
     public string CharacterName => _nameBox.Text.Trim();
     public string Sprite => (_spriteBox.SelectedItem as AssetChoice)?.Reference ?? string.Empty;
-    public string VoiceSound => (_voiceBox.SelectedItem as AssetChoice)?.Reference ?? string.Empty;
+    public IReadOnlyList<string> VoiceSounds => _voiceList.SelectedItems
+        .OfType<AssetChoice>()
+        .Select(choice => choice.Reference)
+        .Where(reference => reference.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    public string VoiceSound => VoiceSounds.FirstOrDefault() ?? string.Empty;
     public double VoicePitch => double.TryParse(
         _voicePitchBox.Text,
         NumberStyles.Float,
@@ -150,6 +155,54 @@ public sealed class CharacterEditorWindow : Window
         2 => CharacterPosition.Right,
         _ => CharacterPosition.Center,
     };
+
+    private static IReadOnlyList<string> CharacterVoiceReferences(
+        CharacterPlacement? character) =>
+        character?.GetVoiceSounds() ?? [];
+
+    private static ListBox CreateAssetList(
+        IEnumerable<NovelAsset> assets,
+        IReadOnlyList<string> currentReferences)
+    {
+        var selected = currentReferences
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var values = assets
+            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+            .Select(asset => new AssetChoice(
+                AssetReference.Create(asset.Id),
+                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
+            .ToList();
+        foreach (var reference in selected.Where(reference =>
+            !values.Any(value => value.Reference.Equals(
+                reference,
+                StringComparison.OrdinalIgnoreCase))))
+        {
+            values.Add(new AssetChoice(
+                reference,
+                $"Текущее значение: {reference}"));
+        }
+
+        var list = new ListBox
+        {
+            ItemsSource = values,
+            DisplayMemberPath = nameof(AssetChoice.Name),
+            SelectionMode = SelectionMode.Multiple,
+            Height = 92,
+            Background = (System.Windows.Media.Brush)Application.Current.Resources["FieldBrush"],
+            Foreground = (System.Windows.Media.Brush)Application.Current.Resources["TextBrush"],
+            BorderBrush = (System.Windows.Media.Brush)Application.Current.Resources["BorderBrush"],
+            Margin = new Thickness(0, 4, 0, 12),
+        };
+        foreach (var item in values.Where(value => selected.Contains(
+            value.Reference,
+            StringComparer.OrdinalIgnoreCase)))
+        {
+            list.SelectedItems.Add(item);
+        }
+        return list;
+    }
 
     private static ComboBox CreateAssetBox(
         IEnumerable<NovelAsset> assets,

@@ -196,6 +196,12 @@ public static class NovelBuildCompiler
                     outputDirectory,
                     copiedPaths,
                     usedTargets) ?? string.Empty;
+                CompileDirectValues(
+                    character.VoiceSounds,
+                    projectDirectory,
+                    outputDirectory,
+                    copiedPaths,
+                    usedTargets);
             }
         }
 
@@ -227,6 +233,12 @@ public static class NovelBuildCompiler
                     outputDirectory,
                     copiedPaths,
                     usedTargets) ?? string.Empty;
+                CompileDirectValues(
+                    character.VoiceSounds,
+                    projectDirectory,
+                    outputDirectory,
+                    copiedPaths,
+                    usedTargets);
             }
             foreach (var output in node.Outputs)
             {
@@ -239,6 +251,25 @@ public static class NovelBuildCompiler
             }
         }
         return copiedPaths.Count;
+    }
+
+    private static void CompileDirectValues(
+        List<string> values,
+        string projectDirectory,
+        string outputDirectory,
+        IDictionary<string, string> copiedPaths,
+        ISet<string> usedTargets)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            values[index] = CompileDirectValue(
+                values[index],
+                projectDirectory,
+                outputDirectory,
+                copiedPaths,
+                usedTargets) ?? string.Empty;
+        }
+        values.RemoveAll(string.IsNullOrWhiteSpace);
     }
 
     private static string? CompileDirectValue(

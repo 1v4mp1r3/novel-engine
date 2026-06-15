@@ -156,6 +156,7 @@ public sealed class CharacterPlacement
     public double Scale { get; set; } = 1;
     public double Rotation { get; set; }
     public string VoiceSound { get; set; } = string.Empty;
+    public List<string> VoiceSounds { get; init; } = [];
     public double VoicePitch { get; set; } = 1;
     public int VoiceEveryNthCharacter { get; set; } = 1;
 
@@ -172,9 +173,35 @@ public sealed class CharacterPlacement
             Scale = Scale,
             Rotation = Rotation,
             VoiceSound = VoiceSound,
+            VoiceSounds = [.. VoiceSounds],
             VoicePitch = VoicePitch,
             VoiceEveryNthCharacter = VoiceEveryNthCharacter,
         };
+
+    public List<string> GetVoiceSounds()
+    {
+        var values = VoiceSounds
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (!string.IsNullOrWhiteSpace(VoiceSound)
+            && !values.Contains(VoiceSound, StringComparer.OrdinalIgnoreCase))
+        {
+            values.Add(VoiceSound);
+        }
+        return values;
+    }
+
+    public void SetVoiceSounds(IEnumerable<string> sounds)
+    {
+        var values = sounds
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        VoiceSounds.Clear();
+        VoiceSounds.AddRange(values);
+        VoiceSound = VoiceSounds.FirstOrDefault() ?? string.Empty;
+    }
 }
 
 public static class CharacterLayout
@@ -300,6 +327,7 @@ public sealed class NovelProject
                     character.VoiceSound,
                     reference,
                     replacement);
+                ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
             }
             foreach (var output in node.Outputs)
             {
@@ -764,10 +792,13 @@ public sealed class NovelProject
                     character.Sprite,
                     AssetKind.Image,
                     $"тип {type.Name}, персонаж {character.Name}");
-                yield return new AssetValue(
-                    character.VoiceSound,
-                    AssetKind.Audio,
-                    $"тип {type.Name}, голос персонажа {character.Name}");
+                foreach (var voice in CharacterVoiceValues(character))
+                {
+                    yield return new AssetValue(
+                        voice,
+                        AssetKind.Audio,
+                        $"тип {type.Name}, голос персонажа {character.Name}");
+                }
             }
         }
 
@@ -799,10 +830,13 @@ public sealed class NovelProject
                     character.Sprite,
                     AssetKind.Image,
                     $"нода {node.Title}, персонаж {character.Name}");
-                yield return new AssetValue(
-                    character.VoiceSound,
-                    AssetKind.Audio,
-                    $"нода {node.Title}, голос персонажа {character.Name}");
+                foreach (var voice in CharacterVoiceValues(character))
+                {
+                    yield return new AssetValue(
+                        voice,
+                        AssetKind.Audio,
+                        $"нода {node.Title}, голос персонажа {character.Name}");
+                }
             }
             foreach (var output in node.Outputs)
             {
@@ -851,6 +885,32 @@ public sealed class NovelProject
                 character.VoiceSound,
                 reference,
                 replacement);
+            ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
+        }
+    }
+
+    private static IReadOnlyList<string> CharacterVoiceValues(CharacterPlacement character)
+        => character.GetVoiceSounds();
+
+    private static void ReplaceAssetReferences(
+        List<string> values,
+        string reference,
+        string replacement)
+    {
+        for (var index = values.Count - 1; index >= 0; index--)
+        {
+            if (!values[index].Equals(reference, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (replacement.Length == 0)
+            {
+                values.RemoveAt(index);
+            }
+            else
+            {
+                values[index] = replacement;
+            }
         }
     }
 

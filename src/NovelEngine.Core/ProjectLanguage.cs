@@ -891,11 +891,11 @@ public static class ProjectLanguage
                 .Append("    sprite ")
                 .AppendLine(FormatAssetValue(character.Sprite));
         }
-        if (character.VoiceSound.Length > 0)
+        foreach (var voice in CharacterVoiceSounds(character))
         {
             builder.Append(indent)
                 .Append("    voice ")
-                .AppendLine(FormatAssetValue(character.VoiceSound));
+                .AppendLine(FormatAssetValue(voice));
         }
         if (Math.Abs(character.VoicePitch - 1) > 0.001)
         {
@@ -929,6 +929,10 @@ public static class ProjectLanguage
         }
         builder.Append(indent).AppendLine("}");
     }
+
+    private static IReadOnlyList<string> CharacterVoiceSounds(
+        CharacterPlacement character) =>
+        character.GetVoiceSounds();
 
     private static void WriteOptional(
         StringBuilder builder,
@@ -1673,7 +1677,7 @@ public static class ProjectLanguage
             var y = CharacterLayout.DefaultCenterY;
             var scale = 1d;
             var rotation = 0d;
-            var voiceSound = string.Empty;
+            var voiceSounds = new List<string>();
             var voicePitch = 1d;
             var voiceEveryNthCharacter = 1;
             while (!Match(TokenKind.RightBrace))
@@ -1690,8 +1694,8 @@ public static class ProjectLanguage
                 }
                 else if (Keyword(property, "voice"))
                 {
-                    voiceSound = ExpectAssetValue(
-                        "Ожидался путь или @ссылка на voice-блип.");
+                    voiceSounds.Add(ExpectAssetValue(
+                        "Ожидался путь или @ссылка на voice-блип."));
                 }
                 else if (Keyword(property, "voice-pitch"))
                 {
@@ -1752,7 +1756,8 @@ public static class ProjectLanguage
                 Y = y,
                 Scale = scale,
                 Rotation = rotation,
-                VoiceSound = voiceSound,
+                VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
+                VoiceSounds = voiceSounds,
                 VoicePitch = voicePitch,
                 VoiceEveryNthCharacter = voiceEveryNthCharacter,
             };

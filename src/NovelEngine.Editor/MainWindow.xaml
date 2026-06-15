@@ -185,6 +185,7 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="*" />
                                     <DataGridTextColumn Header="Позиция" Binding="{Binding Position}" Width="90" />
+                                    <DataGridTextColumn Header="Блипы" Binding="{Binding VoiceCount}" Width="70" />
                                 </DataGrid.Columns>
                             </DataGrid>
                             <WrapPanel Margin="0,7,0,0">

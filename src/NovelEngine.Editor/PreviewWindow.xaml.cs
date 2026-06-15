@@ -564,7 +564,7 @@ public partial class PreviewWindow : Window
     {
         var text = node.Text;
         var voice = ResolveVoice(node);
-        PrepareCharacterVoice(voice);
+        PrepareCharacterVoice(voice?.SoundPaths.FirstOrDefault(), voice?.Pitch ?? 1);
         var visible = string.Empty;
         var voicedCharacters = 0;
         try
@@ -610,13 +610,17 @@ public partial class PreviewWindow : Window
         {
             return null;
         }
-        var sound = ResolveAsset(character.VoiceSound);
-        if (sound.Length == 0 || !File.Exists(sound))
+        var sounds = character.GetVoiceSounds()
+            .Select(ResolveAsset)
+            .Where(sound => sound.Length > 0 && File.Exists(sound))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (sounds.Count == 0)
         {
             return null;
         }
         return new CharacterVoice(
-            sound,
+            sounds,
             Math.Clamp(character.VoicePitch, 0.25, 4),
             Math.Clamp(character.VoiceEveryNthCharacter, 1, 12));
     }
@@ -629,7 +633,10 @@ public partial class PreviewWindow : Window
             {
                 return;
             }
-            PrepareCharacterVoice(voice);
+            var soundPath = voice.SoundPaths.Count == 1
+                ? voice.SoundPaths[0]
+                : voice.SoundPaths[Random.Shared.Next(voice.SoundPaths.Count)];
+            PrepareCharacterVoice(soundPath, voice.Pitch);
             _voicePlayer.Stop();
             _voicePlayer.Position = TimeSpan.Zero;
             _voicePlayer.Volume = _settings.VoiceVolume;
@@ -642,17 +649,17 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void PrepareCharacterVoice(CharacterVoice? voice)
+    private void PrepareCharacterVoice(string? soundPath, double pitch)
     {
-        if (voice is null)
+        if (string.IsNullOrWhiteSpace(soundPath))
         {
             _voicePlayer.Stop();
             _voicePlayer.Close();
             _currentVoicePath = string.Empty;
             return;
         }
-        if (_currentVoicePath.Equals(voice.SoundPath, StringComparison.OrdinalIgnoreCase)
-            && Math.Abs(_currentVoicePitch - voice.Pitch) < 0.001)
+        if (_currentVoicePath.Equals(soundPath, StringComparison.OrdinalIgnoreCase)
+            && Math.Abs(_currentVoicePitch - pitch) < 0.001)
         {
             return;
         }
@@ -660,10 +667,10 @@ public partial class PreviewWindow : Window
         _voicePlayer.Stop();
         _voicePlayer.Close();
         _voicePlayer.Volume = _settings.VoiceVolume;
-        _voicePlayer.SpeedRatio = voice.Pitch;
-        _voicePlayer.Open(new Uri(voice.SoundPath, UriKind.Absolute));
-        _currentVoicePath = voice.SoundPath;
-        _currentVoicePitch = voice.Pitch;
+        _voicePlayer.SpeedRatio = pitch;
+        _voicePlayer.Open(new Uri(soundPath, UriKind.Absolute));
+        _currentVoicePath = soundPath;
+        _currentVoicePitch = pitch;
         _lastVoiceStartedUtc = DateTime.MinValue;
     }
 
@@ -953,7 +960,7 @@ public partial class PreviewWindow : Window
     }
 
     private sealed record CharacterVoice(
-        string SoundPath,
+        IReadOnlyList<string> SoundPaths,
         double Pitch,
         int EveryNthCharacter);
 }

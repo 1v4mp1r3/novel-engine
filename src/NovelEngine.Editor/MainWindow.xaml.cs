@@ -1322,11 +1322,11 @@ public partial class MainWindow : Window
         {
             var voice = voices[0];
             return CreateAssetMenuItem(
-                $"Подвязать «{voice.Id}» к «{characterLabel}»",
+                $"Добавить «{voice.Id}» к «{characterLabel}»",
                 () => BindVoiceAssetToCharacter(voice, character.Id));
         }
 
-        var menu = CreateHoverSubmenu("Подвязать voice-блип из voices");
+        var menu = CreateHoverSubmenu("Добавить voice-блип из voices");
         foreach (var voice in voices)
         {
             menu.Items.Add(CreateAssetMenuItem(
@@ -1353,11 +1353,11 @@ public partial class MainWindow : Window
         {
             var character = characters[0];
             return CreateAssetMenuItem(
-                $"Привязать voice-блип к «{CharacterLabel(character)}»",
+                $"Добавить voice-блип к «{CharacterLabel(character)}»",
                 () => BindVoiceAssetToCharacter(asset, character.Id));
         }
 
-        var menu = CreateHoverSubmenu("Привязать voice-блип к персонажу");
+        var menu = CreateHoverSubmenu("Добавить voice-блип к персонажу");
         foreach (var character in characters.OrderBy(
             character => character.Name,
             StringComparer.CurrentCultureIgnoreCase))
@@ -1374,6 +1374,9 @@ public partial class MainWindow : Window
         string.IsNullOrWhiteSpace(character.Name)
             ? character.Id
             : character.Name;
+
+    private static List<string> CharacterVoiceReferences(CharacterPlacement character)
+        => character.GetVoiceSounds();
 
     private CharacterPlacement? FindEffectiveCharacterBySprite(
         NovelNode node,
@@ -1485,14 +1488,20 @@ public partial class MainWindow : Window
         }
 
         var reference = AssetReference.Create(asset.Id);
-        character.VoiceSound = reference;
+        var voices = CharacterVoiceReferences(character);
+        if (!voices.Contains(reference, StringComparer.OrdinalIgnoreCase))
+        {
+            voices.Add(reference);
+        }
+        character.SetVoiceSounds(voices);
         if (node.UsesTypeDefaults)
         {
             node.PropertyOverrides.Add("characters");
         }
 
         MarkDirty();
-        StatusText.Text = $"Voice-блип персонажа «{character.Name}»: {reference}";
+        StatusText.Text =
+            $"Voice-блипы персонажа «{character.Name}»: {character.VoiceSounds.Count}";
     }
 
     private static bool IsInAssetFolder(NovelAsset asset, string folder)
@@ -2446,6 +2455,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        var voiceSounds = NormalizeVoiceReferences(dialog.VoiceSounds);
         node.InheritCharacters = false;
         if (node.UsesTypeDefaults)
         {
@@ -2460,7 +2470,8 @@ public partial class MainWindow : Window
                 Name = dialog.CharacterName,
                 Sprite = NormalizeAssetPath(dialog.Sprite),
                 Position = dialog.Position,
-                VoiceSound = NormalizeAssetPath(dialog.VoiceSound),
+                VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
+                VoiceSounds = voiceSounds,
                 VoicePitch = dialog.VoicePitch,
                 VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter,
             });
@@ -2487,9 +2498,10 @@ public partial class MainWindow : Window
             return;
         }
 
+        var voiceSounds = NormalizeVoiceReferences(dialog.VoiceSounds);
         character.Name = dialog.CharacterName;
         character.Sprite = NormalizeAssetPath(dialog.Sprite);
-        character.VoiceSound = NormalizeAssetPath(dialog.VoiceSound);
+        character.SetVoiceSounds(voiceSounds);
         character.VoicePitch = dialog.VoicePitch;
         character.VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter;
         if (character.Position != dialog.Position)
@@ -2506,6 +2518,13 @@ public partial class MainWindow : Window
         }
         MarkDirty();
     }
+
+    private List<string> NormalizeVoiceReferences(IEnumerable<string> references) =>
+        references
+            .Select(NormalizeAssetPath)
+            .Where(reference => reference.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e)
     {
@@ -3246,6 +3265,7 @@ public partial class MainWindow : Window
             CharacterPosition.Right => "Справа",
             _ => "По центру",
         };
+        public int VoiceCount => CharacterVoiceReferences(Character).Count;
     }
 
     private sealed record OutputView(NodeOutput Output, string TargetTitle)
