@@ -15,7 +15,7 @@ namespace NovelEngine.Editor;
 
 public partial class PreviewWindow : Window
 {
-    private static readonly TimeSpan MinVoiceRestartDelay = TimeSpan.FromMilliseconds(45);
+    private const int VoicePlayerPoolSize = 6;
     private static readonly JsonSerializerOptions SaveOptions = new()
     {
         WriteIndented = true,
@@ -29,15 +29,14 @@ public partial class PreviewWindow : Window
     private readonly NovelBuildManifest? _buildManifest;
     private readonly MediaPlayer _musicPlayer = new();
     private readonly MediaPlayer _transitionPlayer = new();
-    private readonly MediaPlayer _voicePlayer = new();
+    private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _voicePlayerIndexes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<MediaPlayer> _activeVoicePlayers = new();
     private readonly GameRuntimeSettings _settings = new();
     private string _currentMusicPath = string.Empty;
     private bool _transitioning;
     private bool _paused;
     private bool _mainMenuActive;
-    private string _currentVoicePath = string.Empty;
-    private double _currentVoicePitch = 1;
-    private DateTime _lastVoiceStartedUtc = DateTime.MinValue;
     private CancellationTokenSource? _dialogueCts;
 
     public PreviewWindow(
@@ -176,9 +175,7 @@ public partial class PreviewWindow : Window
         _dialogueCts?.Cancel();
         _musicPlayer.Stop();
         _transitionPlayer.Stop();
-        _voicePlayer.Stop();
-        _voicePlayer.Close();
-        _currentVoicePath = string.Empty;
+        StopAllVoicePlayers(close: true);
         ChoicesPanel.Children.Clear();
         NodeTitleText.Text = string.Empty;
         SpeakerText.Text = string.Empty;
@@ -564,7 +561,6 @@ public partial class PreviewWindow : Window
     {
         var text = node.Text;
         var voice = ResolveVoice(node);
-        PrepareCharacterVoice(voice?.SoundPaths.FirstOrDefault(), voice?.Pitch ?? 1);
         var visible = string.Empty;
         var voicedCharacters = 0;
         try
@@ -629,19 +625,14 @@ public partial class PreviewWindow : Window
     {
         try
         {
-            if (DateTime.UtcNow - _lastVoiceStartedUtc < MinVoiceRestartDelay)
-            {
-                return;
-            }
             var soundPath = voice.SoundPaths.Count == 1
                 ? voice.SoundPaths[0]
                 : voice.SoundPaths[Random.Shared.Next(voice.SoundPaths.Count)];
-            PrepareCharacterVoice(soundPath, voice.Pitch);
-            _voicePlayer.Stop();
-            _voicePlayer.Position = TimeSpan.Zero;
-            _voicePlayer.Volume = _settings.VoiceVolume;
-            _lastVoiceStartedUtc = DateTime.UtcNow;
-            _voicePlayer.Play();
+            var player = GetNextVoicePlayer(soundPath, voice.Pitch);
+            _activeVoicePlayers.Add(player);
+            player.Stop();
+            player.Position = TimeSpan.Zero;
+            player.Play();
         }
         catch (Exception)
         {
@@ -649,29 +640,61 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private void PrepareCharacterVoice(string? soundPath, double pitch)
+    private MediaPlayer GetNextVoicePlayer(string soundPath, double pitch)
     {
-        if (string.IsNullOrWhiteSpace(soundPath))
+        if (!_voicePlayerPools.TryGetValue(soundPath, out var pool))
         {
-            _voicePlayer.Stop();
-            _voicePlayer.Close();
-            _currentVoicePath = string.Empty;
-            return;
-        }
-        if (_currentVoicePath.Equals(soundPath, StringComparison.OrdinalIgnoreCase)
-            && Math.Abs(_currentVoicePitch - pitch) < 0.001)
-        {
-            return;
+            pool = CreateVoicePlayerPool(soundPath, pitch);
+            _voicePlayerPools[soundPath] = pool;
         }
 
-        _voicePlayer.Stop();
-        _voicePlayer.Close();
-        _voicePlayer.Volume = _settings.VoiceVolume;
-        _voicePlayer.SpeedRatio = pitch;
-        _voicePlayer.Open(new Uri(soundPath, UriKind.Absolute));
-        _currentVoicePath = soundPath;
-        _currentVoicePitch = pitch;
-        _lastVoiceStartedUtc = DateTime.MinValue;
+        var index = _voicePlayerIndexes.TryGetValue(soundPath, out var currentIndex)
+            ? currentIndex
+            : 0;
+        _voicePlayerIndexes[soundPath] = (index + 1) % pool.Count;
+
+        var player = pool[index % pool.Count];
+        player.Volume = _settings.VoiceVolume;
+        player.SpeedRatio = pitch;
+        return player;
+    }
+
+    private List<MediaPlayer> CreateVoicePlayerPool(string soundPath, double pitch)
+    {
+        var pool = new List<MediaPlayer>(VoicePlayerPoolSize);
+        for (var index = 0; index < VoicePlayerPoolSize; index++)
+        {
+            var player = new MediaPlayer
+            {
+                Volume = _settings.VoiceVolume,
+                SpeedRatio = pitch,
+            };
+            player.MediaEnded += (_, _) => _activeVoicePlayers.Remove(player);
+            player.MediaFailed += (_, _) => _activeVoicePlayers.Remove(player);
+            player.Open(new Uri(soundPath, UriKind.Absolute));
+            pool.Add(player);
+        }
+
+        return pool;
+    }
+
+    private void StopAllVoicePlayers(bool close)
+    {
+        foreach (var player in _voicePlayerPools.Values.SelectMany(pool => pool))
+        {
+            player.Stop();
+            if (close)
+            {
+                player.Close();
+            }
+        }
+
+        _activeVoicePlayers.Clear();
+        if (close)
+        {
+            _voicePlayerPools.Clear();
+            _voicePlayerIndexes.Clear();
+        }
     }
 
     private void Window_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
@@ -739,7 +762,10 @@ public partial class PreviewWindow : Window
         {
             _musicPlayer.Pause();
             _transitionPlayer.Pause();
-            _voicePlayer.Pause();
+            foreach (var player in _activeVoicePlayers.ToList())
+            {
+                player.Pause();
+            }
         }
         else
         {
@@ -748,7 +774,10 @@ public partial class PreviewWindow : Window
                 _musicPlayer.Play();
             }
             _transitionPlayer.Play();
-            _voicePlayer.Play();
+            foreach (var player in _activeVoicePlayers.ToList())
+            {
+                player.Play();
+            }
         }
     }
 
@@ -773,7 +802,10 @@ public partial class PreviewWindow : Window
         _settings.TextDelayMs = Math.Clamp(_settings.TextDelayMs, 0, 120);
         _musicPlayer.Volume = _settings.MusicVolume;
         _transitionPlayer.Volume = _settings.EffectsVolume;
-        _voicePlayer.Volume = _settings.VoiceVolume;
+        foreach (var player in _voicePlayerPools.Values.SelectMany(pool => pool))
+        {
+            player.Volume = _settings.VoiceVolume;
+        }
     }
 
     private void SaveGameAs()
@@ -954,8 +986,7 @@ public partial class PreviewWindow : Window
         _musicPlayer.Close();
         _transitionPlayer.Stop();
         _transitionPlayer.Close();
-        _voicePlayer.Stop();
-        _voicePlayer.Close();
+        StopAllVoicePlayers(close: true);
         _dialogueCts?.Cancel();
     }
 
