@@ -112,6 +112,13 @@ public partial class PreviewWindow : Window
         DialogueText.Text = string.Empty;
         ChoicesPanel.Children.Clear();
 
+        _dialogueCts = new CancellationTokenSource();
+        _ = TypeDialogueAsync(node, _dialogueCts.Token);
+    }
+
+    private void ShowChoices()
+    {
+        ChoicesPanel.Children.Clear();
         var outputs = _player.GetAvailableOutputs();
         for (var index = 0; index < outputs.Count; index++)
         {
@@ -132,8 +139,6 @@ public partial class PreviewWindow : Window
             ChoicesPanel.Children.Add(end);
         }
         SetChoicesEnabled(!_paused && !_transitioning);
-        _dialogueCts = new CancellationTokenSource();
-        _ = TypeDialogueAsync(node, _dialogueCts.Token);
     }
 
     private void RefreshDebugState(NovelNode node)
@@ -588,6 +593,9 @@ public partial class PreviewWindow : Window
                     await Task.Delay(_settings.TextDelayMs, cancellationToken);
                 }
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            ShowChoices();
         }
         catch (OperationCanceledException)
         {
