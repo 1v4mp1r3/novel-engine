@@ -2,6 +2,7 @@ using System.IO;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using NovelEngine.Core;
 
@@ -442,6 +443,251 @@ public sealed class AssetFolderPickerWindow : Window
             return;
         }
         DialogResult = true;
+    }
+}
+
+public sealed class VoiceBlipEditorWindow : Window
+{
+    private readonly TextBox _nameBox;
+    private readonly Slider _pitchSlider;
+    private readonly Slider _volumeSlider;
+    private readonly Slider _genderSlider;
+    private readonly Slider _toneSlider;
+    private readonly Slider _speedSlider;
+    private readonly Slider _randomSlider;
+    private readonly MediaPlayer _previewPlayer = new();
+    private string? _previewPath;
+
+    public VoiceBlipEditorWindow()
+    {
+        Title = "Создать voice-блип";
+        Width = 560;
+        Height = 620;
+        MinWidth = 520;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+        _nameBox = DialogUi.TextBox("voice_blip");
+        _nameBox.SelectAll();
+        _pitchSlider = CreateSlider(50);
+        _volumeSlider = CreateSlider(75);
+        _genderSlider = CreateSlider(50);
+        _toneSlider = CreateSlider(50);
+        _speedSlider = CreateSlider(50);
+        _randomSlider = CreateSlider(20);
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(DialogUi.Label("Имя блипа"));
+        panel.Children.Add(_nameBox);
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "Тестовый генератор WAV-блипов. Настройки повторяют базовые ручки Dialogue Engine: Pitch, Volume, Gender, Tone, Speed, Random.",
+                Foreground = (Brush)Application.Current.Resources["MutedBrush"],
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8),
+            });
+        panel.Children.Add(CreateSliderRow("Pitch", _pitchSlider));
+        panel.Children.Add(CreateSliderRow("Volume", _volumeSlider));
+        panel.Children.Add(CreateSliderRow("Gender", _genderSlider));
+        panel.Children.Add(CreateSliderRow("Tone", _toneSlider));
+        panel.Children.Add(CreateSliderRow("Speed", _speedSlider));
+        panel.Children.Add(CreateSliderRow("Random", _randomSlider));
+        panel.Children.Add(CreateButtons());
+        Content = new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+        Closed += (_, _) => CleanupPreview();
+    }
+
+    public string BlipName => _nameBox.Text.Trim();
+
+    public VoiceBlipOptions Options => new()
+    {
+        Pitch = _pitchSlider.Value,
+        Volume = _volumeSlider.Value,
+        Gender = _genderSlider.Value,
+        Tone = _toneSlider.Value,
+        Speed = _speedSlider.Value,
+        Randomness = _randomSlider.Value,
+    };
+
+    private static Slider CreateSlider(double value) =>
+        new()
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = value,
+            TickFrequency = 5,
+            IsSnapToTickEnabled = false,
+            Margin = new Thickness(0, 0, 12, 0),
+        };
+
+    private static FrameworkElement CreateSliderRow(string label, Slider slider)
+    {
+        var valueText = new TextBlock
+        {
+            Width = 42,
+            TextAlignment = TextAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Text = Math.Round(slider.Value).ToString(CultureInfo.InvariantCulture),
+        };
+        slider.ValueChanged += (_, _) =>
+        {
+            valueText.Text = Math.Round(slider.Value).ToString(CultureInfo.InvariantCulture);
+        };
+
+        var grid = new Grid { Margin = new Thickness(0, 8, 0, 12) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+        grid.Children.Add(
+            new TextBlock
+            {
+                Text = label,
+                Foreground = (Brush)Application.Current.Resources["MutedBrush"],
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+        Grid.SetColumn(slider, 1);
+        grid.Children.Add(slider);
+        Grid.SetColumn(valueText, 2);
+        grid.Children.Add(valueText);
+        return grid;
+    }
+
+    private FrameworkElement CreateButtons()
+    {
+        var panel = new DockPanel { Margin = new Thickness(0, 18, 0, 0) };
+        var left = new StackPanel { Orientation = Orientation.Horizontal };
+        left.Children.Add(CreateButton("По умолчанию", ResetDefaults));
+        left.Children.Add(CreateButton("Random", Randomize));
+        left.Children.Add(CreateButton("Прослушать", Preview));
+
+        var right = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var cancel = CreateButton("Отмена", () => DialogResult = false);
+        cancel.IsCancel = true;
+        var save = CreateButton("Создать", Save);
+        save.IsDefault = true;
+        save.MinWidth = 110;
+        right.Children.Add(cancel);
+        right.Children.Add(save);
+
+        DockPanel.SetDock(left, Dock.Left);
+        DockPanel.SetDock(right, Dock.Right);
+        panel.Children.Add(right);
+        panel.Children.Add(left);
+        return panel;
+    }
+
+    private static Button CreateButton(string text, Action action)
+    {
+        var button = new Button
+        {
+            Content = text,
+            MinWidth = 92,
+        };
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private void ResetDefaults()
+    {
+        _pitchSlider.Value = 50;
+        _volumeSlider.Value = 75;
+        _genderSlider.Value = 50;
+        _toneSlider.Value = 50;
+        _speedSlider.Value = 50;
+        _randomSlider.Value = 20;
+    }
+
+    private void Randomize()
+    {
+        _pitchSlider.Value = Random.Shared.Next(28, 78);
+        _volumeSlider.Value = Random.Shared.Next(55, 91);
+        _genderSlider.Value = Random.Shared.Next(25, 76);
+        _toneSlider.Value = Random.Shared.Next(15, 90);
+        _speedSlider.Value = Random.Shared.Next(30, 86);
+        _randomSlider.Value = Random.Shared.Next(5, 58);
+    }
+
+    private void Preview()
+    {
+        try
+        {
+            CleanupPreview();
+            _previewPath = Path.Combine(
+                Path.GetTempPath(),
+                $"novel-engine-blip-preview-{Guid.NewGuid():N}.wav");
+            VoiceBlipGenerator.WriteWaveFile(_previewPath, Options);
+            _previewPlayer.Open(new Uri(_previewPath, UriKind.Absolute));
+            _previewPlayer.Play();
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Предпрослушивание voice-блипа",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void CleanupPreview()
+    {
+        _previewPlayer.Stop();
+        _previewPlayer.Close();
+        if (_previewPath is null)
+        {
+            return;
+        }
+        try
+        {
+            if (File.Exists(_previewPath))
+            {
+                File.Delete(_previewPath);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        _previewPath = null;
+    }
+
+    private void Save()
+    {
+        if (BlipName.Length == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Укажите имя блипа.",
+                "Создать voice-блип",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        try
+        {
+            VoiceBlipGenerator.CreateWaveBytes(Options);
+            DialogResult = true;
+        }
+        catch (InvalidDataException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Создать voice-блип",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 }
 

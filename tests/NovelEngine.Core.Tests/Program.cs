@@ -17,6 +17,7 @@ var tests = new (string Name, Action Run)[]
     ("character transforms and voice survive code and JSON", CharacterTransformsRoundTrip),
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
+    ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
@@ -453,6 +454,47 @@ static void MainMenuAndVoiceAssetReferences()
     Assert(
         scene.Characters.Single().VoiceSound == "@voice_main",
         "Voice asset reference was not replaced.");
+}
+
+static void VoiceBlipGeneratorEmitsWav()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-blip-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var path = Path.Combine(directory, "hero.wav");
+        var options = new VoiceBlipOptions
+        {
+            Pitch = 64,
+            Volume = 80,
+            Gender = 42,
+            Tone = 70,
+            Speed = 58,
+            Randomness = 24,
+        };
+
+        VoiceBlipGenerator.WriteWaveFile(path, options);
+        var bytes = File.ReadAllBytes(path);
+        var memoryBytes = VoiceBlipGenerator.CreateWaveBytes(options);
+
+        Assert(File.Exists(path), "Generated wav file was not created.");
+        Assert(bytes.Length > 44, "Generated wav file has no sample data.");
+        Assert(
+            System.Text.Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF",
+            "Generated wav is missing RIFF header.");
+        Assert(
+            System.Text.Encoding.ASCII.GetString(bytes, 8, 4) == "WAVE",
+            "Generated wav is missing WAVE marker.");
+        Assert(
+            memoryBytes.Length == bytes.Length,
+            "Memory and file wave rendering diverged.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
 }
 
 static void ProjectLanguageRejectsCycles()

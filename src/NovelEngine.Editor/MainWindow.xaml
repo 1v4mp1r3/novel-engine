@@ -296,6 +296,10 @@
                                 <Button Content="+ Импортировать"
                                         Background="#305B55"
                                         Click="ImportAssets_Click" />
+                                <Button x:Name="CreateVoiceBlipButton"
+                                        Content="+ Создать блип"
+                                        Background="#305B55"
+                                        Click="CreateVoiceBlip_Click" />
                                 <Button Content="+ Папка"
                                         Click="CreateAssetFolder_Click" />
                                 <Button x:Name="RenameFolderButton"

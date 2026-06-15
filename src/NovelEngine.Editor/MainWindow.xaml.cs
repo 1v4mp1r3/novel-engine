@@ -1123,6 +1123,43 @@ public partial class MainWindow : Window
             },
         };
 
+    private string GetVoiceBlipTargetFolder()
+    {
+        if (_selectedAssetFolder is not null
+            && IsFolderOrChild(_selectedAssetFolder, "voices"))
+        {
+            return ProjectAssets.NormalizeFolder(_selectedAssetFolder);
+        }
+        return "voices";
+    }
+
+    private string CreateUniqueVoiceBlipPath(string folder, string name)
+    {
+        var safeStem = ProjectAssets.MakeId(name);
+        var directory = Path.Combine(
+            ProjectAssets.GetAssetsDirectory(_projectPath!),
+            ProjectAssets.NormalizeFolder(folder).Replace(
+                '/',
+                Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(directory);
+
+        var path = Path.Combine(directory, $"{safeStem}.wav");
+        var suffix = 2;
+        while (File.Exists(path))
+        {
+            path = Path.Combine(directory, $"{safeStem}-{suffix++}.wav");
+        }
+        return path;
+    }
+
+    private static bool IsFolderOrChild(string candidate, string folder)
+    {
+        candidate = ProjectAssets.NormalizeFolder(candidate);
+        folder = ProjectAssets.NormalizeFolder(folder);
+        return candidate.Equals(folder, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
     private string AssetSize(NovelAsset asset)
     {
         var path = ResolveAssetPath(asset);
@@ -1584,6 +1621,48 @@ public partial class MainWindow : Window
                 this,
                 $"Не удалось импортировать ассет:\n\n{error.Message}",
                 "Импорт файлов",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void CreateVoiceBlip_Click(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureProjectSavedForAssets())
+        {
+            return;
+        }
+
+        var dialog = new VoiceBlipEditorWindow { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var folder = GetVoiceBlipTargetFolder();
+            ProjectAssets.CreateFolder(_project, folder);
+            var targetPath = CreateUniqueVoiceBlipPath(folder, dialog.BlipName);
+            VoiceBlipGenerator.WriteWaveFile(targetPath, dialog.Options);
+            var asset = ProjectAssets.Import(_project, _projectPath!, targetPath, folder);
+            _selectedAssetFolder = folder;
+            MarkDirty();
+            RefreshAssets(syncFromDisk: false);
+            AssetsGrid.SelectedItem = AssetsGrid.Items
+                .OfType<AssetView>()
+                .FirstOrDefault(view => view.Id == asset.Id);
+            StatusText.Text = $"Создан voice-блип @{asset.Id}";
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Создать voice-блип",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
