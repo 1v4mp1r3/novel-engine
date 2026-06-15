@@ -928,6 +928,18 @@ static void BuildCompilerEmitsPackage()
         var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
         scene.Background = AssetReference.Create(asset.Id);
         scene.InheritBackground = false;
+        project.MainMenu.Background = AssetReference.Create(asset.Id);
+        project.MainMenu.Elements.Clear();
+        project.MainMenu.Elements.Add(
+            new MainMenuElement
+            {
+                Id = "custom-title",
+                Kind = MainMenuElementKind.Label,
+                Text = "Custom title",
+                X = 120,
+                Y = 80,
+                CustomStyleCode = "align left; italic true",
+            });
         scene.InheritCharacters = false;
         scene.Characters.Add(
             new CharacterPlacement
@@ -1011,6 +1023,15 @@ static void BuildCompilerEmitsPackage()
         Assert(
             loaded.Project.Nodes.Count == project.Nodes.Count,
             "Runtime project changed node count.");
+        Assert(
+            loaded.Project.MainMenu.Background == AssetReference.Create(asset.Id),
+            "Runtime project lost main menu background.");
+        var builtMenuElement = loaded.Project.MainMenu.Elements.Single();
+        Assert(
+            builtMenuElement.Id == "custom-title"
+                && builtMenuElement.Text == "Custom title"
+                && builtMenuElement.CustomStyleCode == "align left; italic true",
+            "Runtime project lost custom main menu elements.");
 
         var foreignDirectory = Path.Combine(directory, "foreign-output");
         Directory.CreateDirectory(foreignDirectory);

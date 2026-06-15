@@ -53,6 +53,7 @@ public static class NovelBuildCompiler
             ? ProjectLanguage.Format(project)
             : project.SourceCode;
         var runtimeProject = ProjectLanguage.Parse(source);
+        CopyMainMenu(project.MainMenu, runtimeProject.MainMenu);
         runtimeProject.SourceCode = debugSymbols ? source : string.Empty;
         runtimeProject.Validate();
 
@@ -112,6 +113,16 @@ public static class NovelBuildCompiler
             }
             throw;
         }
+    }
+
+    private static void CopyMainMenu(
+        MainMenuDesign source,
+        MainMenuDesign destination)
+    {
+        destination.Background = source.Background;
+        destination.Elements.Clear();
+        destination.Elements.AddRange(
+            source.Elements.Select(element => element.Clone()));
     }
 
     public static NovelBuildManifest LoadManifest(string manifestPath)
