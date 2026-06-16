@@ -3756,6 +3756,118 @@ public partial class MainWindow : Window
     private void HideDiagnostics_Click(object sender, RoutedEventArgs e) =>
         DiagnosticsPanel.Visibility = Visibility.Collapsed;
 
+    private void DiagnosticsGrid_MouseDoubleClick(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (DiagnosticsGrid.SelectedItem is not DiagnosticView view)
+        {
+            return;
+        }
+
+        NavigateToDiagnostic(view.Diagnostic);
+    }
+
+    private void NavigateToDiagnostic(ProjectDiagnostic diagnostic)
+    {
+        if (TryNavigateToDiagnosticAsset(diagnostic.Location))
+        {
+            return;
+        }
+        if (TryNavigateToDiagnosticNode(diagnostic.Location))
+        {
+            return;
+        }
+
+        StatusText.Text = $"Нет быстрой навигации для «{diagnostic.Location}»";
+    }
+
+    private bool TryNavigateToDiagnosticAsset(string location)
+    {
+        var assetId = TryReadDiagnosticAssetId(location);
+        if (assetId is null)
+        {
+            return false;
+        }
+
+        WorkspaceTabs.SelectedItem = FilesTab;
+        RefreshAssets();
+        var assetView = AssetsGrid.Items
+            .OfType<AssetView>()
+            .FirstOrDefault(view => view.Id.Equals(
+                assetId,
+                StringComparison.OrdinalIgnoreCase));
+        if (assetView is null)
+        {
+            StatusText.Text = $"Ассет @{assetId} не найден в менеджере файлов";
+            return true;
+        }
+
+        AssetsGrid.SelectedItem = assetView;
+        AssetsGrid.ScrollIntoView(assetView);
+        RefreshAssetPreview();
+        StatusText.Text = $"Открыт ассет @{assetId}";
+        return true;
+    }
+
+    private bool TryNavigateToDiagnosticNode(string location)
+    {
+        var node = _project.Nodes
+            .OrderByDescending(node => DiagnosticNodeDisplay(node).Length)
+            .FirstOrDefault(node => LocationReferencesNode(location, node));
+        if (node is null)
+        {
+            return false;
+        }
+
+        Graph.SelectNode(node.Id);
+        if (location.Contains("скрипт", StringComparison.OrdinalIgnoreCase)
+            || location.Contains("условие", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigateToNodeCode(node.Id);
+        }
+        else
+        {
+            WorkspaceTabs.SelectedItem = GraphTab;
+            StatusText.Text = $"Выбрана нода «{DiagnosticNodeDisplay(node)}»";
+        }
+        return true;
+    }
+
+    private static string? TryReadDiagnosticAssetId(string location)
+    {
+        const string marker = "Ассет @";
+        var start = location.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        start += marker.Length;
+        var end = start;
+        while (end < location.Length
+            && (char.IsLetterOrDigit(location[end])
+                || location[end] is '_' or '-'))
+        {
+            end++;
+        }
+
+        var assetId = location[start..end];
+        return AssetReference.IsValidId(assetId) ? assetId : null;
+    }
+
+    private static bool LocationReferencesNode(string location, NovelNode node)
+    {
+        var display = DiagnosticNodeDisplay(node);
+        return location.Contains($"Нода «{display}»", StringComparison.Ordinal)
+            || location.Equals($"Нода {node.Id}", StringComparison.Ordinal)
+            || location.StartsWith($"Нода {node.Id},", StringComparison.Ordinal)
+            || location.StartsWith($"Нода {node.Id} ", StringComparison.Ordinal);
+    }
+
+    private static string DiagnosticNodeDisplay(NovelNode node) =>
+        string.IsNullOrWhiteSpace(node.Title) ? node.Id : node.Title;
+
     private static string KindName(NodeKind kind) =>
         kind switch
         {

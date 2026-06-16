@@ -105,6 +105,10 @@
                     <TextBlock x:Name="DiagnosticsSummaryText"
                                FontWeight="Bold"
                                VerticalAlignment="Center" />
+                    <TextBlock Text="Двойной клик — перейти к месту"
+                               Margin="12,1,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               VerticalAlignment="Center" />
                     <Button DockPanel.Dock="Right"
                             Content="Скрыть"
                             Padding="10,4"
@@ -115,7 +119,8 @@
                           HeadersVisibility="Column"
                           IsReadOnly="True"
                           CanUserAddRows="False"
-                          CanUserDeleteRows="False">
+                          CanUserDeleteRows="False"
+                          MouseDoubleClick="DiagnosticsGrid_MouseDoubleClick">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Уровень"
                                             Binding="{Binding Severity}"

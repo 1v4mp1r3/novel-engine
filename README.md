@@ -86,6 +86,8 @@ currently installed on this workstation.
   game, launch it with runtime diagnostics, or stop the separate player process.
 - Build and run commands perform project diagnostics first: errors block the
   action, while warnings ask for explicit confirmation.
+- Double-click a project diagnostic to jump to the affected node, code
+  declaration, or asset.
 - Compiled packages are written to `build/<project-name>` beside the project.
   They contain a validated runtime project, manifest, and copied assets.
 - The file manager supports nested project folders; assets can be created,
