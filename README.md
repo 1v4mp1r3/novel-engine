@@ -94,5 +94,6 @@ currently installed on this workstation.
   They contain a validated runtime project, manifest, and copied assets.
 - The file manager supports nested project folders; assets can be created,
   renamed, moved, and referenced without depending on their physical path.
+- Audio assets can be previewed directly from the file manager.
 - Asset usage results can be opened directly to jump back to the node or main
   menu area that references the asset.

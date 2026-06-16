@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private bool _workspaceNeedsProjectFile;
     private Process? _gameProcess;
     private FileSystemWatcher? _filesWatcher;
+    private readonly MediaPlayer _assetPreviewPlayer = new();
     private readonly DispatcherTimer _codeAnalysisTimer;
     private readonly DispatcherTimer _autoSaveTimer;
     private readonly DispatcherTimer _filesRefreshTimer;
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private int _projectHistoryIndex = -1;
     private bool _restoringProjectHistory;
     private string _savedProjectSnapshot = string.Empty;
+    private string? _assetPreviewAudioPath;
 
     public MainWindow()
         : this(null)
@@ -66,6 +68,11 @@ public partial class MainWindow : Window
         Graph.EditMainMenuRequested += EditMainMenu;
         Graph.OpenNodeCodeRequested += NavigateToNodeCode;
         Graph.TransitionSettingsRequested += EditTransition;
+        _assetPreviewPlayer.MediaEnded += (_, _) =>
+        {
+            AssetPreviewStopButton.IsEnabled = false;
+            StatusText.Text = "Прослушивание завершено";
+        };
         Closing += MainWindow_Closing;
         Loaded += (_, _) => Graph.CenterGraph();
 
@@ -1377,6 +1384,8 @@ public partial class MainWindow : Window
 
     private void RefreshAssetPreview()
     {
+        StopAssetPreviewPlayback();
+        _assetPreviewAudioPath = null;
         var view = AssetsGrid.SelectedItem as AssetView;
         var selected = view is not null;
         RenameAssetButton.IsEnabled = selected;
@@ -1385,6 +1394,9 @@ public partial class MainWindow : Window
         FindAssetUsageButton.IsEnabled = selected;
         DeleteAssetButton.IsEnabled = selected;
         AssetPreviewImage.Source = null;
+        AssetPreviewAudioPanel.Visibility = Visibility.Collapsed;
+        AssetPreviewPlayButton.IsEnabled = false;
+        AssetPreviewStopButton.IsEnabled = false;
         AssetReferenceText.Text = selected
             ? AssetReference.Create(view!.Id)
             : string.Empty;
@@ -1400,6 +1412,23 @@ public partial class MainWindow : Window
                     : "Изображение не найдено"
             : "Выберите ассет";
         AssetPreviewPlaceholder.Visibility = Visibility.Visible;
+
+        if (view?.Asset.Kind == AssetKind.Audio)
+        {
+            AssetPreviewAudioPanel.Visibility = Visibility.Visible;
+            var audioPath = ResolveAssetPath(view.Asset);
+            if (File.Exists(audioPath))
+            {
+                _assetPreviewAudioPath = audioPath;
+                AssetPreviewPlayButton.IsEnabled = true;
+                AssetPreviewPlaceholder.Text = "Аудиофайл готов к прослушиванию";
+            }
+            else
+            {
+                AssetPreviewPlaceholder.Text = "Аудиофайл не найден";
+            }
+            return;
+        }
 
         if (view?.Asset.Kind != AssetKind.Image)
         {
@@ -1430,6 +1459,56 @@ public partial class MainWindow : Window
 
     private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RefreshAssetPreview();
+
+    private void PlayAssetPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (_assetPreviewAudioPath is null || !File.Exists(_assetPreviewAudioPath))
+        {
+            StatusText.Text = "Аудиофайл для предпросмотра не найден";
+            return;
+        }
+
+        try
+        {
+            _assetPreviewPlayer.Stop();
+            _assetPreviewPlayer.Open(new Uri(_assetPreviewAudioPath, UriKind.Absolute));
+            _assetPreviewPlayer.Play();
+            AssetPreviewStopButton.IsEnabled = true;
+            StatusText.Text =
+                $"Прослушивание {Path.GetFileName(_assetPreviewAudioPath)}";
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidOperationException
+            or NotSupportedException
+            or UnauthorizedAccessException
+            or UriFormatException)
+        {
+            AssetPreviewStopButton.IsEnabled = false;
+            StatusText.Text = "Не удалось воспроизвести аудио";
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Предпросмотр аудио",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void StopAssetPreview_Click(object sender, RoutedEventArgs e)
+    {
+        StopAssetPreviewPlayback();
+        StatusText.Text = "Прослушивание остановлено";
+    }
+
+    private void StopAssetPreviewPlayback()
+    {
+        _assetPreviewPlayer.Stop();
+        if (IsInitialized)
+        {
+            AssetPreviewStopButton.IsEnabled = false;
+        }
+    }
 
     private void AssetsGrid_PreviewMouseRightButtonDown(
         object sender,
@@ -2648,6 +2727,7 @@ public partial class MainWindow : Window
         }
         _autoSaveTimer.Stop();
         _filesWatcher?.Dispose();
+        _assetPreviewPlayer.Close();
         StopGameProcess(silent: true);
     }
 

@@ -497,6 +497,17 @@
                                                        VerticalAlignment="Center" />
                                         </Grid>
                                     </Border>
+                                    <WrapPanel x:Name="AssetPreviewAudioPanel"
+                                               Margin="0,0,0,12"
+                                               Visibility="Collapsed">
+                                        <Button x:Name="AssetPreviewPlayButton"
+                                                Content="Прослушать"
+                                                Background="#305B55"
+                                                Click="PlayAssetPreview_Click" />
+                                        <Button x:Name="AssetPreviewStopButton"
+                                                Content="Стоп"
+                                                Click="StopAssetPreview_Click" />
+                                    </WrapPanel>
                                     <TextBlock Text="Ссылка в коде"
                                                Style="{StaticResource FieldLabel}" />
                                     <TextBox x:Name="AssetReferenceText"
