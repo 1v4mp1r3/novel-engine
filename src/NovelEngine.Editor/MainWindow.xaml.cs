@@ -185,6 +185,13 @@ public partial class MainWindow : Window
             Graph.DeleteSelected();
             e.Handled = true;
         }
+        else if (e.Key == Key.D
+            && Keyboard.Modifiers == ModifierKeys.Control
+            && !IsTextEditing())
+        {
+            Graph.DuplicateSelected();
+            e.Handled = true;
+        }
         else if (e.Key == Key.Home && !IsTextEditing())
         {
             Graph.CenterGraph();
@@ -2654,6 +2661,9 @@ public partial class MainWindow : Window
 
     private void DeleteNode_Click(object sender, RoutedEventArgs e) =>
         Graph.DeleteSelected();
+
+    private void DuplicateNode_Click(object sender, RoutedEventArgs e) =>
+        Graph.DuplicateSelected();
 
     private void CenterGraph_Click(object sender, RoutedEventArgs e) =>
         Graph.CenterGraph();

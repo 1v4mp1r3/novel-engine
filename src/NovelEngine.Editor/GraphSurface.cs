@@ -94,6 +94,28 @@ public sealed class GraphSurface : FrameworkElement
         ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void DuplicateSelected()
+    {
+        if (SelectedNodeId is null)
+        {
+            System.Media.SystemSounds.Beep.Play();
+            return;
+        }
+
+        try
+        {
+            var duplicate = Project.DuplicateNode(SelectedNodeId);
+            SelectedNodeId = duplicate.Id;
+            RequestRender();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            ProjectChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (InvalidOperationException)
+        {
+            System.Media.SystemSounds.Beep.Play();
+        }
+    }
+
     public void RefreshGraph() => RequestRender();
 
     public void CenterGraph()
@@ -313,6 +335,11 @@ public sealed class GraphSurface : FrameworkElement
             DeleteSelected();
             e.Handled = true;
         }
+        else if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            DuplicateSelected();
+            e.Handled = true;
+        }
         else if (e.Key == Key.Home)
         {
             CenterGraph();
@@ -384,6 +411,9 @@ public sealed class GraphSurface : FrameworkElement
                 menu.Items.Add(CreateMenuItem(
                     "Редактировать сцену и персонажей",
                     () => EditNodeSceneRequested?.Invoke(node.Id)));
+                menu.Items.Add(CreateMenuItem(
+                    "Дублировать ноду",
+                    DuplicateSelected));
             }
             if (node.Kind == NodeKind.Dialogue)
             {

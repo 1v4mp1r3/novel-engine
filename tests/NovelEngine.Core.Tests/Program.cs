@@ -7,6 +7,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
+    ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
@@ -182,6 +183,53 @@ static void DialogueChoicesConnectIndependently()
 
     Assert(dialogue.Outputs[0].TargetNodeId == firstTarget.Id, "First choice target was lost.");
     Assert(dialogue.Outputs[1].TargetNodeId == secondTarget.Id, "Second choice target was lost.");
+}
+
+static void DuplicateNodeCopiesAuthoringDataSafely()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.AddRange(
+    [
+        new NovelAsset { Id = "city", Kind = AssetKind.Image, Path = "city.png" },
+        new NovelAsset { Id = "hero", Kind = AssetKind.Image, Path = "hero.png" },
+        new NovelAsset { Id = "theme", Kind = AssetKind.Audio, Path = "theme.ogg" },
+        new NovelAsset { Id = "blip", Kind = AssetKind.Audio, Path = "blip.wav" },
+        new NovelAsset { Id = "click", Kind = AssetKind.Audio, Path = "click.wav" },
+    ]);
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.Title = "Intro";
+    scene.Text = "Hello";
+    scene.Background = "@city";
+    scene.Music = "@theme";
+    scene.Script = "set visited = 1";
+    scene.Outputs[0].Condition = "visited >= 1";
+    scene.Outputs[0].Script = "add score 1";
+    scene.Outputs[0].TransitionSound = "@click";
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+            Sprite = "@hero",
+            VoiceSounds = ["@blip"],
+        });
+
+    var duplicate = project.DuplicateNode(scene.Id);
+
+    Assert(duplicate.Id != scene.Id, "Duplicate node reused the source id.");
+    Assert(duplicate.Title == "Intro копия", "Duplicate title was not marked as a copy.");
+    Assert(duplicate.X == scene.X + 48 && duplicate.Y == scene.Y + 48, "Duplicate position offset changed.");
+    Assert(duplicate.Text == scene.Text, "Duplicate text was not copied.");
+    Assert(duplicate.Background == scene.Background, "Duplicate background was not copied.");
+    Assert(duplicate.Music == scene.Music, "Duplicate music was not copied.");
+    Assert(duplicate.Script == scene.Script, "Duplicate script was not copied.");
+    Assert(duplicate.Outputs.Count == scene.Outputs.Count, "Duplicate outputs count changed.");
+    Assert(duplicate.Outputs[0].Id != scene.Outputs[0].Id, "Duplicate output reused the source id.");
+    Assert(duplicate.Outputs[0].TargetNodeId is null, "Duplicate output kept the source connection.");
+    Assert(duplicate.Outputs[0].TransitionSound == "@click", "Duplicate transition sound was not copied.");
+    Assert(duplicate.Characters[0].Id != scene.Characters[0].Id, "Duplicate character reused the source id.");
+    Assert(duplicate.Characters[0].Sprite == "@hero", "Duplicate character data was not copied.");
+    project.Validate();
 }
 
 static void ProjectJsonRoundTrip()

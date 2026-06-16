@@ -60,6 +60,8 @@ currently installed on this workstation.
 
 - Right-click the canvas to add a scene or dialogue node.
 - Drag from an output circle to the input circle of another node to connect them.
+- Use `Ctrl+D` or the node context menu to duplicate the selected scene or
+  dialogue node without copying its graph connections.
 - Scene nodes have one linear `Дальше` output.
 - Dialogue nodes can have any number of choices.
 - A node may inherit or replace the current background and character set.

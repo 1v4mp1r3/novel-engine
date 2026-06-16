@@ -418,6 +418,51 @@ public sealed class NovelProject
         return node;
     }
 
+    public NovelNode DuplicateNode(string nodeId, float offsetX = 48, float offsetY = 48)
+    {
+        var source = FindNode(nodeId)
+            ?? throw new InvalidOperationException("Нода не найдена.");
+        if (source.Kind == NodeKind.Start)
+        {
+            throw new InvalidOperationException("Стартовую ноду нельзя дублировать.");
+        }
+
+        var duplicate = new NovelNode
+        {
+            Id = CreateId("node"),
+            Kind = source.Kind,
+            TypeName = source.TypeName,
+            UsesTypeDefaults = source.UsesTypeDefaults,
+            Title = CreateDuplicateTitle(source.Title),
+            Speaker = source.Speaker,
+            Text = source.Text,
+            Background = source.Background,
+            InheritBackground = source.InheritBackground,
+            Music = source.Music,
+            InheritMusic = source.InheritMusic,
+            InheritCharacters = source.InheritCharacters,
+            Script = source.Script,
+            X = source.X + offsetX,
+            Y = source.Y + offsetY,
+        };
+        duplicate.PropertyOverrides.UnionWith(source.PropertyOverrides);
+        duplicate.Characters.AddRange(
+            source.Characters.Select(character => character.CloneWithId(CreateId("char"))));
+        duplicate.Outputs.AddRange(
+            source.Outputs.Select(output => new NodeOutput
+            {
+                Id = CreateId("out"),
+                Label = output.Label,
+                Condition = output.Condition,
+                Script = output.Script,
+                TransitionSound = output.TransitionSound,
+                FadeDurationMs = output.FadeDurationMs,
+            }));
+
+        Nodes.Add(duplicate);
+        return duplicate;
+    }
+
     public NodeOutput AddChoice(string nodeId, string label = "Новый вариант")
     {
         var node = FindNode(nodeId)
@@ -808,6 +853,29 @@ public sealed class NovelProject
 
     private static string CreateId(string prefix) =>
         $"{prefix}-{Guid.NewGuid():N}";
+
+    private string CreateDuplicateTitle(string title)
+    {
+        var baseTitle = string.IsNullOrWhiteSpace(title)
+            ? "Копия ноды"
+            : $"{title} копия";
+        var existing = Nodes
+            .Select(node => node.Title)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!existing.Contains(baseTitle))
+        {
+            return baseTitle;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseTitle} {index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
 
     private IEnumerable<string> EnumerateAssetValues() =>
         EnumerateTypedAssetValues().Select(value => value.Value);
