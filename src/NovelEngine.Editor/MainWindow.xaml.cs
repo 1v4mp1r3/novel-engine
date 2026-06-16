@@ -3405,14 +3405,31 @@ public partial class MainWindow : Window
         }
 
         MarkDirty();
-        var duplicateView = OutputsGrid.Items
-            .OfType<OutputView>()
-            .FirstOrDefault(view => view.Id == duplicate.Id);
-        if (duplicateView is not null)
+        SelectOutputView(duplicate.Id);
+    }
+
+    private void MoveOutputUp_Click(object sender, RoutedEventArgs e) =>
+        MoveSelectedOutput(-1);
+
+    private void MoveOutputDown_Click(object sender, RoutedEventArgs e) =>
+        MoveSelectedOutput(1);
+
+    private void MoveSelectedOutput(int direction)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        if (node?.Kind != NodeKind.Dialogue || output is null)
         {
-            OutputsGrid.SelectedItem = duplicateView;
-            OutputsGrid.ScrollIntoView(duplicateView);
+            return;
         }
+
+        if (!_project.MoveOutput(node.Id, output.Id, direction))
+        {
+            return;
+        }
+
+        MarkDirty();
+        SelectOutputView(output.Id);
     }
 
     private void DisconnectOutput_Click(object sender, RoutedEventArgs e)
@@ -3433,6 +3450,20 @@ public partial class MainWindow : Window
         return node?.Outputs.FirstOrDefault(output => output.Id == view?.Id);
     }
 
+    private void SelectOutputView(string outputId)
+    {
+        var outputView = OutputsGrid.Items
+            .OfType<OutputView>()
+            .FirstOrDefault(view => view.Id == outputId);
+        if (outputView is null)
+        {
+            return;
+        }
+
+        OutputsGrid.SelectedItem = outputView;
+        OutputsGrid.ScrollIntoView(outputView);
+    }
+
     private void OutputsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
@@ -3443,9 +3474,15 @@ public partial class MainWindow : Window
 
     private void SetOutputButtons(bool canAdd, bool selected)
     {
+        var selectedIndex = OutputsGrid.SelectedIndex;
+        var outputCount = OutputsGrid.Items.Count;
+
         AddOutputButton.IsEnabled = canAdd;
         EditOutputButton.IsEnabled = selected;
         DuplicateOutputButton.IsEnabled = canAdd && selected;
+        MoveOutputUpButton.IsEnabled = canAdd && selected && selectedIndex > 0;
+        MoveOutputDownButton.IsEnabled =
+            canAdd && selected && selectedIndex >= 0 && selectedIndex < outputCount - 1;
         DeleteOutputButton.IsEnabled = canAdd && selected;
         DisconnectOutputButton.IsEnabled = selected;
     }

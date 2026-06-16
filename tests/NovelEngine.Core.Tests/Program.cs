@@ -10,6 +10,7 @@ var tests = new (string Name, Action Run)[]
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
     ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
     ("duplicating dialogue choices copies authoring data safely", DuplicateDialogueChoiceCopiesAuthoringDataSafely),
+    ("moving dialogue choices preserves data and boundaries", MoveDialogueChoicesPreservesDataAndBoundaries),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
@@ -288,6 +289,33 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
     Assert(
         dialogue.Outputs.IndexOf(duplicate) == dialogue.Outputs.IndexOf(source) + 1,
         "Duplicate choice was not inserted next to the source choice.");
+    project.Validate();
+}
+
+static void MoveDialogueChoicesPreservesDataAndBoundaries()
+{
+    var project = NovelProject.CreateDefault();
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var first = dialogue.Outputs[0];
+    var second = dialogue.Outputs[1];
+    var third = project.AddChoice(dialogue.Id, "Спрятаться");
+    third.Condition = "courage < 2";
+    third.Script = "set hidden = true";
+    third.TargetNodeId = scene.Id;
+
+    Assert(!project.MoveOutput(dialogue.Id, first.Id, -1), "First choice moved beyond the top boundary.");
+    Assert(project.MoveOutput(dialogue.Id, third.Id, -1), "Third choice did not move up.");
+    Assert(
+        dialogue.Outputs.Select(output => output.Id).SequenceEqual([first.Id, third.Id, second.Id]),
+        "Choice order after moving up is wrong.");
+    Assert(third.TargetNodeId == scene.Id, "Moved choice lost its target connection.");
+    Assert(third.Condition == "courage < 2", "Moved choice lost its condition.");
+    Assert(project.MoveOutput(dialogue.Id, first.Id, 1), "First choice did not move down.");
+    Assert(
+        dialogue.Outputs.Select(output => output.Id).SequenceEqual([third.Id, first.Id, second.Id]),
+        "Choice order after moving down is wrong.");
+    Assert(!project.MoveOutput(scene.Id, scene.Outputs[0].Id, 1), "Scene output should not move as a dialogue choice.");
     project.Validate();
 }
 

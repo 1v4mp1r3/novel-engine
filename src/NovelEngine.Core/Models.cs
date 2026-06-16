@@ -535,6 +535,36 @@ public sealed class NovelProject
         return duplicate;
     }
 
+    public bool MoveOutput(string nodeId, string outputId, int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        var node = FindNode(nodeId);
+        if (node is null || node.Kind != NodeKind.Dialogue)
+        {
+            return false;
+        }
+
+        var currentIndex = node.Outputs.FindIndex(output => output.Id == outputId);
+        if (currentIndex < 0)
+        {
+            return false;
+        }
+
+        var targetIndex = currentIndex + Math.Sign(direction);
+        if (targetIndex < 0 || targetIndex >= node.Outputs.Count)
+        {
+            return false;
+        }
+
+        (node.Outputs[currentIndex], node.Outputs[targetIndex]) =
+            (node.Outputs[targetIndex], node.Outputs[currentIndex]);
+        return true;
+    }
+
     public void Connect(string sourceNodeId, string outputId, string targetNodeId)
     {
         var source = FindNode(sourceNodeId)
