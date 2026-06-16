@@ -9,6 +9,7 @@ var tests = new (string Name, Action Run)[]
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
     ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
+    ("duplicating dialogue choices copies authoring data safely", DuplicateDialogueChoiceCopiesAuthoringDataSafely),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
@@ -257,6 +258,36 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     Assert(duplicate.Outputs[0].TransitionSound == "@click", "Duplicate transition sound was not copied.");
     Assert(duplicate.Characters[0].Id != scene.Characters[0].Id, "Duplicate character reused the source id.");
     Assert(duplicate.Characters[0].Sprite == "@hero", "Duplicate character data was not copied.");
+    project.Validate();
+}
+
+static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset { Id = "click", Kind = AssetKind.Audio, Path = "click.wav" });
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    var target = project.AddNode(NodeKind.Scene, 1100, 220);
+    var source = dialogue.Outputs[0];
+    source.Label = "Спросить";
+    source.Condition = "trust >= 2";
+    source.Script = "add trust 1";
+    source.TransitionSound = "@click";
+    source.FadeDurationMs = 900;
+    source.TargetNodeId = target.Id;
+
+    var duplicate = project.DuplicateOutput(dialogue.Id, source.Id);
+
+    Assert(duplicate.Id != source.Id, "Duplicate choice reused the source id.");
+    Assert(duplicate.Label == "Спросить копия", "Duplicate choice label was not marked as a copy.");
+    Assert(duplicate.Condition == source.Condition, "Duplicate choice condition was not copied.");
+    Assert(duplicate.Script == source.Script, "Duplicate choice script was not copied.");
+    Assert(duplicate.TransitionSound == "@click", "Duplicate choice transition sound was not copied.");
+    Assert(duplicate.FadeDurationMs == source.FadeDurationMs, "Duplicate choice fade duration was not copied.");
+    Assert(duplicate.TargetNodeId is null, "Duplicate choice kept the source connection.");
+    Assert(
+        dialogue.Outputs.IndexOf(duplicate) == dialogue.Outputs.IndexOf(source) + 1,
+        "Duplicate choice was not inserted next to the source choice.");
     project.Validate();
 }
 

@@ -277,6 +277,7 @@
                             <WrapPanel Margin="0,7,0,8">
                                 <Button x:Name="AddOutputButton" Content="+ Вариант" Click="AddOutput_Click" />
                                 <Button x:Name="EditOutputButton" Content="Изменить" Click="EditOutput_Click" />
+                                <Button x:Name="DuplicateOutputButton" Content="Дублировать" Click="DuplicateOutput_Click" />
                                 <Button x:Name="DeleteOutputButton" Content="Удалить" Click="DeleteOutput_Click" />
                                 <Button x:Name="DisconnectOutputButton" Content="Разорвать" Click="DisconnectOutput_Click" />
                             </WrapPanel>

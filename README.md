@@ -66,6 +66,8 @@ currently installed on this workstation.
   dialogue node without copying its graph connections.
 - Scene nodes have one linear `Дальше` output.
 - Dialogue nodes can have any number of choices.
+- Duplicate a dialogue choice to reuse its condition, script, sound, and fade
+  settings without copying its graph connection.
 - A node may inherit or replace the current background and character set.
 - A node may inherit music without restarting playback.
 - Right-click a connection to configure its transition sound and fade duration.

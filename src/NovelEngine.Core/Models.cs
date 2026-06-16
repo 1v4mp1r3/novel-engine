@@ -508,6 +508,33 @@ public sealed class NovelProject
         return output;
     }
 
+    public NodeOutput DuplicateOutput(string nodeId, string outputId)
+    {
+        var node = FindNode(nodeId)
+            ?? throw new InvalidOperationException("Нода не найдена.");
+        if (node.Kind != NodeKind.Dialogue)
+        {
+            throw new InvalidOperationException("Варианты ответа доступны только диалоговой ноде.");
+        }
+
+        var source = node.Outputs.FirstOrDefault(output => output.Id == outputId)
+            ?? throw new InvalidOperationException("Вариант ответа не найден.");
+
+        var duplicate = new NodeOutput
+        {
+            Id = CreateId("out"),
+            Label = CreateDuplicateOutputLabel(node, source.Label),
+            Condition = source.Condition,
+            Script = source.Script,
+            TransitionSound = source.TransitionSound,
+            FadeDurationMs = source.FadeDurationMs,
+        };
+
+        var sourceIndex = node.Outputs.IndexOf(source);
+        node.Outputs.Insert(sourceIndex + 1, duplicate);
+        return duplicate;
+    }
+
     public void Connect(string sourceNodeId, string outputId, string targetNodeId)
     {
         var source = FindNode(sourceNodeId)
@@ -901,6 +928,29 @@ public sealed class NovelProject
         for (var index = 2; ; index++)
         {
             var candidate = $"{baseTitle} {index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string CreateDuplicateOutputLabel(NovelNode node, string label)
+    {
+        var baseLabel = string.IsNullOrWhiteSpace(label)
+            ? "Копия варианта"
+            : $"{label} копия";
+        var existing = node.Outputs
+            .Select(output => output.Label)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!existing.Contains(baseLabel))
+        {
+            return baseLabel;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseLabel} {index}";
             if (!existing.Contains(candidate))
             {
                 return candidate;

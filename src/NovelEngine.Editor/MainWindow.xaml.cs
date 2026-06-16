@@ -3379,6 +3379,42 @@ public partial class MainWindow : Window
         }
     }
 
+    private void DuplicateOutput_Click(object sender, RoutedEventArgs e)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        if (node?.Kind != NodeKind.Dialogue || output is null)
+        {
+            return;
+        }
+
+        NodeOutput duplicate;
+        try
+        {
+            duplicate = _project.DuplicateOutput(node.Id, output.Id);
+        }
+        catch (InvalidOperationException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Дублирование варианта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        MarkDirty();
+        var duplicateView = OutputsGrid.Items
+            .OfType<OutputView>()
+            .FirstOrDefault(view => view.Id == duplicate.Id);
+        if (duplicateView is not null)
+        {
+            OutputsGrid.SelectedItem = duplicateView;
+            OutputsGrid.ScrollIntoView(duplicateView);
+        }
+    }
+
     private void DisconnectOutput_Click(object sender, RoutedEventArgs e)
     {
         var output = SelectedOutput();
@@ -3409,6 +3445,7 @@ public partial class MainWindow : Window
     {
         AddOutputButton.IsEnabled = canAdd;
         EditOutputButton.IsEnabled = selected;
+        DuplicateOutputButton.IsEnabled = canAdd && selected;
         DeleteOutputButton.IsEnabled = canAdd && selected;
         DisconnectOutputButton.IsEnabled = selected;
     }
