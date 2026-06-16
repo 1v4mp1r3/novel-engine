@@ -14,6 +14,8 @@ namespace NovelEngine.Editor;
 
 public partial class MainWindow : Window
 {
+    private const int MaxProjectHistoryEntries = 100;
+
     private NovelProject _project = NovelProject.CreateDefault();
     private string? _projectPath;
     private bool _dirty;
@@ -40,6 +42,10 @@ public partial class MainWindow : Window
     private bool _codeRefreshPending = true;
     private bool _codeRefreshUseStoredSource = true;
     private bool _syncingFilesFromDisk;
+    private readonly List<ProjectHistoryEntry> _projectHistory = [];
+    private int _projectHistoryIndex = -1;
+    private bool _restoringProjectHistory;
+    private string _savedProjectSnapshot = string.Empty;
 
     public MainWindow()
         : this(null)
@@ -153,6 +159,21 @@ public partial class MainWindow : Window
             OpenProject_Click(this, new RoutedEventArgs());
             e.Handled = true;
         }
+        else if (e.Key == Key.Z
+            && Keyboard.Modifiers == ModifierKeys.Control
+            && !IsTextEditing())
+        {
+            UndoProject();
+            e.Handled = true;
+        }
+        else if ((e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control
+                || e.Key == Key.Z
+                    && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            && !IsTextEditing())
+        {
+            RedoProject();
+            e.Handled = true;
+        }
         else if (e.Key == Key.S
             && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
@@ -217,6 +238,7 @@ public partial class MainWindow : Window
                 ? "Новый проект"
                 : $"Новый проект в папке {Path.GetFileName(_workspaceDirectory)}"
             : $"Открыт {Path.GetFileName(path)}";
+        ResetProjectHistory();
         RefreshProjectDiagnostics(showPanel: false);
     }
 
@@ -449,17 +471,141 @@ public partial class MainWindow : Window
 
     private void MarkDirty()
     {
-        _dirty = true;
         if (!_codeHasPendingChanges)
         {
             RequestCodeRefresh(useStoredSource: false);
         }
+        if (!_restoringProjectHistory)
+        {
+            RecordProjectHistorySnapshot(Graph.SelectedNodeId);
+        }
+        _dirty = !CurrentProjectMatchesSavedSnapshot();
         RefreshWindowTitle();
         RefreshExplorer();
         RefreshProperties();
         Graph.RefreshGraph();
         StatusText.Text = "Проект изменён";
         RequestDiagnosticsRefresh();
+    }
+
+    private void ResetProjectHistory()
+    {
+        _projectHistory.Clear();
+        var snapshot = CaptureProjectSnapshot();
+        _projectHistory.Add(new ProjectHistoryEntry(snapshot, Graph.SelectedNodeId));
+        _projectHistoryIndex = 0;
+        _savedProjectSnapshot = snapshot;
+        UpdateHistoryControls();
+    }
+
+    private void RecordProjectHistorySnapshot(string? selectedNodeId)
+    {
+        var snapshot = CaptureProjectSnapshot();
+        if (_projectHistoryIndex >= 0
+            && _projectHistory[_projectHistoryIndex].Snapshot == snapshot)
+        {
+            _projectHistory[_projectHistoryIndex] =
+                _projectHistory[_projectHistoryIndex] with { SelectedNodeId = selectedNodeId };
+            UpdateHistoryControls();
+            return;
+        }
+
+        if (_projectHistoryIndex < _projectHistory.Count - 1)
+        {
+            _projectHistory.RemoveRange(
+                _projectHistoryIndex + 1,
+                _projectHistory.Count - _projectHistoryIndex - 1);
+        }
+
+        _projectHistory.Add(new ProjectHistoryEntry(snapshot, selectedNodeId));
+        if (_projectHistory.Count > MaxProjectHistoryEntries)
+        {
+            _projectHistory.RemoveAt(0);
+        }
+        _projectHistoryIndex = _projectHistory.Count - 1;
+        UpdateHistoryControls();
+    }
+
+    private string CaptureProjectSnapshot()
+    {
+        PreservePendingSourceCode();
+        return ProjectSerializer.ToJson(_project);
+    }
+
+    private bool CurrentProjectMatchesSavedSnapshot() =>
+        _savedProjectSnapshot.Length > 0
+        && CaptureProjectSnapshot() == _savedProjectSnapshot;
+
+    private bool CanUndoProject => _projectHistoryIndex > 0;
+
+    private bool CanRedoProject =>
+        _projectHistoryIndex >= 0 && _projectHistoryIndex < _projectHistory.Count - 1;
+
+    private void UndoProject()
+    {
+        if (!CanUndoProject)
+        {
+            StatusText.Text = "Нечего отменять";
+            return;
+        }
+        RestoreProjectHistory(_projectHistoryIndex - 1, "Изменение отменено");
+    }
+
+    private void RedoProject()
+    {
+        if (!CanRedoProject)
+        {
+            StatusText.Text = "Нечего повторять";
+            return;
+        }
+        RestoreProjectHistory(_projectHistoryIndex + 1, "Изменение повторено");
+    }
+
+    private void RestoreProjectHistory(int historyIndex, string statusText)
+    {
+        if (historyIndex < 0 || historyIndex >= _projectHistory.Count)
+        {
+            return;
+        }
+
+        _restoringProjectHistory = true;
+        try
+        {
+            var entry = _projectHistory[historyIndex];
+            _project = ProjectSerializer.FromJson(entry.Snapshot);
+            _projectHistoryIndex = historyIndex;
+            _codeHasPendingChanges = false;
+            Graph.SetProject(_project);
+            if (entry.SelectedNodeId is not null
+                && _project.FindNode(entry.SelectedNodeId) is not null)
+            {
+                Graph.SelectNode(entry.SelectedNodeId);
+            }
+            RefreshExplorer();
+            RefreshProperties();
+            RefreshAssets(syncFromDisk: false);
+            RequestCodeRefresh(useStoredSource: true);
+            _dirty = !CurrentProjectMatchesSavedSnapshot();
+            RefreshWindowTitle();
+            RefreshProjectDiagnostics(showPanel: false);
+            StatusText.Text = statusText;
+        }
+        finally
+        {
+            _restoringProjectHistory = false;
+            UpdateHistoryControls();
+        }
+    }
+
+    private void UpdateHistoryControls()
+    {
+        if (!IsInitialized)
+        {
+            return;
+        }
+
+        UndoMenuItem.IsEnabled = CanUndoProject;
+        RedoMenuItem.IsEnabled = CanRedoProject;
     }
 
     private void RequestCodeRefresh(bool useStoredSource)
@@ -531,7 +677,8 @@ public partial class MainWindow : Window
             RefreshExplorer();
             RefreshProperties();
             RefreshAssets(syncFromDisk: false);
-            _dirty = true;
+            RecordProjectHistorySnapshot(selectedNodeId);
+            _dirty = !CurrentProjectMatchesSavedSnapshot();
             RefreshWindowTitle();
             CodeStatusText.Foreground = (Brush)FindResource("AccentBrush");
             CodeStatusText.Text =
@@ -2160,6 +2307,10 @@ public partial class MainWindow : Window
 
     private void SaveProjectAs_Click(object sender, RoutedEventArgs e) => SaveProjectAs();
 
+    private void Undo_Click(object sender, RoutedEventArgs e) => UndoProject();
+
+    private void Redo_Click(object sender, RoutedEventArgs e) => RedoProject();
+
     private bool SaveProject()
     {
         if (!EnsureCodeApplied())
@@ -2207,7 +2358,9 @@ public partial class MainWindow : Window
             EnsureWorkspaceStructure();
             ProjectSerializer.Save(_project, fullPath);
             ConfigureFilesWatcher();
+            _savedProjectSnapshot = CaptureProjectSnapshot();
             _dirty = false;
+            UpdateHistoryControls();
             RefreshWindowTitle();
             StatusText.Text = $"Сохранён {Path.GetFileName(fullPath)}";
             return true;
@@ -3328,6 +3481,8 @@ public partial class MainWindow : Window
     private sealed record NodeAssetFolderOption(string Folder, string Name);
 
     private sealed record NodeAssetChoice(NovelAsset? Asset, string Name);
+
+    private sealed record ProjectHistoryEntry(string Snapshot, string? SelectedNodeId);
 
     private sealed record DiagnosticView(ProjectDiagnostic Diagnostic)
     {

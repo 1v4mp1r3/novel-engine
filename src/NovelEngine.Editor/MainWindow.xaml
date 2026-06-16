@@ -24,6 +24,18 @@
                 <Separator />
                 <MenuItem Header="Выход" Click="Exit_Click" />
             </MenuItem>
+            <MenuItem Header="Правка">
+                <MenuItem x:Name="UndoMenuItem"
+                          Header="Отменить"
+                          InputGestureText="Ctrl+Z"
+                          IsEnabled="False"
+                          Click="Undo_Click" />
+                <MenuItem x:Name="RedoMenuItem"
+                          Header="Повторить"
+                          InputGestureText="Ctrl+Y"
+                          IsEnabled="False"
+                          Click="Redo_Click" />
+            </MenuItem>
             <MenuItem Header="Ноды">
                 <MenuItem Header="Добавить сцену" Click="AddScene_Click" />
                 <MenuItem Header="Добавить диалог" Click="AddDialogue_Click" />
