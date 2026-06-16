@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _codeAnalysisTimer;
     private readonly DispatcherTimer _autoSaveTimer;
     private readonly DispatcherTimer _filesRefreshTimer;
+    private readonly DispatcherTimer _diagnosticsTimer;
     private string _codeCursorSource = string.Empty;
     private int[] _codeLineStarts = [0];
     private int _lastCodeCursorOffset = -1;
@@ -88,6 +89,15 @@ public partial class MainWindow : Window
             {
                 RefreshAssets();
             }
+        };
+        _diagnosticsTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(450),
+        };
+        _diagnosticsTimer.Tick += (_, _) =>
+        {
+            _diagnosticsTimer.Stop();
+            RefreshProjectDiagnostics(showPanel: false);
         };
 
         SetProject(_project, null);
@@ -207,6 +217,7 @@ public partial class MainWindow : Window
                 ? "Новый проект"
                 : $"Новый проект в папке {Path.GetFileName(_workspaceDirectory)}"
             : $"Открыт {Path.GetFileName(path)}";
+        RefreshProjectDiagnostics(showPanel: false);
     }
 
     private void HandleGraphSelection()
@@ -448,6 +459,7 @@ public partial class MainWindow : Window
         RefreshProperties();
         Graph.RefreshGraph();
         StatusText.Text = "Проект изменён";
+        RequestDiagnosticsRefresh();
     }
 
     private void RequestCodeRefresh(bool useStoredSource)
@@ -527,6 +539,7 @@ public partial class MainWindow : Window
             ApplyCodeHighlighting(source, null);
             StatusText.Text = "Код скомпилирован, граф обновлён";
             Graph.CenterGraph();
+            RequestDiagnosticsRefresh();
             return true;
         }
         catch (ProjectLanguageException error)
@@ -3208,43 +3221,58 @@ public partial class MainWindow : Window
         {
             return;
         }
-        try
-        {
-            _project.Validate();
-            foreach (var node in _project.Nodes)
-            {
-                NovelScript.Execute(node.Script, new ScriptState());
-                foreach (var output in node.Outputs)
-                {
-                    _ = NovelScript.Evaluate(output.Condition, new ScriptState());
-                    NovelScript.Execute(output.Script, new ScriptState());
-                }
-            }
+        RefreshProjectDiagnostics(showPanel: true);
+    }
 
-            var disconnected = _project.Nodes
-                .SelectMany(node => node.Outputs)
-                .Count(output => output.TargetNodeId is null);
-            MessageBox.Show(
-                this,
-                disconnected == 0
-                    ? "Ошибок не найдено."
-                    : $"Структура корректна. Неподключённых выходов: {disconnected}.",
-                "Проверка проекта",
-                MessageBoxButton.OK,
-                disconnected == 0
-                    ? MessageBoxImage.Information
-                    : MessageBoxImage.Warning);
-        }
-        catch (Exception error) when (error is InvalidDataException or InvalidOperationException)
+    private void RequestDiagnosticsRefresh()
+    {
+        _diagnosticsTimer.Stop();
+        _diagnosticsTimer.Start();
+    }
+
+    private void RefreshProjectDiagnostics(bool showPanel)
+    {
+        var report = ProjectDiagnostics.Analyze(_project, _projectPath);
+        var diagnostics = report.Diagnostics
+            .Select(diagnostic => new DiagnosticView(diagnostic))
+            .ToList();
+        DiagnosticsGrid.ItemsSource = diagnostics;
+        DiagnosticsSummaryText.Text =
+            $"Диагностика: {report.ErrorCount} ошибок, "
+            + $"{report.WarningCount} предупреждений, "
+            + $"{report.InfoCount} заметок";
+        DiagnosticsSummaryText.Foreground = report.HasErrors
+            ? Brushes.IndianRed
+            : report.WarningCount > 0
+                ? Brushes.Khaki
+                : (Brush)FindResource("MutedBrush");
+
+        if (diagnostics.Count == 0)
         {
-            MessageBox.Show(
-                this,
-                error.Message,
-                "Ошибка проекта",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            DiagnosticsPanel.Visibility = Visibility.Collapsed;
+            if (showPanel)
+            {
+                StatusText.Text = "Проверка проекта: проблем не найдено";
+            }
+            return;
+        }
+
+        var shouldShowPanel = report.HasErrors || showPanel;
+        DiagnosticsPanel.Visibility = shouldShowPanel
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (shouldShowPanel)
+        {
+            StatusText.Text = report.HasErrors
+                ? $"Проверка проекта: ошибок {report.ErrorCount}"
+                : report.WarningCount > 0
+                    ? $"Проверка проекта: предупреждений {report.WarningCount}"
+                    : $"Проверка проекта: заметок {report.InfoCount}";
         }
     }
+
+    private void HideDiagnostics_Click(object sender, RoutedEventArgs e) =>
+        DiagnosticsPanel.Visibility = Visibility.Collapsed;
 
     private static string KindName(NodeKind kind) =>
         kind switch
@@ -3300,4 +3328,16 @@ public partial class MainWindow : Window
     private sealed record NodeAssetFolderOption(string Folder, string Name);
 
     private sealed record NodeAssetChoice(NovelAsset? Asset, string Name);
+
+    private sealed record DiagnosticView(ProjectDiagnostic Diagnostic)
+    {
+        public string Severity => Diagnostic.Severity switch
+        {
+            ProjectDiagnosticSeverity.Error => "Ошибка",
+            ProjectDiagnosticSeverity.Warning => "Предупреждение",
+            _ => "Заметка",
+        };
+        public string Location => Diagnostic.Location;
+        public string Message => Diagnostic.Message;
+    }
 }

@@ -79,6 +79,45 @@
             <TextBlock x:Name="StatusText" Margin="10,4" Foreground="{StaticResource MutedBrush}" Text="Готово" />
         </Border>
 
+        <Border x:Name="DiagnosticsPanel"
+                DockPanel.Dock="Bottom"
+                Height="150"
+                Padding="10,8"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Visibility="Collapsed">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <TextBlock x:Name="DiagnosticsSummaryText"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center" />
+                    <Button DockPanel.Dock="Right"
+                            Content="Скрыть"
+                            Padding="10,4"
+                            Click="HideDiagnostics_Click" />
+                </DockPanel>
+                <DataGrid x:Name="DiagnosticsGrid"
+                          AutoGenerateColumns="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Уровень"
+                                            Binding="{Binding Severity}"
+                                            Width="100" />
+                        <DataGridTextColumn Header="Где"
+                                            Binding="{Binding Location}"
+                                            Width="260" />
+                        <DataGridTextColumn Header="Сообщение"
+                                            Binding="{Binding Message}"
+                                            Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
         <TabControl x:Name="WorkspaceTabs"
                     SelectionChanged="WorkspaceTabs_SelectionChanged">
             <TabItem x:Name="GraphTab" Header="Граф">

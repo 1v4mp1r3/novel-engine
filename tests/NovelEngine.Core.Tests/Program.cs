@@ -3,6 +3,8 @@ using NovelEngine.Core;
 var tests = new (string Name, Action Run)[]
 {
     ("default project is valid", DefaultProjectIsValid),
+    ("project diagnostics report authoring issues", ProjectDiagnosticsReportAuthoringIssues),
+    ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
@@ -55,6 +57,64 @@ static void DefaultProjectIsValid()
     var project = NovelProject.CreateDefault();
     project.Validate();
     Assert(project.Nodes.Count == 3, "Expected start, scene, and dialogue nodes.");
+}
+
+static void ProjectDiagnosticsReportAuthoringIssues()
+{
+    var project = NovelProject.CreateDefault();
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    dialogue.Speaker = string.Empty;
+    dialogue.Outputs[0].Script = "dance";
+    var orphan = project.AddNode(NodeKind.Scene, 900, 120);
+    orphan.Title = "Lost scene";
+
+    var report = ProjectDiagnostics.Analyze(project);
+
+    Assert(report.ErrorCount > 0, "Broken choice script was not reported as an error.");
+    Assert(
+        report.Diagnostics.Any(
+            diagnostic => diagnostic.Message.Contains("говорящий", StringComparison.Ordinal)),
+        "Missing dialogue speaker warning was not reported.");
+    Assert(
+        report.Diagnostics.Any(
+            diagnostic => diagnostic.Message.Contains("нет пути", StringComparison.Ordinal)),
+        "Unreachable node warning was not reported.");
+}
+
+static void ProjectDiagnosticsCheckPhysicalAssets()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-diagnostics-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+        project.Assets.Add(
+            new NovelAsset
+            {
+                Id = "missing_bg",
+                Kind = AssetKind.Image,
+                Path = "files/backgrounds/missing.png",
+                Folder = "backgrounds",
+            });
+        project.AssetFolders.Add("backgrounds");
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = "@missing_bg";
+
+        var report = ProjectDiagnostics.Analyze(project, projectPath);
+
+        Assert(report.HasErrors, "Missing physical asset was not reported as an error.");
+        Assert(
+            report.Diagnostics.Any(
+                diagnostic => diagnostic.Message.Contains("Файл не найден", StringComparison.Ordinal)),
+            "Missing physical asset diagnostic was not specific.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
 }
 
 static void DialogueChoicesConnectIndependently()
