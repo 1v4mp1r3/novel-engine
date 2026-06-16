@@ -59,9 +59,13 @@ currently installed on this workstation.
 ## Editor basics
 
 - Right-click the canvas to add a scene or dialogue node.
+- Use the canvas node template submenu for common scaffolds such as a
+  background scene, character line, or two-choice branch.
 - Drag from an output circle to the input circle of another node to connect them.
 - Use the selected node context menu to create a connected scene or dialogue
   without manually dragging a link.
+- Use the selected node template submenu to create connected authoring
+  scaffolds in one step.
 - Use `Ctrl+D` or the node context menu to duplicate the selected scene or
   dialogue node without copying its graph connections.
 - Scene nodes have one linear `Дальше` output.

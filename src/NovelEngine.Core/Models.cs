@@ -7,6 +7,13 @@ public enum NodeKind
     Dialogue,
 }
 
+public enum NodeTemplateKind
+{
+    EstablishingScene,
+    CharacterLine,
+    ChoiceBranch,
+}
+
 public enum CharacterPosition
 {
     Left,
@@ -418,6 +425,13 @@ public sealed class NovelProject
         return node;
     }
 
+    public NovelNode AddNodeTemplate(NodeTemplateKind template, float x, float y)
+    {
+        var node = AddNode(GetTemplateNodeKind(template), x, y);
+        ApplyNodeTemplate(node, template);
+        return node;
+    }
+
     public NovelNode AddConnectedNode(
         string sourceNodeId,
         NodeKind kind,
@@ -446,6 +460,21 @@ public sealed class NovelProject
 
         var node = AddNode(kind, x, y);
         output.TargetNodeId = node.Id;
+        return node;
+    }
+
+    public NovelNode AddConnectedNodeTemplate(
+        string sourceNodeId,
+        NodeTemplateKind template,
+        float x,
+        float y)
+    {
+        var node = AddConnectedNode(
+            sourceNodeId,
+            GetTemplateNodeKind(template),
+            x,
+            y);
+        ApplyNodeTemplate(node, template);
         return node;
     }
 
@@ -938,6 +967,62 @@ public sealed class NovelProject
             Id = CreateId("out"),
             Label = label,
         };
+
+    private static NodeKind GetTemplateNodeKind(NodeTemplateKind template) =>
+        template == NodeTemplateKind.EstablishingScene
+            ? NodeKind.Scene
+            : NodeKind.Dialogue;
+
+    private static void ApplyNodeTemplate(NovelNode node, NodeTemplateKind template)
+    {
+        node.Outputs.Clear();
+        node.UsesTypeDefaults = false;
+        node.PropertyOverrides.Clear();
+        node.Characters.Clear();
+        node.Background = string.Empty;
+        node.Music = string.Empty;
+        node.Script = string.Empty;
+
+        switch (template)
+        {
+            case NodeTemplateKind.EstablishingScene:
+                node.TypeName = "scene";
+                node.Title = "Сцена с фоном";
+                node.Speaker = string.Empty;
+                node.Text = "Описание сцены.";
+                node.InheritBackground = false;
+                node.InheritMusic = true;
+                node.InheritCharacters = true;
+                node.Outputs.Add(CreateOutput("Дальше"));
+                break;
+
+            case NodeTemplateKind.CharacterLine:
+                node.TypeName = "dialogue";
+                node.Title = "Реплика персонажа";
+                node.Speaker = "Герой";
+                node.Text = "Текст реплики.";
+                node.InheritBackground = true;
+                node.InheritMusic = true;
+                node.InheritCharacters = true;
+                node.Outputs.Add(CreateOutput("Дальше"));
+                break;
+
+            case NodeTemplateKind.ChoiceBranch:
+                node.TypeName = "dialogue";
+                node.Title = "Выбор";
+                node.Speaker = "Герой";
+                node.Text = "Что сделать дальше?";
+                node.InheritBackground = true;
+                node.InheritMusic = true;
+                node.InheritCharacters = true;
+                node.Outputs.Add(CreateOutput("Вариант 1"));
+                node.Outputs.Add(CreateOutput("Вариант 2"));
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(template), template, null);
+        }
+    }
 
     private static string CreateId(string prefix) =>
         $"{prefix}-{Guid.NewGuid():N}";

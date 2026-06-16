@@ -11,6 +11,7 @@ var tests = new (string Name, Action Run)[]
     ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
     ("duplicating dialogue choices copies authoring data safely", DuplicateDialogueChoiceCopiesAuthoringDataSafely),
     ("moving dialogue choices preserves data and boundaries", MoveDialogueChoicesPreservesDataAndBoundaries),
+    ("node templates create authoring scaffolds", NodeTemplatesCreateAuthoringScaffolds),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
@@ -316,6 +317,39 @@ static void MoveDialogueChoicesPreservesDataAndBoundaries()
         dialogue.Outputs.Select(output => output.Id).SequenceEqual([third.Id, first.Id, second.Id]),
         "Choice order after moving down is wrong.");
     Assert(!project.MoveOutput(scene.Id, scene.Outputs[0].Id, 1), "Scene output should not move as a dialogue choice.");
+    project.Validate();
+}
+
+static void NodeTemplatesCreateAuthoringScaffolds()
+{
+    var project = NovelProject.CreateDefault();
+    var sceneTemplate = project.AddNodeTemplate(NodeTemplateKind.EstablishingScene, 980, 80);
+    var lineTemplate = project.AddNodeTemplate(NodeTemplateKind.CharacterLine, 1220, 80);
+    var choiceTemplate = project.AddNodeTemplate(NodeTemplateKind.ChoiceBranch, 1460, 80);
+
+    Assert(sceneTemplate.Kind == NodeKind.Scene, "Scene template created the wrong node kind.");
+    Assert(sceneTemplate.Title == "Сцена с фоном", "Scene template title changed.");
+    Assert(!sceneTemplate.InheritBackground, "Scene template should be ready to override its background.");
+    Assert(sceneTemplate.Outputs.Count == 1, "Scene template should have one linear output.");
+    Assert(lineTemplate.Kind == NodeKind.Dialogue, "Line template created the wrong node kind.");
+    Assert(lineTemplate.Speaker == "Герой", "Line template did not set a speaker scaffold.");
+    Assert(lineTemplate.Outputs is [{ Label: "Дальше" }], "Line template should have one next output.");
+    Assert(choiceTemplate.Outputs.Count == 2, "Choice template should have two starter choices.");
+    Assert(
+        choiceTemplate.Outputs.Select(output => output.Label).SequenceEqual(["Вариант 1", "Вариант 2"]),
+        "Choice template output labels changed.");
+
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene && node.Id == "scene-1");
+    scene.Outputs[0].TargetNodeId = null;
+    var connected = project.AddConnectedNodeTemplate(
+        scene.Id,
+        NodeTemplateKind.CharacterLine,
+        scene.X + 480,
+        scene.Y);
+
+    Assert(scene.Outputs[0].TargetNodeId == connected.Id, "Connected template was not wired from the source.");
+    Assert(connected.Title == "Реплика персонажа", "Connected template did not apply the requested scaffold.");
+    Assert(connected.Outputs is [{ Label: "Дальше" }], "Connected line template should have one next output.");
     project.Validate();
 }
 

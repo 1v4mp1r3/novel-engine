@@ -80,6 +80,12 @@ public sealed class GraphSurface : FrameworkElement
         return AddNodeAt(world, kind);
     }
 
+    public NovelNode AddNodeTemplateAtCenter(NodeTemplateKind template)
+    {
+        var world = ScreenToWorld(new Point(ActualWidth / 2, ActualHeight / 2));
+        return AddNodeTemplateAt(world, template);
+    }
+
     public void AddConnectedSceneFromSelected() =>
         AddConnectedNodeFromSelected(NodeKind.Scene);
 
@@ -359,10 +365,17 @@ public sealed class GraphSurface : FrameworkElement
             kind,
             (float)(worldPosition.X - NodeWidth / 2),
             (float)(worldPosition.Y - 80));
-        SelectedNodeId = node.Id;
-        RequestRender();
-        SelectionChanged?.Invoke(this, EventArgs.Empty);
-        ProjectChanged?.Invoke(this, EventArgs.Empty);
+        SelectCreatedNode(node);
+        return node;
+    }
+
+    private NovelNode AddNodeTemplateAt(Point worldPosition, NodeTemplateKind template)
+    {
+        var node = Project.AddNodeTemplate(
+            template,
+            (float)(worldPosition.X - NodeWidth / 2),
+            (float)(worldPosition.Y - 80));
+        SelectCreatedNode(node);
         return node;
     }
 
@@ -382,15 +395,44 @@ public sealed class GraphSurface : FrameworkElement
                 kind,
                 source.X + (float)NodeWidth + 160,
                 source.Y);
-            SelectedNodeId = node.Id;
-            RequestRender();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-            ProjectChanged?.Invoke(this, EventArgs.Empty);
+            SelectCreatedNode(node);
         }
         catch (InvalidOperationException)
         {
             System.Media.SystemSounds.Beep.Play();
         }
+    }
+
+    private void AddConnectedNodeTemplateFromSelected(NodeTemplateKind template)
+    {
+        if (SelectedNodeId is null
+            || Project.FindNode(SelectedNodeId) is not { } source)
+        {
+            System.Media.SystemSounds.Beep.Play();
+            return;
+        }
+
+        try
+        {
+            var node = Project.AddConnectedNodeTemplate(
+                source.Id,
+                template,
+                source.X + (float)NodeWidth + 160,
+                source.Y);
+            SelectCreatedNode(node);
+        }
+        catch (InvalidOperationException)
+        {
+            System.Media.SystemSounds.Beep.Play();
+        }
+    }
+
+    private void SelectCreatedNode(NovelNode node)
+    {
+        SelectedNodeId = node.Id;
+        RequestRender();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ShowContextMenu(Point position)
@@ -465,6 +507,7 @@ public sealed class GraphSurface : FrameworkElement
                 "Создать связанный диалог",
                 AddConnectedDialogueFromSelected,
                 CanAddConnectedNode(node)));
+            menu.Items.Add(CreateConnectedTemplateMenu(node));
 
             if (node.Kind != NodeKind.Start)
             {
@@ -484,6 +527,8 @@ public sealed class GraphSurface : FrameworkElement
         canvasMenu.Items.Add(CreateMenuItem(
             "Добавить диалог",
             () => AddNodeAt(_contextWorldPosition, NodeKind.Dialogue)));
+        canvasMenu.Items.Add(new Separator());
+        canvasMenu.Items.Add(CreateTemplateMenu(_contextWorldPosition));
         OpenContextMenu(canvasMenu);
     }
 
@@ -510,6 +555,43 @@ public sealed class GraphSurface : FrameworkElement
     private static bool CanAddConnectedNode(NovelNode node) =>
         node.Outputs.Any(output => output.TargetNodeId is null)
         || node.Kind == NodeKind.Dialogue;
+
+    private MenuItem CreateTemplateMenu(Point worldPosition)
+    {
+        var menu = new MenuItem { Header = "Шаблоны нод" };
+        menu.Items.Add(CreateMenuItem(
+            "Сцена с фоном",
+            () => AddNodeTemplateAt(worldPosition, NodeTemplateKind.EstablishingScene)));
+        menu.Items.Add(CreateMenuItem(
+            "Реплика персонажа",
+            () => AddNodeTemplateAt(worldPosition, NodeTemplateKind.CharacterLine)));
+        menu.Items.Add(CreateMenuItem(
+            "Выбор с двумя вариантами",
+            () => AddNodeTemplateAt(worldPosition, NodeTemplateKind.ChoiceBranch)));
+        return menu;
+    }
+
+    private MenuItem CreateConnectedTemplateMenu(NovelNode node)
+    {
+        var menu = new MenuItem
+        {
+            Header = "Создать связанное по шаблону",
+            IsEnabled = CanAddConnectedNode(node),
+        };
+        menu.Items.Add(CreateMenuItem(
+            "Сцена с фоном",
+            () => AddConnectedNodeTemplateFromSelected(NodeTemplateKind.EstablishingScene),
+            CanAddConnectedNode(node)));
+        menu.Items.Add(CreateMenuItem(
+            "Реплика персонажа",
+            () => AddConnectedNodeTemplateFromSelected(NodeTemplateKind.CharacterLine),
+            CanAddConnectedNode(node)));
+        menu.Items.Add(CreateMenuItem(
+            "Выбор с двумя вариантами",
+            () => AddConnectedNodeTemplateFromSelected(NodeTemplateKind.ChoiceBranch),
+            CanAddConnectedNode(node)));
+        return menu;
+    }
 
     private MenuItem CreateInheritanceMenu(NovelNode node)
     {
