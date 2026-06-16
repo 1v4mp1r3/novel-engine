@@ -18,6 +18,7 @@
             <MenuItem Header="Файл">
                 <MenuItem Header="Новый" InputGestureText="Ctrl+N" Click="NewProject_Click" />
                 <MenuItem Header="Открыть..." InputGestureText="Ctrl+O" Click="OpenProject_Click" />
+                <MenuItem Header="Восстановить автосейв..." Click="RestoreAutoSave_Click" />
                 <Separator />
                 <MenuItem Header="Сохранить" InputGestureText="Ctrl+S" Click="SaveProject_Click" />
                 <MenuItem Header="Сохранить как..." InputGestureText="Ctrl+Shift+S" Click="SaveProjectAs_Click" />

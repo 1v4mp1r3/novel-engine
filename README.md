@@ -42,6 +42,9 @@ creates `files/` for managed game files, and keeps timestamped backups in
 `autosaves/`.
 The startup screen lists recently opened or created projects for quick switching
 between workspaces.
+Use `File -> Restore autosave...` (`Файл -> Восстановить автосейв...`) to load
+a timestamped snapshot from `autosaves/` as unsaved editor state before deciding
+whether to overwrite the main project file.
 
 ## Build and test
 

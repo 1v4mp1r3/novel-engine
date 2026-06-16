@@ -208,7 +208,8 @@ public partial class MainWindow : Window
     private void SetProject(
         NovelProject project,
         string? path,
-        string? workspaceDirectory = null)
+        string? workspaceDirectory = null,
+        bool saveStructureChanges = true)
     {
         _project = project;
         _projectPath = path;
@@ -222,7 +223,7 @@ public partial class MainWindow : Window
         _selectedAssetFolder = null;
         var structureChanges = EnsureWorkspaceStructure();
         var filesChanged = SyncFilesFromDisk(refreshCode: false);
-        if (structureChanges > 0 && _projectPath is not null)
+        if (saveStructureChanges && structureChanges > 0 && _projectPath is not null)
         {
             ProjectSerializer.Save(_project, _projectPath);
         }
@@ -2364,9 +2365,79 @@ public partial class MainWindow : Window
 
     private void SaveProjectAs_Click(object sender, RoutedEventArgs e) => SaveProjectAs();
 
+    private void RestoreAutoSave_Click(object sender, RoutedEventArgs e) => RestoreAutoSave();
+
     private void Undo_Click(object sender, RoutedEventArgs e) => UndoProject();
 
     private void Redo_Click(object sender, RoutedEventArgs e) => RedoProject();
+
+    private void RestoreAutoSave()
+    {
+        if (!ConfirmDiscardChanges())
+        {
+            return;
+        }
+
+        var autoSaveDirectory = GetAutoSaveDirectory();
+        if (autoSaveDirectory is null
+            || !Directory.Exists(autoSaveDirectory)
+            || !Directory.EnumerateFiles(autoSaveDirectory, "*.novel.json").Any())
+        {
+            MessageBox.Show(
+                this,
+                "Для текущего проекта пока нет автосейвов.",
+                "Восстановление автосейва",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Выберите автосейв Novel Engine",
+            Filter = "Автосейвы Novel Engine|*.novel.json|JSON|*.json",
+            InitialDirectory = autoSaveDirectory,
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var targetProjectPath = _projectPath;
+        var targetWorkspaceDirectory = _workspaceDirectory
+            ?? (targetProjectPath is null
+                ? Path.GetDirectoryName(Path.GetFullPath(dialog.FileName))
+                : Path.GetDirectoryName(Path.GetFullPath(targetProjectPath)));
+        try
+        {
+            SetProject(
+                ProjectSerializer.Load(dialog.FileName),
+                targetProjectPath,
+                targetWorkspaceDirectory,
+                saveStructureChanges: false);
+            _savedProjectSnapshot = string.Empty;
+            _dirty = true;
+            RefreshWindowTitle();
+            StatusText.Text =
+                $"Восстановлен автосейв {Path.GetFileName(dialog.FileName)}. Нажмите Ctrl+S, чтобы применить.";
+            RequestDiagnosticsRefresh();
+        }
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException
+            or System.Text.Json.JsonException)
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось восстановить автосейв:\n\n{error.Message}",
+                "Восстановление автосейва",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
 
     private bool SaveProject()
     {
@@ -3496,21 +3567,30 @@ public partial class MainWindow : Window
 
     private void WriteAutoSaveSnapshot()
     {
-        if (_projectPath is null)
+        var directory = GetAutoSaveDirectory();
+        if (directory is null)
         {
             return;
         }
-
-        var workspace = _workspaceDirectory
-            ?? Path.GetDirectoryName(Path.GetFullPath(_projectPath))!;
-        var directory = Path.Combine(workspace, "autosaves");
         Directory.CreateDirectory(directory);
-        var stem = Path.GetFileNameWithoutExtension(_projectPath);
+        var stem = Path.GetFileNameWithoutExtension(
+            _projectPath ?? GetDefaultProjectFileName());
         var path = Path.Combine(
             directory,
             $"{stem}-{DateTime.Now:yyyyMMdd-HHmmss}.novel.json");
         ProjectSerializer.Save(_project, path);
         PruneAutoSaves(directory, stem, keepCount: 24);
+    }
+
+    private string? GetAutoSaveDirectory()
+    {
+        var workspace = _workspaceDirectory
+            ?? (_projectPath is null
+                ? null
+                : Path.GetDirectoryName(Path.GetFullPath(_projectPath)));
+        return workspace is null
+            ? null
+            : Path.Combine(workspace, "autosaves");
     }
 
     private static void PruneAutoSaves(string directory, string stem, int keepCount)
