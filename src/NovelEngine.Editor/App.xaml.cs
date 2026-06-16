@@ -109,8 +109,8 @@ public partial class App : Application
     private bool TryGetStartupProjectFromDialog(out string? startupProjectPath)
     {
         startupProjectPath = null;
-        var launcher = new ProjectStartupWindow();
-        if (launcher.ShowDialog() != true || launcher.SelectedDirectory is null)
+        var launcher = new ProjectStartupWindow(RecentProjectsStore.Load());
+        if (launcher.ShowDialog() != true || launcher.SelectedPath is null)
         {
             return false;
         }
@@ -118,8 +118,8 @@ public partial class App : Application
         try
         {
             startupProjectPath = launcher.SelectedAction == ProjectStartupAction.Create
-                ? ProjectWorkspace.CreateProjectInDirectory(launcher.SelectedDirectory)
-                : launcher.SelectedDirectory;
+                ? ProjectWorkspace.CreateProjectInDirectory(launcher.SelectedPath)
+                : launcher.SelectedPath;
             return true;
         }
         catch (Exception error) when (

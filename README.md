@@ -40,6 +40,8 @@ managed files. Empty folders are opened as a workspace too, so you can create a 
 project there with `Ctrl+N`; the editor immediately writes the project file,
 creates `files/` for managed game files, and keeps timestamped backups in
 `autosaves/`.
+The startup screen lists recently opened or created projects for quick switching
+between workspaces.
 
 ## Build and test
 

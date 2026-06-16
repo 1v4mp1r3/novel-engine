@@ -2347,6 +2347,7 @@ public partial class MainWindow : Window
                 NovelProject.CreateDefault(),
                 null,
                 result.WorkspaceDirectory);
+            RecentProjectsStore.Remember(result.WorkspaceDirectory);
             StatusText.Text =
                 $"Открыта папка {Path.GetFileName(result.WorkspaceDirectory)}. Создайте новый проект через Ctrl+N или сохраните текущий.";
             return;
@@ -2356,6 +2357,7 @@ public partial class MainWindow : Window
             ProjectSerializer.Load(result.ProjectPath),
             result.ProjectPath,
             result.WorkspaceDirectory);
+        RecentProjectsStore.Remember(result.ProjectPath);
     }
 
     private void SaveProject_Click(object sender, RoutedEventArgs e) => SaveProject();
@@ -2418,6 +2420,7 @@ public partial class MainWindow : Window
             UpdateHistoryControls();
             RefreshWindowTitle();
             StatusText.Text = $"Сохранён {Path.GetFileName(fullPath)}";
+            RecentProjectsStore.Remember(fullPath);
             return true;
         }
         catch (Exception error) when (error is IOException or InvalidDataException)

@@ -9,17 +9,21 @@ internal enum ProjectStartupAction
 {
     Create,
     Open,
+    OpenRecent,
 }
 
 internal sealed class ProjectStartupWindow : Window
 {
-    public ProjectStartupWindow()
+    private readonly IReadOnlyList<RecentProjectEntry> _recentProjects;
+
+    public ProjectStartupWindow(IEnumerable<RecentProjectEntry>? recentProjects = null)
     {
+        _recentProjects = recentProjects?.ToList() ?? [];
         Title = "Novel Engine";
-        Width = 520;
-        Height = 320;
+        Width = 640;
+        Height = 560;
         MinWidth = 460;
-        MinHeight = 280;
+        MinHeight = 420;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = new SolidColorBrush(Color.FromRgb(12, 18, 26));
@@ -31,12 +35,15 @@ internal sealed class ProjectStartupWindow : Window
 
     public string? SelectedDirectory { get; private set; }
 
+    public string? SelectedPath { get; private set; }
+
     private UIElement CreateContent()
     {
         var root = new Grid
         {
             Margin = new Thickness(28),
         };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -61,7 +68,7 @@ internal sealed class ProjectStartupWindow : Window
 
         var actions = new Grid
         {
-            Margin = new Thickness(0, 34, 0, 0),
+            Margin = new Thickness(0, 28, 0, 24),
         };
         actions.ColumnDefinitions.Add(new ColumnDefinition());
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
@@ -82,7 +89,50 @@ internal sealed class ProjectStartupWindow : Window
         Grid.SetColumn(open, 2);
         actions.Children.Add(open);
 
+        var recentPanel = CreateRecentProjectsPanel();
+        Grid.SetRow(recentPanel, 3);
+        root.Children.Add(recentPanel);
+
         return root;
+    }
+
+    private UIElement CreateRecentProjectsPanel()
+    {
+        var panel = new DockPanel();
+        var heading = new TextBlock
+        {
+            Text = "Последние проекты",
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 10),
+        };
+        DockPanel.SetDock(heading, Dock.Top);
+        panel.Children.Add(heading);
+
+        if (_recentProjects.Count == 0)
+        {
+            panel.Children.Add(
+                new TextBlock
+                {
+                    Text = "Здесь появятся проекты после открытия или создания.",
+                    Foreground = new SolidColorBrush(Color.FromRgb(151, 171, 196)),
+                    TextWrapping = TextWrapping.Wrap,
+                });
+            return panel;
+        }
+
+        var list = new StackPanel();
+        foreach (var entry in _recentProjects)
+        {
+            list.Children.Add(CreateRecentProjectButton(entry));
+        }
+        panel.Children.Add(
+            new ScrollViewer
+            {
+                Content = list,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            });
+        return panel;
     }
 
     private static Button CreateActionButton(
@@ -122,6 +172,38 @@ internal sealed class ProjectStartupWindow : Window
         return button;
     }
 
+    private Button CreateRecentProjectButton(RecentProjectEntry entry)
+    {
+        var panel = new StackPanel();
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = entry.DisplayName,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+            });
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = entry.Path,
+                Foreground = new SolidColorBrush(Color.FromRgb(151, 171, 196)),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+
+        var button = new Button
+        {
+            Background = new SolidColorBrush(Color.FromRgb(17, 25, 36)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(52, 73, 98)),
+            BorderThickness = new Thickness(1),
+            Content = panel,
+            Margin = new Thickness(0, 0, 0, 8),
+            Padding = new Thickness(12, 9, 12, 9),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        };
+        button.Click += (_, _) => SelectRecent(entry.Path);
+        return button;
+    }
+
     private void ChooseDirectory(ProjectStartupAction action)
     {
         var dialog = new OpenFolderDialog
@@ -138,6 +220,15 @@ internal sealed class ProjectStartupWindow : Window
 
         SelectedAction = action;
         SelectedDirectory = dialog.FolderName;
+        SelectedPath = dialog.FolderName;
+        DialogResult = true;
+    }
+
+    private void SelectRecent(string path)
+    {
+        SelectedAction = ProjectStartupAction.OpenRecent;
+        SelectedDirectory = path;
+        SelectedPath = path;
         DialogResult = true;
     }
 }
