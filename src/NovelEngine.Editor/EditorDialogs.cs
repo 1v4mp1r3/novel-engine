@@ -463,6 +463,136 @@ public sealed class AssetIdEditorWindow : Window
     }
 }
 
+public sealed class AssetUsageWindow : Window
+{
+    public AssetUsageWindow(NovelAsset asset, IReadOnlyList<AssetUsage> usages)
+    {
+        Title = $"Где используется @{asset.Id}";
+        Width = 680;
+        Height = 420;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.CanResize;
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = $"{AssetKindName(asset.Kind)}  @{asset.Id}",
+                FontWeight = FontWeights.Bold,
+                FontSize = 16,
+                Foreground = (Brush)Application.Current.Resources["TextBrush"],
+                Margin = new Thickness(0, 0, 0, 10),
+            });
+
+        if (usages.Count == 0)
+        {
+            panel.Children.Add(
+                new TextBlock
+                {
+                    Text = "Ассет сейчас нигде не используется.",
+                    Foreground = (Brush)Application.Current.Resources["MutedBrush"],
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 12),
+                });
+        }
+        else
+        {
+            panel.Children.Add(
+                new TextBlock
+                {
+                    Text = $"Найдено мест: {usages.Count}",
+                    Foreground = (Brush)Application.Current.Resources["MutedBrush"],
+                    Margin = new Thickness(0, 0, 0, 8),
+                });
+            panel.Children.Add(CreateUsageGrid(usages));
+        }
+
+        panel.Children.Add(CreateCloseButton(this));
+        Content = panel;
+    }
+
+    private static DataGrid CreateUsageGrid(IReadOnlyList<AssetUsage> usages)
+    {
+        var grid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            IsReadOnly = true,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            ItemsSource = usages
+                .Select(usage => new AssetUsageView(
+                    usage.Location,
+                    AssetKindName(usage.ExpectedKind),
+                    usage.Reference))
+                .ToList(),
+            Height = 250,
+            Margin = new Thickness(0, 0, 0, 8),
+            Background = (Brush)Application.Current.Resources["PanelBrush"],
+            Foreground = (Brush)Application.Current.Resources["TextBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["BorderBrush"],
+            RowBackground = (Brush)Application.Current.Resources["PanelBrush"],
+            AlternatingRowBackground =
+                (Brush)Application.Current.Resources["PanelBrush"],
+        };
+        grid.Columns.Add(
+            new DataGridTextColumn
+            {
+                Header = "Место",
+                Binding = new System.Windows.Data.Binding(nameof(AssetUsageView.Location)),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+            });
+        grid.Columns.Add(
+            new DataGridTextColumn
+            {
+                Header = "Тип",
+                Binding = new System.Windows.Data.Binding(nameof(AssetUsageView.Kind)),
+                Width = 120,
+            });
+        grid.Columns.Add(
+            new DataGridTextColumn
+            {
+                Header = "Ссылка",
+                Binding = new System.Windows.Data.Binding(nameof(AssetUsageView.Reference)),
+                Width = 130,
+            });
+        return grid;
+    }
+
+    private static FrameworkElement CreateCloseButton(Window window)
+    {
+        var panel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 14, 0, 0),
+        };
+        var close = new Button
+        {
+            Content = "Закрыть",
+            MinWidth = 110,
+            IsDefault = true,
+            IsCancel = true,
+        };
+        close.Click += (_, _) => window.Close();
+        panel.Children.Add(close);
+        return panel;
+    }
+
+    private static string AssetKindName(AssetKind kind) =>
+        kind switch
+        {
+            AssetKind.Image => "Изображение",
+            AssetKind.Audio => "Аудио",
+            _ => "Файл",
+        };
+
+    private sealed record AssetUsageView(
+        string Location,
+        string Kind,
+        string Reference);
+}
+
 public sealed class AssetFolderEditorWindow : Window
 {
     private readonly TextBox _nameBox;

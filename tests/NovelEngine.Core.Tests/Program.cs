@@ -163,6 +163,11 @@ static void CharacterLibraryRoundTrip()
     Assert(
         fromCode.CountAssetReferences("alice_voice") == 1,
         "Character library voice reference was not counted.");
+    Assert(
+        fromCode.FindAssetUsages("alice_voice").Single().Location.Contains(
+            "библиотека персонажей",
+            StringComparison.Ordinal),
+        "Character library voice usage location was not reported.");
 }
 
 static void DialogueChoicesConnectIndependently()
@@ -586,6 +591,16 @@ static void MainMenuAndVoiceAssetReferences()
     Assert(project.CountAssetReferences("menu_bg") == 2, "Main menu image refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero") == 1, "Voice refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero_alt") == 1, "Second voice refs were not counted.");
+    var menuUsages = project.FindAssetUsages("menu_bg");
+    Assert(menuUsages.Count == 2, "Main menu image usages were not listed.");
+    Assert(
+        menuUsages.Any(usage => usage.Location.Contains("главное меню", StringComparison.Ordinal)),
+        "Main menu image usage location was not reported.");
+    Assert(
+        project.FindAssetUsages("voice_hero").Single().Location.Contains(
+            "голос персонажа",
+            StringComparison.Ordinal),
+        "Voice usage location was not reported.");
 
     project.ReplaceAssetReference("voice_hero", "@voice_main");
     Assert(

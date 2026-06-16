@@ -1374,6 +1374,7 @@ public partial class MainWindow : Window
         RenameAssetButton.IsEnabled = selected;
         MoveAssetButton.IsEnabled = selected;
         CopyAssetReferenceButton.IsEnabled = selected;
+        FindAssetUsageButton.IsEnabled = selected;
         DeleteAssetButton.IsEnabled = selected;
         AssetPreviewImage.Source = null;
         AssetReferenceText.Text = selected
@@ -1455,6 +1456,9 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateAssetMenuItem(
             "Скопировать ссылку",
             () => CopyAssetReference(view)));
+        menu.Items.Add(CreateAssetMenuItem(
+            "Где используется",
+            () => ShowAssetUsages(view)));
 
         if (view.Asset.Kind == AssetKind.Image)
         {
@@ -1729,6 +1733,17 @@ public partial class MainWindow : Window
         };
         item.Click += (_, _) => action();
         return item;
+    }
+
+    private void ShowAssetUsages(AssetView view)
+    {
+        var dialog = new AssetUsageWindow(
+            view.Asset,
+            _project.FindAssetUsages(view.Id))
+        {
+            Owner = this,
+        };
+        dialog.ShowDialog();
     }
 
     private static MenuItem CreateHoverSubmenu(string header)
@@ -2092,6 +2107,16 @@ public partial class MainWindow : Window
             return;
         }
         CopyAssetReference(view);
+    }
+
+    private void FindAssetUsage_Click(object sender, RoutedEventArgs e)
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        if (view is null)
+        {
+            return;
+        }
+        ShowAssetUsages(view);
     }
 
     private void DeleteAsset_Click(object sender, RoutedEventArgs e)

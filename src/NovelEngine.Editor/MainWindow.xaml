@@ -378,6 +378,9 @@
                                 <Button x:Name="CopyAssetReferenceButton"
                                         Content="Копировать ссылку"
                                         Click="CopyAssetReference_Click" />
+                                <Button x:Name="FindAssetUsageButton"
+                                        Content="Где используется"
+                                        Click="FindAssetUsage_Click" />
                                 <Button x:Name="DeleteAssetButton"
                                         Content="Удалить"
                                         Background="#4A2932"

@@ -144,6 +144,11 @@ public sealed class NovelAsset
     public string Folder { get; set; } = string.Empty;
 }
 
+public sealed record AssetUsage(
+    string Location,
+    AssetKind ExpectedKind,
+    string Reference);
+
 public sealed class CharacterPlacement
 {
     public required string Id { get; init; }
@@ -318,6 +323,20 @@ public sealed class NovelProject
         var reference = AssetReference.Create(assetId);
         return EnumerateAssetValues().Count(
             value => value.Equals(reference, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<AssetUsage> FindAssetUsages(string assetId)
+    {
+        var reference = AssetReference.Create(assetId);
+        return EnumerateTypedAssetValues()
+            .Where(value => value.Value.Equals(
+                reference,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(value => new AssetUsage(
+                value.Owner,
+                value.ExpectedKind,
+                value.Value))
+            .ToList();
     }
 
     public void ReplaceAssetReference(string assetId, string replacement)
