@@ -390,6 +390,9 @@
                                 <Button x:Name="FindAssetUsageButton"
                                         Content="Где используется"
                                         Click="FindAssetUsage_Click" />
+                                <Button x:Name="OpenSelectedAssetButton"
+                                        Content="Открыть файл"
+                                        Click="OpenSelectedAsset_Click" />
                                 <Button x:Name="DeleteAssetButton"
                                         Content="Удалить"
                                         Background="#4A2932"

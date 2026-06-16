@@ -99,5 +99,7 @@ currently installed on this workstation.
 - Use the file manager search box to filter assets by id, folder, path, file
   name, or type.
 - Audio assets can be previewed directly from the file manager.
+- Selected assets can be opened in Windows Explorer from the toolbar or context
+  menu.
 - Asset usage results can be opened directly to jump back to the node or main
   menu area that references the asset.

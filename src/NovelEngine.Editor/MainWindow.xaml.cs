@@ -1427,6 +1427,7 @@ public partial class MainWindow : Window
         MoveAssetButton.IsEnabled = selected;
         CopyAssetReferenceButton.IsEnabled = selected;
         FindAssetUsageButton.IsEnabled = selected;
+        OpenSelectedAssetButton.IsEnabled = selected;
         DeleteAssetButton.IsEnabled = selected;
         AssetPreviewImage.Source = null;
         AssetPreviewAudioPanel.Visibility = Visibility.Collapsed;
@@ -1595,6 +1596,9 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateAssetMenuItem(
             "Где используется",
             () => ShowAssetUsages(view)));
+        menu.Items.Add(CreateAssetMenuItem(
+            "Открыть файл в проводнике",
+            () => OpenSelectedAssetInExplorer(view.Asset)));
 
         if (view.Asset.Kind == AssetKind.Image)
         {
@@ -2347,6 +2351,16 @@ public partial class MainWindow : Window
         ShowAssetUsages(view);
     }
 
+    private void OpenSelectedAsset_Click(object sender, RoutedEventArgs e)
+    {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        if (view is null)
+        {
+            return;
+        }
+        OpenSelectedAssetInExplorer(view.Asset);
+    }
+
     private void DeleteAsset_Click(object sender, RoutedEventArgs e)
     {
         var view = AssetsGrid.SelectedItem as AssetView;
@@ -2434,6 +2448,37 @@ public partial class MainWindow : Window
                 FileName = directory,
                 UseShellExecute = true,
             });
+    }
+
+    private void OpenSelectedAssetInExplorer(NovelAsset asset)
+    {
+        var path = ResolveAssetPath(asset);
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath);
+        if (File.Exists(fullPath))
+        {
+            Process.Start(
+                new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{fullPath}\"",
+                    UseShellExecute = true,
+                });
+            StatusText.Text = $"Открыт файл {Path.GetFileName(fullPath)}";
+            return;
+        }
+
+        if (directory is not null)
+        {
+            Directory.CreateDirectory(directory);
+            Process.Start(
+                new ProcessStartInfo
+                {
+                    FileName = directory,
+                    UseShellExecute = true,
+                });
+        }
+        StatusText.Text = $"Файл ассета не найден: {fullPath}";
     }
 
     private bool EnsureProjectSavedForAssets()
