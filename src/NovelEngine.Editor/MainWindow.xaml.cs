@@ -1220,7 +1220,14 @@ public partial class MainWindow : Window
                 asset => asset.Folder.Equals(
                     _selectedAssetFolder,
                     StringComparison.OrdinalIgnoreCase));
-        AssetsGrid.ItemsSource = assets
+        var folderAssetCount = assets.Count();
+        var query = AssetSearchBox.Text.Trim();
+        if (query.Length > 0)
+        {
+            assets = assets.Where(asset => AssetMatchesSearch(asset, query));
+        }
+
+        var assetViews = assets
             .OrderBy(asset => asset.Kind)
             .ThenBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
             .Select(
@@ -1229,6 +1236,10 @@ public partial class MainWindow : Window
                     _project.CountAssetReferences(asset.Id),
                     AssetSize(asset)))
             .ToList();
+        AssetsGrid.ItemsSource = assetViews;
+        AssetSearchSummaryText.Text = query.Length == 0
+            ? string.Empty
+            : $"Найдено {assetViews.Count} из {folderAssetCount}";
         if (selectedId is not null)
         {
             AssetsGrid.SelectedItem = AssetsGrid.Items
@@ -1240,6 +1251,30 @@ public partial class MainWindow : Window
         }
         RefreshAssetPreview();
     }
+
+    private static bool AssetMatchesSearch(NovelAsset asset, string query)
+    {
+        var tokens = query
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return tokens.Length == 0 || tokens.All(token =>
+            ContainsSearchToken(asset.Id, token)
+            || ContainsSearchToken(asset.Path, token)
+            || ContainsSearchToken(asset.Folder, token)
+            || ContainsSearchToken(Path.GetFileName(asset.Path), token)
+            || ContainsSearchToken(asset.Kind.ToString(), token)
+            || ContainsSearchToken(AssetKindLabel(asset.Kind), token));
+    }
+
+    private static bool ContainsSearchToken(string value, string token) =>
+        value.Contains(token, StringComparison.CurrentCultureIgnoreCase);
+
+    private static string AssetKindLabel(AssetKind kind) =>
+        kind switch
+        {
+            AssetKind.Image => "изображение картинка image",
+            AssetKind.Audio => "аудио музыка звук audio",
+            _ => "файл file",
+        };
 
     private void RefreshAssetFolders()
     {
@@ -1459,6 +1494,20 @@ public partial class MainWindow : Window
 
     private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RefreshAssetPreview();
+
+    private void AssetSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        RefreshAssetList();
+
+    private void AssetSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || AssetSearchBox.Text.Length == 0)
+        {
+            return;
+        }
+
+        AssetSearchBox.Clear();
+        e.Handled = true;
+    }
 
     private void PlayAssetPreview_Click(object sender, RoutedEventArgs e)
     {
