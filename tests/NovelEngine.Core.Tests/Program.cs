@@ -562,6 +562,13 @@ static void MainMenuAndVoiceAssetReferences()
             Kind = AssetKind.Audio,
             Path = "assets/audio/hero-alt.wav",
         });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "transition_click",
+            Kind = AssetKind.Audio,
+            Path = "assets/audio/click.wav",
+        });
     project.MainMenu.Background = "@menu_bg";
     project.MainMenu.Elements.Add(
         new MainMenuElement
@@ -586,21 +593,30 @@ static void MainMenuAndVoiceAssetReferences()
                 "@voice_hero_alt",
             ],
         });
+    scene.Outputs[0].TransitionSound = "@transition_click";
 
     project.Validate();
     Assert(project.CountAssetReferences("menu_bg") == 2, "Main menu image refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero") == 1, "Voice refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero_alt") == 1, "Second voice refs were not counted.");
+    Assert(project.CountAssetReferences("transition_click") == 1, "Transition sound refs were not counted.");
     var menuUsages = project.FindAssetUsages("menu_bg");
     Assert(menuUsages.Count == 2, "Main menu image usages were not listed.");
     Assert(
         menuUsages.Any(usage => usage.Location.Contains("главное меню", StringComparison.Ordinal)),
         "Main menu image usage location was not reported.");
+    var voiceUsage = project.FindAssetUsages("voice_hero").Single();
     Assert(
-        project.FindAssetUsages("voice_hero").Single().Location.Contains(
-            "голос персонажа",
-            StringComparison.Ordinal),
+        voiceUsage.Location.Contains("голос персонажа", StringComparison.Ordinal),
         "Voice usage location was not reported.");
+    Assert(voiceUsage.NodeId == scene.Id, "Voice usage node id was not reported.");
+    var transitionUsage = project.FindAssetUsages("transition_click").Single();
+    Assert(
+        transitionUsage.Location.Contains("переход", StringComparison.Ordinal),
+        "Transition sound usage location was not reported.");
+    Assert(
+        transitionUsage.NodeId == scene.Id,
+        "Transition sound usage node id was not reported.");
 
     project.ReplaceAssetReference("voice_hero", "@voice_main");
     Assert(

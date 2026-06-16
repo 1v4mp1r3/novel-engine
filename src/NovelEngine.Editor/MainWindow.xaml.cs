@@ -1744,7 +1744,99 @@ public partial class MainWindow : Window
         {
             Owner = this,
         };
-        dialog.ShowDialog();
+        if (dialog.ShowDialog() == true && dialog.SelectedUsage is { } usage)
+        {
+            NavigateToAssetUsage(usage);
+        }
+    }
+
+    private void NavigateToAssetUsage(AssetUsage usage)
+    {
+        if (usage.NodeId is not null
+            && _project.FindNode(usage.NodeId) is { } node)
+        {
+            Graph.SelectNode(node.Id);
+            WorkspaceTabs.SelectedItem = GraphTab;
+            SelectAssetUsageDetail(usage.Location);
+            StatusText.Text =
+                $"Ассет используется в ноде «{DiagnosticNodeDisplay(node)}»";
+            return;
+        }
+
+        if (usage.Location.StartsWith("главное меню", StringComparison.OrdinalIgnoreCase))
+        {
+            EditMainMenu();
+            return;
+        }
+
+        if (usage.Location.StartsWith("тип ", StringComparison.OrdinalIgnoreCase))
+        {
+            WorkspaceTabs.SelectedItem = CodeTab;
+            StatusText.Text =
+                $"Ассет используется в настройках типа: {usage.Location}";
+            return;
+        }
+
+        if (usage.Location.StartsWith(
+            "библиотека персонажей",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            WorkspaceTabs.SelectedItem = GraphTab;
+            StatusText.Text =
+                $"Ассет используется в библиотеке персонажей: {usage.Location}";
+            return;
+        }
+
+        StatusText.Text = $"Ассет используется: {usage.Location}";
+    }
+
+    private void SelectAssetUsageDetail(string location)
+    {
+        var outputLabel = TryReadLocationTail(location, "переход ");
+        if (outputLabel is not null)
+        {
+            var outputView = OutputsGrid.Items
+                .OfType<OutputView>()
+                .FirstOrDefault(view => view.Label.Equals(
+                    outputLabel,
+                    StringComparison.Ordinal));
+            if (outputView is not null)
+            {
+                OutputsGrid.SelectedItem = outputView;
+                OutputsGrid.ScrollIntoView(outputView);
+            }
+            return;
+        }
+
+        var characterName = TryReadLocationTail(location, "голос персонажа ")
+            ?? TryReadLocationTail(location, "персонаж ");
+        if (characterName is null)
+        {
+            return;
+        }
+
+        var characterView = CharactersGrid.Items
+            .OfType<CharacterView>()
+            .FirstOrDefault(view => view.Name.Equals(
+                characterName,
+                StringComparison.Ordinal));
+        if (characterView is not null)
+        {
+            CharactersGrid.SelectedItem = characterView;
+            CharactersGrid.ScrollIntoView(characterView);
+        }
+    }
+
+    private static string? TryReadLocationTail(string location, string marker)
+    {
+        var start = location.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var value = location[(start + marker.Length)..].Trim();
+        return value.Length == 0 ? null : value;
     }
 
     private static MenuItem CreateHoverSubmenu(string header)

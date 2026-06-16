@@ -465,6 +465,8 @@ public sealed class AssetIdEditorWindow : Window
 
 public sealed class AssetUsageWindow : Window
 {
+    private readonly DataGrid? _usageGrid;
+
     public AssetUsageWindow(NovelAsset asset, IReadOnlyList<AssetUsage> usages)
     {
         Title = $"Где используется @{asset.Id}";
@@ -500,15 +502,28 @@ public sealed class AssetUsageWindow : Window
             panel.Children.Add(
                 new TextBlock
                 {
-                    Text = $"Найдено мест: {usages.Count}",
+                    Text = $"Найдено мест: {usages.Count}. Двойной клик — перейти.",
                     Foreground = (Brush)Application.Current.Resources["MutedBrush"],
                     Margin = new Thickness(0, 0, 0, 8),
                 });
-            panel.Children.Add(CreateUsageGrid(usages));
+            _usageGrid = CreateUsageGrid(usages);
+            _usageGrid.MouseDoubleClick += (_, _) => ConfirmNavigation();
+            panel.Children.Add(_usageGrid);
         }
 
-        panel.Children.Add(CreateCloseButton(this));
+        panel.Children.Add(CreateButtons(this, usages.Count > 0));
         Content = panel;
+    }
+
+    public AssetUsage? SelectedUsage =>
+        (_usageGrid?.SelectedItem as AssetUsageView)?.Usage;
+
+    private void ConfirmNavigation()
+    {
+        if (SelectedUsage is not null)
+        {
+            DialogResult = true;
+        }
     }
 
     private static DataGrid CreateUsageGrid(IReadOnlyList<AssetUsage> usages)
@@ -522,6 +537,7 @@ public sealed class AssetUsageWindow : Window
             HeadersVisibility = DataGridHeadersVisibility.Column,
             ItemsSource = usages
                 .Select(usage => new AssetUsageView(
+                    usage,
                     usage.Location,
                     AssetKindName(usage.ExpectedKind),
                     usage.Reference))
@@ -559,7 +575,7 @@ public sealed class AssetUsageWindow : Window
         return grid;
     }
 
-    private static FrameworkElement CreateCloseButton(Window window)
+    private static FrameworkElement CreateButtons(Window window, bool canNavigate)
     {
         var panel = new StackPanel
         {
@@ -567,14 +583,22 @@ public sealed class AssetUsageWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 14, 0, 0),
         };
+        var navigate = new Button
+        {
+            Content = "Перейти",
+            MinWidth = 110,
+            IsDefault = canNavigate,
+            IsEnabled = canNavigate,
+        };
         var close = new Button
         {
             Content = "Закрыть",
             MinWidth = 110,
-            IsDefault = true,
             IsCancel = true,
         };
+        navigate.Click += (_, _) => window.DialogResult = true;
         close.Click += (_, _) => window.Close();
+        panel.Children.Add(navigate);
         panel.Children.Add(close);
         return panel;
     }
@@ -588,6 +612,7 @@ public sealed class AssetUsageWindow : Window
         };
 
     private sealed record AssetUsageView(
+        AssetUsage Usage,
         string Location,
         string Kind,
         string Reference);

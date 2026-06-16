@@ -147,7 +147,8 @@ public sealed class NovelAsset
 public sealed record AssetUsage(
     string Location,
     AssetKind ExpectedKind,
-    string Reference);
+    string Reference,
+    string? NodeId = null);
 
 public sealed class CharacterPlacement
 {
@@ -335,7 +336,8 @@ public sealed class NovelProject
             .Select(value => new AssetUsage(
                 value.Owner,
                 value.ExpectedKind,
-                value.Value))
+                value.Value,
+                value.NodeId))
             .ToList();
     }
 
@@ -876,23 +878,27 @@ public sealed class NovelProject
             yield return new AssetValue(
                 node.Background,
                 AssetKind.Image,
-                $"нода {node.Title}, фон");
+                $"нода {node.Title}, фон",
+                node.Id);
             yield return new AssetValue(
                 node.Music,
                 AssetKind.Audio,
-                $"нода {node.Title}, музыка");
+                $"нода {node.Title}, музыка",
+                node.Id);
             foreach (var character in node.Characters)
             {
                 yield return new AssetValue(
                     character.Sprite,
                     AssetKind.Image,
-                    $"нода {node.Title}, персонаж {character.Name}");
+                    $"нода {node.Title}, персонаж {character.Name}",
+                    node.Id);
                 foreach (var voice in CharacterVoiceValues(character))
                 {
                     yield return new AssetValue(
                         voice,
                         AssetKind.Audio,
-                        $"нода {node.Title}, голос персонажа {character.Name}");
+                        $"нода {node.Title}, голос персонажа {character.Name}",
+                        node.Id);
                 }
             }
             foreach (var output in node.Outputs)
@@ -900,7 +906,8 @@ public sealed class NovelProject
                 yield return new AssetValue(
                     output.TransitionSound,
                     AssetKind.Audio,
-                    $"переход {output.Label}");
+                    $"нода {node.Title}, переход {output.Label}",
+                    node.Id);
             }
         }
     }
@@ -998,7 +1005,8 @@ public sealed class NovelProject
     private sealed record AssetValue(
         string Value,
         AssetKind ExpectedKind,
-        string Owner);
+        string Owner,
+        string? NodeId = null);
 }
 
 public static class AssetReference
