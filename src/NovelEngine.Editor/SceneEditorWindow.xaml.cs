@@ -28,6 +28,7 @@ public partial class SceneEditorWindow : Window
     private double _startDistance;
     private double _startAngle;
     private bool _transformMode;
+    private readonly List<CharacterPlacement> _characters;
 
     public SceneEditorWindow(
         NovelProject project,
@@ -40,7 +41,7 @@ public partial class SceneEditorWindow : Window
 
         var player = new NovelPlayer(project);
         player.StartAt(node.Id);
-        Characters = player.State.CurrentCharacters
+        _characters = player.State.CurrentCharacters
             .Select(character => character.Clone())
             .ToList();
         BackgroundImage.Source = LoadBitmap(ResolveAsset(player.State.CurrentBackground));
@@ -52,10 +53,7 @@ public partial class SceneEditorWindow : Window
             InheritanceText.Visibility = Visibility.Visible;
         }
 
-        CharacterList.ItemsSource = Characters;
-        EmptyStateText.Visibility = Characters.Count == 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        RefreshCharacterList();
         BuildCharacterVisuals();
         if (Characters.Count > 0)
         {
@@ -63,7 +61,7 @@ public partial class SceneEditorWindow : Window
         }
     }
 
-    public IReadOnlyList<CharacterPlacement> Characters { get; }
+    public IReadOnlyList<CharacterPlacement> Characters => _characters;
 
     internal void EnableTransformModeForScreenshot()
     {
@@ -77,13 +75,14 @@ public partial class SceneEditorWindow : Window
     {
         StageCanvas.Children.Clear();
         _visuals.Clear();
-        foreach (var character in Characters)
+        foreach (var character in _characters)
         {
             var visual = CreateCharacterVisual(character);
             _visuals.Add(character.Id, visual);
             StageCanvas.Children.Add(visual.Root);
             UpdateVisual(visual);
         }
+        RefreshEmptyState();
     }
 
     private CharacterVisual CreateCharacterVisual(CharacterPlacement character)
@@ -368,6 +367,7 @@ public partial class SceneEditorWindow : Window
             Panel.SetZIndex(visual.Root, selected ? 100 : 0);
         }
         UpdateTransformText();
+        UpdateCharacterButtons();
     }
 
     private void StageRoot_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -389,6 +389,7 @@ public partial class SceneEditorWindow : Window
             Panel.SetZIndex(visual.Root, 0);
         }
         TransformText.Text = "Персонаж не выбран";
+        UpdateCharacterButtons();
     }
 
     private void ToggleTransform_Click(object sender, RoutedEventArgs e) =>
@@ -418,6 +419,120 @@ public partial class SceneEditorWindow : Window
         _selectedCharacter.Scale = 1;
         _selectedCharacter.Rotation = 0;
         UpdateSelectedVisual();
+    }
+
+    private void AddLibraryCharacter_Click(object sender, RoutedEventArgs e)
+    {
+        if (_project.Characters.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Библиотека персонажей пока пуста.",
+                "Редактор сцены",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new CharacterLibraryPickerWindow(_project.Characters)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true || dialog.SelectedCharacter is null)
+        {
+            return;
+        }
+
+        var character = dialog.SelectedCharacter.CloneWithId(
+            CreateUniqueCharacterId(dialog.SelectedCharacter.Id));
+        EnsureCustomTransform(character);
+        _characters.Add(character);
+        RefreshCharacterList();
+        BuildCharacterVisuals();
+        SelectCharacter(character);
+    }
+
+    private void RemoveCharacter_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedCharacter is null)
+        {
+            return;
+        }
+
+        var removedIndex = _characters.IndexOf(_selectedCharacter);
+        _characters.Remove(_selectedCharacter);
+        _selectedCharacter = null;
+        RefreshCharacterList();
+        BuildCharacterVisuals();
+        if (_characters.Count > 0)
+        {
+            CharacterList.SelectedIndex = Math.Clamp(removedIndex, 0, _characters.Count - 1);
+        }
+        else
+        {
+            TransformText.Text = "Персонаж не выбран";
+            UpdateCharacterButtons();
+        }
+    }
+
+    private void RefreshCharacterList()
+    {
+        CharacterList.ItemsSource = null;
+        CharacterList.ItemsSource = _characters;
+        RefreshEmptyState();
+        UpdateCharacterButtons();
+    }
+
+    private void RefreshEmptyState()
+    {
+        EmptyStateText.Visibility = _characters.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void UpdateCharacterButtons()
+    {
+        AddLibraryCharacterButton.IsEnabled = _project.Characters.Count > 0;
+        RemoveCharacterButton.IsEnabled = _selectedCharacter is not null;
+    }
+
+    private string CreateUniqueCharacterId(string preferredId)
+    {
+        var seed = SanitizeCharacterId(preferredId);
+        var existing = _characters
+            .Select(character => character.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!existing.Contains(seed))
+        {
+            return seed;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{seed}-{index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string SanitizeCharacterId(string value)
+    {
+        var cleaned = new string(
+            value
+                .Trim()
+                .Select(character =>
+                    character is '_' or '-' || char.IsLetterOrDigit(character)
+                        ? character
+                        : '-')
+                .ToArray())
+            .Trim('-');
+        if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
+        {
+            cleaned = $"character-{cleaned}";
+        }
+        return cleaned;
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

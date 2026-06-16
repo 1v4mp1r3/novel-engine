@@ -78,6 +78,16 @@
                                    TextWrapping="Wrap"
                                    Text="Персонаж не выбран" />
                     </Border>
+                    <StackPanel DockPanel.Dock="Bottom"
+                                Margin="0,10,0,0">
+                        <Button x:Name="AddLibraryCharacterButton"
+                                Content="Из библиотеки"
+                                Click="AddLibraryCharacter_Click" />
+                        <Button x:Name="RemoveCharacterButton"
+                                Content="Убрать со сцены"
+                                Background="#4A2932"
+                                Click="RemoveCharacter_Click" />
+                    </StackPanel>
                     <ListBox x:Name="CharacterList"
                              Background="Transparent"
                              BorderThickness="0"
