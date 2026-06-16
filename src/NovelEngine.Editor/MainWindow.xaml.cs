@@ -3140,6 +3140,10 @@ public partial class MainWindow : Window
         {
             return null;
         }
+        if (!ConfirmProjectReadyForBuild())
+        {
+            return null;
+        }
 
         _buildInProgress = true;
         UpdateGameControls();
@@ -3582,13 +3586,49 @@ public partial class MainWindow : Window
         RefreshProjectDiagnostics(showPanel: true);
     }
 
+    private bool ConfirmProjectReadyForBuild()
+    {
+        var report = RefreshProjectDiagnostics(showPanel: true);
+        if (report.HasErrors)
+        {
+            StatusText.Text = "Сборка остановлена: есть ошибки проекта";
+            MessageBox.Show(
+                this,
+                "В проекте есть ошибки. Исправьте их перед сборкой или запуском.",
+                "Проверка проекта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+
+        if (report.WarningCount == 0)
+        {
+            return true;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            $"В проекте есть предупреждения: {report.WarningCount}.\n\n"
+            + "Продолжить сборку?",
+            "Проверка проекта",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (result == MessageBoxResult.Yes)
+        {
+            return true;
+        }
+
+        StatusText.Text = "Сборка отменена после проверки проекта";
+        return false;
+    }
+
     private void RequestDiagnosticsRefresh()
     {
         _diagnosticsTimer.Stop();
         _diagnosticsTimer.Start();
     }
 
-    private void RefreshProjectDiagnostics(bool showPanel)
+    private ProjectDiagnosticReport RefreshProjectDiagnostics(bool showPanel)
     {
         var report = ProjectDiagnostics.Analyze(_project, _projectPath);
         var diagnostics = report.Diagnostics
@@ -3612,7 +3652,7 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = "Проверка проекта: проблем не найдено";
             }
-            return;
+            return report;
         }
 
         var shouldShowPanel = report.HasErrors || showPanel;
@@ -3627,6 +3667,7 @@ public partial class MainWindow : Window
                     ? $"Проверка проекта: предупреждений {report.WarningCount}"
                     : $"Проверка проекта: заметок {report.InfoCount}";
         }
+        return report;
     }
 
     private void HideDiagnostics_Click(object sender, RoutedEventArgs e) =>

@@ -79,6 +79,8 @@ currently installed on this workstation.
   blocks while scrolling.
 - The top-right IDE controls compile the current project, launch the compiled
   game, launch it with runtime diagnostics, or stop the separate player process.
+- Build and run commands perform project diagnostics first: errors block the
+  action, while warnings ask for explicit confirmation.
 - Compiled packages are written to `build/<project-name>` beside the project.
   They contain a validated runtime project, manifest, and copied assets.
 - The file manager supports nested project folders; assets can be created,
