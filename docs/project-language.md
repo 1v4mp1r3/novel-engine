@@ -43,6 +43,27 @@ Asset kinds are `image`, `audio`, and `other`. Backgrounds and sprites require
 images; music and transition sounds require audio. Renaming an asset in the
 manager updates every `@reference` in nodes and user-defined types.
 
+## Character library
+
+Reusable characters can be declared at the top level and then inserted into
+nodes from the editor UI:
+
+```text
+character alice {
+    name "Alice"
+    sprite @alice_happy
+    voice @alice_blip_1
+    voice @alice_blip_2
+    voice-pitch 1.1
+    voice-every 1
+    position left
+}
+```
+
+The same character block syntax is used inside nodes and types. Top-level
+characters are stored in the project library; node-level characters describe
+who is currently on the scene.
+
 Folders are project declarations rather than incidental UI state. Use
 `folder "parent/child"` to create a nested folder and `in "parent/child"` to
 assign an asset to it. Creating, renaming, deleting, and moving folders in the

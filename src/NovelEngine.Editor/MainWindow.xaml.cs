@@ -2644,6 +2644,68 @@ public partial class MainWindow : Window
         MarkDirty();
     }
 
+    private void AddLibraryCharacter_Click(object sender, RoutedEventArgs e)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null)
+        {
+            return;
+        }
+        if (_project.Characters.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Библиотека персонажей пока пуста. Добавьте персонажа на сцену и нажмите «В библиотеку».",
+                "Библиотека персонажей",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new CharacterLibraryPickerWindow(_project.Characters)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true || dialog.SelectedCharacter is null)
+        {
+            return;
+        }
+
+        node.InheritCharacters = false;
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("inheritCharacters");
+            node.PropertyOverrides.Add("characters");
+        }
+        InheritCharactersCheck.IsChecked = false;
+        var id = CreateUniqueCharacterId(dialog.SelectedCharacter.Id, node.Characters);
+        node.Characters.Add(dialog.SelectedCharacter.CloneWithId(id));
+        MarkDirty();
+        StatusText.Text = $"Персонаж «{CharacterLabel(dialog.SelectedCharacter)}» добавлен из библиотеки";
+    }
+
+    private void SaveCharacterToLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        var character = SelectedCharacter();
+        if (character is null)
+        {
+            return;
+        }
+
+        var existing = _project.FindCharacter(character.Id);
+        if (existing is null)
+        {
+            _project.Characters.Add(character.Clone());
+            StatusText.Text = $"Персонаж «{CharacterLabel(character)}» добавлен в библиотеку";
+        }
+        else
+        {
+            CopyCharacterValues(character, existing);
+            StatusText.Text = $"Персонаж «{CharacterLabel(character)}» обновлён в библиотеке";
+        }
+        MarkDirty();
+    }
+
     private void EditCharacter_Click(object sender, RoutedEventArgs e)
     {
         var character = SelectedCharacter();
@@ -2692,6 +2754,64 @@ public partial class MainWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    private static void CopyCharacterValues(
+        CharacterPlacement source,
+        CharacterPlacement target)
+    {
+        target.Name = source.Name;
+        target.Sprite = source.Sprite;
+        target.Position = source.Position;
+        target.HasCustomTransform = source.HasCustomTransform;
+        target.X = source.X;
+        target.Y = source.Y;
+        target.Scale = source.Scale;
+        target.Rotation = source.Rotation;
+        target.SetVoiceSounds(source.GetVoiceSounds());
+        target.VoicePitch = source.VoicePitch;
+        target.VoiceEveryNthCharacter = source.VoiceEveryNthCharacter;
+    }
+
+    private static string CreateUniqueCharacterId(
+        string preferredId,
+        IEnumerable<CharacterPlacement> characters)
+    {
+        var seed = SanitizeCharacterId(preferredId);
+        var existing = characters
+            .Select(character => character.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!existing.Contains(seed))
+        {
+            return seed;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{seed}-{index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string SanitizeCharacterId(string value)
+    {
+        var cleaned = new string(
+            value
+                .Trim()
+                .Select(character =>
+                    character is '_' or '-' || char.IsLetterOrDigit(character)
+                        ? character
+                        : '-')
+                .ToArray())
+            .Trim('-');
+        if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
+        {
+            cleaned = $"character-{cleaned}";
+        }
+        return cleaned;
+    }
+
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
@@ -2739,6 +2859,9 @@ public partial class MainWindow : Window
     {
         CharactersGrid.IsEnabled = canEdit;
         AddCharacterButton.IsEnabled = canEdit;
+        AddLibraryCharacterButton.IsEnabled = canEdit && _project.Characters.Count > 0;
+        SaveCharacterToLibraryButton.IsEnabled =
+            canEdit && CharactersGrid.SelectedItem is CharacterView;
         EditCharacterButton.IsEnabled = canEdit && CharactersGrid.SelectedItem is CharacterView;
         DeleteCharacterButton.IsEnabled = canEdit && CharactersGrid.SelectedItem is CharacterView;
     }

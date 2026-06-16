@@ -276,6 +276,71 @@ public sealed class CharacterEditorWindow : Window
     private sealed record AssetChoice(string Reference, string Name);
 }
 
+public sealed class CharacterLibraryPickerWindow : Window
+{
+    private readonly ListBox _characterList;
+
+    public CharacterLibraryPickerWindow(IEnumerable<CharacterPlacement> characters)
+    {
+        Title = "Персонаж из библиотеки";
+        Width = 520;
+        Height = 420;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.NoResize;
+
+        var choices = characters
+            .OrderBy(character => character.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(character => new CharacterChoice(
+                character,
+                $"{DisplayName(character)}  ·  {character.Id}  ·  "
+                + $"блипы: {character.GetVoiceSounds().Count}"))
+            .ToList();
+        _characterList = new ListBox
+        {
+            ItemsSource = choices,
+            DisplayMemberPath = nameof(CharacterChoice.Name),
+            Height = 260,
+            Margin = new Thickness(0, 4, 0, 12),
+        };
+        if (choices.Count > 0)
+        {
+            _characterList.SelectedIndex = 0;
+        }
+        _characterList.MouseDoubleClick += (_, _) => Save();
+
+        var panel = DialogUi.Panel();
+        panel.Children.Add(DialogUi.Label("Выберите персонажа"));
+        panel.Children.Add(_characterList);
+        panel.Children.Add(DialogUi.Buttons(Save, this));
+        Content = panel;
+    }
+
+    public CharacterPlacement? SelectedCharacter =>
+        (_characterList.SelectedItem as CharacterChoice)?.Character;
+
+    private void Save()
+    {
+        if (SelectedCharacter is null)
+        {
+            MessageBox.Show(
+                this,
+                "Выберите персонажа из библиотеки.",
+                "Библиотека персонажей",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        DialogResult = true;
+    }
+
+    private static string DisplayName(CharacterPlacement character) =>
+        string.IsNullOrWhiteSpace(character.Name)
+            ? character.Id
+            : character.Name;
+
+    private sealed record CharacterChoice(CharacterPlacement Character, string Name);
+}
+
 public sealed class TransitionEditorWindow : Window
 {
     private readonly TextBox _soundBox;

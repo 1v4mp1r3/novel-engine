@@ -94,6 +94,9 @@ public static class ProjectLanguage
             "character",
             "name",
             "sprite",
+            "voice",
+            "voice-pitch",
+            "voice-every",
             "position",
             "placement",
             "scale",
@@ -527,6 +530,12 @@ public static class ProjectLanguage
             builder.AppendLine();
         }
 
+        foreach (var character in project.Characters)
+        {
+            builder.AppendLine();
+            WriteCharacter(builder, character, string.Empty);
+        }
+
         foreach (var type in project.NodeTypes)
         {
             builder.AppendLine();
@@ -742,6 +751,18 @@ public static class ProjectLanguage
             {
                 ProjectAssets.CreateFolder(project, declaration.Folder);
             }
+        }
+        var characterIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var declaration in document.Characters)
+        {
+            var character = declaration.Character;
+            if (!characterIds.Add(character.Id))
+            {
+                throw Error(
+                    declaration.Token,
+                    $"Персонаж библиотеки «{character.Id}» уже объявлен.");
+            }
+            project.Characters.Add(character.Clone());
         }
         foreach (var declaration in document.Types)
         {
@@ -1299,6 +1320,7 @@ public static class ProjectLanguage
         public string Title { get; set; } = "Новая новелла";
         public List<FolderDeclaration> Folders { get; } = [];
         public List<AssetDeclaration> Assets { get; } = [];
+        public List<CharacterDeclaration> Characters { get; } = [];
         public List<TypeDeclaration> Types { get; } = [];
         public List<NodeDeclaration> Nodes { get; } = [];
     }
@@ -1311,6 +1333,8 @@ public static class ProjectLanguage
         Token Token);
 
     private sealed record FolderDeclaration(string Path, Token Token);
+
+    private sealed record CharacterDeclaration(CharacterPlacement Character, Token Token);
 
     private sealed record TypeDeclaration(
         string Name,
@@ -1465,6 +1489,10 @@ public static class ProjectLanguage
                 {
                     document.Assets.Add(ParseAsset());
                 }
+                else if (MatchKeyword("character"))
+                {
+                    document.Characters.Add(ParseCharacterDeclaration());
+                }
                 else if (MatchKeyword("type"))
                 {
                     document.Types.Add(ParseType());
@@ -1477,7 +1505,7 @@ public static class ProjectLanguage
                 {
                     throw Error(
                         Current,
-                        "Ожидалось объявление folder, asset, type или node.");
+                        "Ожидалось объявление folder, asset, character, type или node.");
                 }
             }
             return document;
@@ -1761,6 +1789,12 @@ public static class ProjectLanguage
                 VoicePitch = voicePitch,
                 VoiceEveryNthCharacter = voiceEveryNthCharacter,
             };
+        }
+
+        private CharacterDeclaration ParseCharacterDeclaration()
+        {
+            var token = Current;
+            return new CharacterDeclaration(ParseCharacter(), token);
         }
 
         private OutputDeclaration ParseOutput()

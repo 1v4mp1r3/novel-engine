@@ -241,6 +241,8 @@
                             </DataGrid>
                             <WrapPanel Margin="0,7,0,0">
                                 <Button x:Name="AddCharacterButton" Content="+ Персонаж" Click="AddCharacter_Click" />
+                                <Button x:Name="AddLibraryCharacterButton" Content="Из библиотеки" Click="AddLibraryCharacter_Click" />
+                                <Button x:Name="SaveCharacterToLibraryButton" Content="В библиотеку" Click="SaveCharacterToLibrary_Click" />
                                 <Button x:Name="EditCharacterButton" Content="Изменить" Click="EditCharacter_Click" />
                                 <Button x:Name="DeleteCharacterButton" Content="Удалить" Click="DeleteCharacter_Click" />
                             </WrapPanel>

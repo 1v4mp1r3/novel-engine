@@ -160,10 +160,12 @@ public sealed class CharacterPlacement
     public double VoicePitch { get; set; } = 1;
     public int VoiceEveryNthCharacter { get; set; } = 1;
 
-    public CharacterPlacement Clone() =>
+    public CharacterPlacement Clone() => CloneWithId(Id);
+
+    public CharacterPlacement CloneWithId(string id) =>
         new()
         {
-            Id = Id,
+            Id = id,
             Name = Name,
             Sprite = Sprite,
             Position = Position,
@@ -284,6 +286,7 @@ public sealed class NovelProject
     public MainMenuDesign MainMenu { get; init; } = new();
     public List<string> AssetFolders { get; init; } = [];
     public List<NovelAsset> Assets { get; init; } = [];
+    public List<CharacterPlacement> Characters { get; init; } = [];
     public List<NodeTypeDefinition> NodeTypes { get; init; } = [];
     public List<NovelNode> Nodes { get; init; } = [];
 
@@ -302,6 +305,14 @@ public sealed class NovelProject
         return FindAsset(id)?.Path ?? string.Empty;
     }
 
+    public CharacterPlacement? FindCharacter(string? characterId) =>
+        characterId is null
+            ? null
+            : Characters.FirstOrDefault(
+                character => character.Id.Equals(
+                    characterId,
+                    StringComparison.Ordinal));
+
     public int CountAssetReferences(string assetId)
     {
         var reference = AssetReference.Create(assetId);
@@ -312,6 +323,10 @@ public sealed class NovelProject
     public void ReplaceAssetReference(string assetId, string replacement)
     {
         var reference = AssetReference.Create(assetId);
+        foreach (var character in Characters)
+        {
+            ReplaceCharacterAssetValues(character, reference, replacement);
+        }
         foreach (var type in NodeTypes)
         {
             ReplaceAssetValues(type.Defaults, reference, replacement);
@@ -322,12 +337,7 @@ public sealed class NovelProject
             node.Music = Replace(node.Music, reference, replacement);
             foreach (var character in node.Characters)
             {
-                character.Sprite = Replace(character.Sprite, reference, replacement);
-                character.VoiceSound = Replace(
-                    character.VoiceSound,
-                    reference,
-                    replacement);
-                ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
+                ReplaceCharacterAssetValues(character, reference, replacement);
             }
             foreach (var output in node.Outputs)
             {
@@ -573,6 +583,19 @@ public sealed class NovelProject
             }
         }
 
+        var libraryCharacterIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var character in Characters)
+        {
+            if (string.IsNullOrWhiteSpace(character.Id)
+                || !libraryCharacterIds.Add(character.Id))
+            {
+                throw new InvalidDataException(
+                    $"Повторяющийся или пустой id персонажа библиотеки: {character.Id}");
+            }
+            ValidateCharacterTransform(character);
+            ValidateCharacterVoice(character);
+        }
+
         var mainMenuIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var element in MainMenu.Elements)
         {
@@ -770,6 +793,21 @@ public sealed class NovelProject
 
     private IEnumerable<AssetValue> EnumerateTypedAssetValues()
     {
+        foreach (var character in Characters)
+        {
+            yield return new AssetValue(
+                character.Sprite,
+                AssetKind.Image,
+                $"библиотека персонажей, персонаж {character.Name}");
+            foreach (var voice in CharacterVoiceValues(character))
+            {
+                yield return new AssetValue(
+                    voice,
+                    AssetKind.Audio,
+                    $"библиотека персонажей, голос персонажа {character.Name}");
+            }
+        }
+
         foreach (var type in NodeTypes)
         {
             if (type.Defaults.Background is not null)
@@ -880,13 +918,21 @@ public sealed class NovelProject
         defaults.Music = ReplaceNullable(defaults.Music, reference, replacement);
         foreach (var character in defaults.Characters)
         {
-            character.Sprite = Replace(character.Sprite, reference, replacement);
-            character.VoiceSound = Replace(
-                character.VoiceSound,
-                reference,
-                replacement);
-            ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
+            ReplaceCharacterAssetValues(character, reference, replacement);
         }
+    }
+
+    private static void ReplaceCharacterAssetValues(
+        CharacterPlacement character,
+        string reference,
+        string replacement)
+    {
+        character.Sprite = Replace(character.Sprite, reference, replacement);
+        character.VoiceSound = Replace(
+            character.VoiceSound,
+            reference,
+            replacement);
+        ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
     }
 
     private static IReadOnlyList<string> CharacterVoiceValues(CharacterPlacement character)

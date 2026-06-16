@@ -179,6 +179,16 @@ public static class NovelBuildCompiler
                 usedTargets);
         }
 
+        foreach (var character in project.Characters)
+        {
+            CompileCharacterAssets(
+                character,
+                projectDirectory,
+                outputDirectory,
+                copiedPaths,
+                usedTargets);
+        }
+
         foreach (var type in project.NodeTypes)
         {
             type.Defaults.Background = CompileDirectValue(
@@ -195,20 +205,8 @@ public static class NovelBuildCompiler
                 usedTargets);
             foreach (var character in type.Defaults.Characters)
             {
-                character.Sprite = CompileDirectValue(
-                    character.Sprite,
-                    projectDirectory,
-                    outputDirectory,
-                    copiedPaths,
-                    usedTargets) ?? string.Empty;
-                character.VoiceSound = CompileDirectValue(
-                    character.VoiceSound,
-                    projectDirectory,
-                    outputDirectory,
-                    copiedPaths,
-                    usedTargets) ?? string.Empty;
-                CompileDirectValues(
-                    character.VoiceSounds,
+                CompileCharacterAssets(
+                    character,
                     projectDirectory,
                     outputDirectory,
                     copiedPaths,
@@ -232,20 +230,8 @@ public static class NovelBuildCompiler
                 usedTargets) ?? string.Empty;
             foreach (var character in node.Characters)
             {
-                character.Sprite = CompileDirectValue(
-                    character.Sprite,
-                    projectDirectory,
-                    outputDirectory,
-                    copiedPaths,
-                    usedTargets) ?? string.Empty;
-                character.VoiceSound = CompileDirectValue(
-                    character.VoiceSound,
-                    projectDirectory,
-                    outputDirectory,
-                    copiedPaths,
-                    usedTargets) ?? string.Empty;
-                CompileDirectValues(
-                    character.VoiceSounds,
+                CompileCharacterAssets(
+                    character,
                     projectDirectory,
                     outputDirectory,
                     copiedPaths,
@@ -262,6 +248,33 @@ public static class NovelBuildCompiler
             }
         }
         return copiedPaths.Count;
+    }
+
+    private static void CompileCharacterAssets(
+        CharacterPlacement character,
+        string projectDirectory,
+        string outputDirectory,
+        IDictionary<string, string> copiedPaths,
+        ISet<string> usedTargets)
+    {
+        character.Sprite = CompileDirectValue(
+            character.Sprite,
+            projectDirectory,
+            outputDirectory,
+            copiedPaths,
+            usedTargets) ?? string.Empty;
+        character.VoiceSound = CompileDirectValue(
+            character.VoiceSound,
+            projectDirectory,
+            outputDirectory,
+            copiedPaths,
+            usedTargets) ?? string.Empty;
+        CompileDirectValues(
+            character.VoiceSounds,
+            projectDirectory,
+            outputDirectory,
+            copiedPaths,
+            usedTargets);
     }
 
     private static void CompileDirectValues(

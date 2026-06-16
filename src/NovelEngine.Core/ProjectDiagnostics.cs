@@ -131,6 +131,14 @@ public static class ProjectDiagnostics
             .Where(group => group.Count() == 1)
             .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
 
+        foreach (var character in project.Characters)
+        {
+            AddCharacterDiagnostics(
+                diagnostics,
+                $"Библиотека персонажей, персонаж «{DisplayCharacter(character)}»",
+                character);
+        }
+
         foreach (var node in project.Nodes)
         {
             if (string.IsNullOrWhiteSpace(node.Title))
@@ -157,20 +165,10 @@ public static class ProjectDiagnostics
 
             foreach (var character in node.Characters)
             {
-                if (string.IsNullOrWhiteSpace(character.Name))
-                {
-                    diagnostics.Add(
-                        Warning(
-                            $"Нода «{DisplayNode(node)}», персонаж {character.Id}",
-                            "У персонажа не указано имя."));
-                }
-                if (string.IsNullOrWhiteSpace(character.Sprite))
-                {
-                    diagnostics.Add(
-                        Warning(
-                            $"Нода «{DisplayNode(node)}», персонаж «{DisplayCharacter(character)}»",
-                            "У персонажа не выбран спрайт."));
-                }
+                AddCharacterDiagnostics(
+                    diagnostics,
+                    $"Нода «{DisplayNode(node)}», персонаж «{DisplayCharacter(character)}»",
+                    character);
             }
 
             foreach (var output in node.Outputs)
@@ -194,6 +192,21 @@ public static class ProjectDiagnostics
         }
 
         AddUnreachableNodeDiagnostics(project, diagnostics, uniqueNodesById);
+    }
+
+    private static void AddCharacterDiagnostics(
+        List<ProjectDiagnostic> diagnostics,
+        string location,
+        CharacterPlacement character)
+    {
+        if (string.IsNullOrWhiteSpace(character.Name))
+        {
+            diagnostics.Add(Warning(location, "У персонажа не указано имя."));
+        }
+        if (string.IsNullOrWhiteSpace(character.Sprite))
+        {
+            diagnostics.Add(Warning(location, "У персонажа не выбран спрайт."));
+        }
     }
 
     private static void AddUnreachableNodeDiagnostics(

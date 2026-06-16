@@ -5,6 +5,7 @@ var tests = new (string Name, Action Run)[]
     ("default project is valid", DefaultProjectIsValid),
     ("project diagnostics report authoring issues", ProjectDiagnosticsReportAuthoringIssues),
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
+    ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
@@ -115,6 +116,53 @@ static void ProjectDiagnosticsCheckPhysicalAssets()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void CharacterLibraryRoundTrip()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "alice_sprite",
+            Kind = AssetKind.Image,
+            Path = "files/characters/alice.png",
+        });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "alice_voice",
+            Kind = AssetKind.Audio,
+            Path = "files/voices/alice.wav",
+        });
+    project.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "alice",
+            Name = "Alice",
+            Sprite = "@alice_sprite",
+            Position = CharacterPosition.Left,
+            VoiceSound = "@alice_voice",
+            VoiceSounds = ["@alice_voice"],
+            VoicePitch = 1.2,
+            VoiceEveryNthCharacter = 2,
+        });
+
+    var fromJson = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
+    var formatted = ProjectLanguage.Format(project);
+    var fromCode = ProjectLanguage.Parse(formatted);
+
+    Assert(fromJson.Characters.Count == 1, "JSON lost character library entries.");
+    Assert(fromCode.Characters.Count == 1, "Project language lost character library entries.");
+    Assert(
+        formatted.Contains("character alice", StringComparison.Ordinal),
+        "Character library was not formatted as a top-level character block.");
+    Assert(
+        fromCode.Characters[0].Sprite == "@alice_sprite",
+        "Character library sprite reference changed.");
+    Assert(
+        fromCode.CountAssetReferences("alice_voice") == 1,
+        "Character library voice reference was not counted.");
 }
 
 static void DialogueChoicesConnectIndependently()
@@ -989,6 +1037,15 @@ static void BuildCompilerEmitsPackage()
         scene.Background = AssetReference.Create(asset.Id);
         scene.InheritBackground = false;
         project.MainMenu.Background = AssetReference.Create(asset.Id);
+        project.Characters.Add(
+            new CharacterPlacement
+            {
+                Id = "library_hero",
+                Name = "Library Hero",
+                Sprite = sourceAsset,
+                VoiceSound = sourceVoiceAlt,
+                VoiceSounds = [sourceVoiceAlt],
+            });
         project.MainMenu.Elements.Clear();
         project.MainMenu.Elements.Add(
             new MainMenuElement
@@ -1034,6 +1091,8 @@ static void BuildCompilerEmitsPackage()
             .FindNode(scene.Id)!
             .Characters
             .Single(character => character.Id == "hero");
+        var builtLibraryCharacter = loaded.Project.Characters.Single(
+            character => character.Id == "library_hero");
 
         Assert(File.Exists(result.ManifestPath), "Build manifest was not emitted.");
         Assert(
@@ -1077,6 +1136,21 @@ static void BuildCompilerEmitsPackage()
         Assert(
             builtCharacter.VoiceEveryNthCharacter == 2,
             "Runtime project changed character voice frequency.");
+        Assert(
+            File.Exists(
+                Path.Combine(
+                    result.OutputDirectory,
+                    builtLibraryCharacter.Sprite.Replace(
+                        '/',
+                        Path.DirectorySeparatorChar))),
+            "Compiled library character sprite was not copied.");
+        Assert(
+            builtLibraryCharacter.GetVoiceSounds().All(voice =>
+                File.Exists(
+                    Path.Combine(
+                        result.OutputDirectory,
+                        voice.Replace('/', Path.DirectorySeparatorChar)))),
+            "Compiled library character voice was not copied.");
         Assert(
             loaded.Manifest.DebugSymbols,
             "Debug build did not retain debug symbols.");
