@@ -7,6 +7,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
+    ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
     ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
@@ -183,6 +184,33 @@ static void DialogueChoicesConnectIndependently()
 
     Assert(dialogue.Outputs[0].TargetNodeId == firstTarget.Id, "First choice target was lost.");
     Assert(dialogue.Outputs[1].TargetNodeId == secondTarget.Id, "Second choice target was lost.");
+}
+
+static void AddConnectedNodePreservesExistingGraph()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+
+    scene.Outputs[0].TargetNodeId = null;
+    var connected = project.AddConnectedNode(scene.Id, NodeKind.Dialogue, scene.X + 400, scene.Y);
+
+    Assert(connected.Kind == NodeKind.Dialogue, "Connected dialogue node was not created.");
+    Assert(scene.Outputs[0].TargetNodeId == connected.Id, "Connected node was not wired to the free output.");
+    Assert(connected.X == scene.X + 400 && connected.Y == scene.Y, "Connected node position changed.");
+
+    var firstTarget = project.AddNode(NodeKind.Scene, 1300, 50);
+    var secondTarget = project.AddNode(NodeKind.Scene, 1300, 280);
+    dialogue.Outputs[0].TargetNodeId = firstTarget.Id;
+    dialogue.Outputs[1].TargetNodeId = secondTarget.Id;
+    var outputCount = dialogue.Outputs.Count;
+    var addedChoiceTarget = project.AddConnectedNode(dialogue.Id, NodeKind.Scene, 1600, 420);
+
+    Assert(dialogue.Outputs.Count == outputCount + 1, "Dialogue did not add a new choice for the connected node.");
+    Assert(dialogue.Outputs[^1].TargetNodeId == addedChoiceTarget.Id, "New dialogue choice was not connected.");
+    Assert(dialogue.Outputs[0].TargetNodeId == firstTarget.Id, "Existing first dialogue connection was overwritten.");
+    Assert(dialogue.Outputs[1].TargetNodeId == secondTarget.Id, "Existing second dialogue connection was overwritten.");
+    project.Validate();
 }
 
 static void DuplicateNodeCopiesAuthoringDataSafely()

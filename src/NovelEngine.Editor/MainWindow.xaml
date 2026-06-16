@@ -40,6 +40,8 @@
             <MenuItem Header="Ноды">
                 <MenuItem Header="Добавить сцену" Click="AddScene_Click" />
                 <MenuItem Header="Добавить диалог" Click="AddDialogue_Click" />
+                <MenuItem Header="Создать связанную сцену" Click="AddConnectedScene_Click" />
+                <MenuItem Header="Создать связанный диалог" Click="AddConnectedDialogue_Click" />
                 <MenuItem Header="Дублировать выбранную" InputGestureText="Ctrl+D" Click="DuplicateNode_Click" />
                 <Separator />
                 <MenuItem Header="Удалить выбранную" InputGestureText="Delete" Click="DeleteNode_Click" />

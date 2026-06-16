@@ -418,6 +418,37 @@ public sealed class NovelProject
         return node;
     }
 
+    public NovelNode AddConnectedNode(
+        string sourceNodeId,
+        NodeKind kind,
+        float x,
+        float y)
+    {
+        if (kind == NodeKind.Start)
+        {
+            throw new InvalidOperationException("Связанная стартовая нода недоступна.");
+        }
+
+        var source = FindNode(sourceNodeId)
+            ?? throw new InvalidOperationException("Исходная нода не найдена.");
+        var output = source.Outputs.FirstOrDefault(output => output.TargetNodeId is null);
+        if (output is null)
+        {
+            if (source.Kind != NodeKind.Dialogue)
+            {
+                throw new InvalidOperationException("У ноды нет свободного выхода.");
+            }
+
+            output = AddChoice(
+                source.Id,
+                kind == NodeKind.Dialogue ? "Новый диалог" : "Новая сцена");
+        }
+
+        var node = AddNode(kind, x, y);
+        output.TargetNodeId = node.Id;
+        return node;
+    }
+
     public NovelNode DuplicateNode(string nodeId, float offsetX = 48, float offsetY = 48)
     {
         var source = FindNode(nodeId)

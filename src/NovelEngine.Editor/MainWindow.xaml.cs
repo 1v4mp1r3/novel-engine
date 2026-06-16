@@ -2788,6 +2788,12 @@ public partial class MainWindow : Window
     private void AddDialogue_Click(object sender, RoutedEventArgs e) =>
         Graph.AddNodeAtCenter(NodeKind.Dialogue);
 
+    private void AddConnectedScene_Click(object sender, RoutedEventArgs e) =>
+        Graph.AddConnectedSceneFromSelected();
+
+    private void AddConnectedDialogue_Click(object sender, RoutedEventArgs e) =>
+        Graph.AddConnectedDialogueFromSelected();
+
     private void DeleteNode_Click(object sender, RoutedEventArgs e) =>
         Graph.DeleteSelected();
 

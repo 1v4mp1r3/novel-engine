@@ -80,6 +80,12 @@ public sealed class GraphSurface : FrameworkElement
         return AddNodeAt(world, kind);
     }
 
+    public void AddConnectedSceneFromSelected() =>
+        AddConnectedNodeFromSelected(NodeKind.Scene);
+
+    public void AddConnectedDialogueFromSelected() =>
+        AddConnectedNodeFromSelected(NodeKind.Dialogue);
+
     public void DeleteSelected()
     {
         if (SelectedNodeId is null || !Project.RemoveNode(SelectedNodeId))
@@ -360,6 +366,33 @@ public sealed class GraphSurface : FrameworkElement
         return node;
     }
 
+    private void AddConnectedNodeFromSelected(NodeKind kind)
+    {
+        if (SelectedNodeId is null
+            || Project.FindNode(SelectedNodeId) is not { } source)
+        {
+            System.Media.SystemSounds.Beep.Play();
+            return;
+        }
+
+        try
+        {
+            var node = Project.AddConnectedNode(
+                source.Id,
+                kind,
+                source.X + (float)NodeWidth + 160,
+                source.Y);
+            SelectedNodeId = node.Id;
+            RequestRender();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            ProjectChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (InvalidOperationException)
+        {
+            System.Media.SystemSounds.Beep.Play();
+        }
+    }
+
     private void ShowContextMenu(Point position)
     {
         var connection = HitConnection(position);
@@ -423,6 +456,16 @@ public sealed class GraphSurface : FrameworkElement
                     () => AddChoiceRequested?.Invoke(node.Id)));
             }
 
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateMenuItem(
+                "Создать связанную сцену",
+                AddConnectedSceneFromSelected,
+                CanAddConnectedNode(node)));
+            menu.Items.Add(CreateMenuItem(
+                "Создать связанный диалог",
+                AddConnectedDialogueFromSelected,
+                CanAddConnectedNode(node)));
+
             if (node.Kind != NodeKind.Start)
             {
                 menu.Items.Add(new Separator());
@@ -450,12 +493,23 @@ public sealed class GraphSurface : FrameworkElement
         menu.IsOpen = true;
     }
 
-    private static MenuItem CreateMenuItem(string header, Action action)
+    private static MenuItem CreateMenuItem(
+        string header,
+        Action action,
+        bool isEnabled = true)
     {
-        var item = new MenuItem { Header = header };
+        var item = new MenuItem
+        {
+            Header = header,
+            IsEnabled = isEnabled,
+        };
         item.Click += (_, _) => action();
         return item;
     }
+
+    private static bool CanAddConnectedNode(NovelNode node) =>
+        node.Outputs.Any(output => output.TargetNodeId is null)
+        || node.Kind == NodeKind.Dialogue;
 
     private MenuItem CreateInheritanceMenu(NovelNode node)
     {
