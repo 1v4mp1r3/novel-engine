@@ -142,7 +142,14 @@
 
                     <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
                         <DockPanel Margin="12">
-                            <TextBlock DockPanel.Dock="Top" Text="ПРОЕКТ" FontWeight="Bold" FontSize="14" Margin="4,6,0,14" />
+                            <StackPanel DockPanel.Dock="Top">
+                                <TextBlock Text="ПРОЕКТ" FontWeight="Bold" FontSize="14" Margin="4,6,0,10" />
+                                <TextBox x:Name="ProjectSearchBox"
+                                         Margin="0,0,0,10"
+                                         ToolTip="Поиск по названию, id, говорящему и тексту ноды"
+                                         TextChanged="ProjectSearchBox_TextChanged"
+                                         KeyDown="ProjectSearchBox_KeyDown" />
+                            </StackPanel>
                             <StackPanel DockPanel.Dock="Bottom">
                                 <Button Content="+ Сцена" Click="AddScene_Click" />
                                 <Button Content="+ Диалог" Click="AddDialogue_Click" />

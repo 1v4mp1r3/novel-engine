@@ -253,16 +253,20 @@ public partial class MainWindow : Window
         _syncingSelection = true;
         try
         {
+            var query = ProjectSearchBox.Text.Trim();
+            var matchedNodes = FilteredNodes(query).ToList();
             ProjectTree.Items.Clear();
             var root = new TreeViewItem
             {
-                Header = _project.Title,
+                Header = query.Length == 0
+                    ? _project.Title
+                    : $"{_project.Title} · найдено {matchedNodes.Count}",
                 IsExpanded = true,
             };
             ProjectTree.Items.Add(root);
-            AddNodeGroup(root, "Старт", NodeKind.Start);
-            AddNodeGroup(root, "Сцены", NodeKind.Scene);
-            AddNodeGroup(root, "Диалоги", NodeKind.Dialogue);
+            AddNodeGroup(root, "Старт", NodeKind.Start, query, matchedNodes);
+            AddNodeGroup(root, "Сцены", NodeKind.Scene, query, matchedNodes);
+            AddNodeGroup(root, "Диалоги", NodeKind.Dialogue, query, matchedNodes);
         }
         finally
         {
@@ -270,15 +274,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddNodeGroup(TreeViewItem root, string title, NodeKind kind)
+    private void AddNodeGroup(
+        TreeViewItem root,
+        string title,
+        NodeKind kind,
+        string query,
+        IReadOnlyList<NovelNode> matchedNodes)
     {
+        var nodes = matchedNodes
+            .Where(node => node.Kind == kind)
+            .ToList();
         var group = new TreeViewItem
         {
-            Header = title,
+            Header = query.Length == 0 ? title : $"{title} ({nodes.Count})",
             IsExpanded = true,
         };
         root.Items.Add(group);
-        foreach (var node in _project.Nodes.Where(node => node.Kind == kind))
+        foreach (var node in nodes)
         {
             var item = new TreeViewItem
             {
@@ -289,6 +301,24 @@ public partial class MainWindow : Window
             group.Items.Add(item);
         }
     }
+
+    private IEnumerable<NovelNode> FilteredNodes(string query) =>
+        _project.Nodes.Where(node => NodeMatchesSearch(node, query));
+
+    private static bool NodeMatchesSearch(NovelNode node, string query)
+    {
+        if (query.Length == 0)
+        {
+            return true;
+        }
+        return Contains(node.Title, query)
+            || Contains(node.Id, query)
+            || Contains(node.Speaker, query)
+            || Contains(node.Text, query);
+    }
+
+    private static bool Contains(string value, string query) =>
+        value.Contains(query, StringComparison.CurrentCultureIgnoreCase);
 
     private void RefreshProperties()
     {
@@ -2446,6 +2476,33 @@ public partial class MainWindow : Window
             return;
         }
         Graph.SelectNode((e.NewValue as TreeViewItem)?.Tag as string);
+    }
+
+    private void ProjectSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        RefreshExplorer();
+
+    private void ProjectSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        var query = ProjectSearchBox.Text.Trim();
+        var node = FilteredNodes(query).FirstOrDefault();
+        if (node is null)
+        {
+            StatusText.Text = query.Length == 0
+                ? "В проекте нет нод"
+                : $"По запросу «{query}» ничего не найдено";
+            e.Handled = true;
+            return;
+        }
+
+        Graph.SelectNode(node.Id);
+        RefreshExplorer();
+        StatusText.Text = $"Найдена нода «{node.Title}»";
+        e.Handled = true;
     }
 
     private void Inheritance_Changed(object sender, RoutedEventArgs e)
