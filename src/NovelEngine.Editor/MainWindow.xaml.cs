@@ -2676,7 +2676,7 @@ public partial class MainWindow : Window
                 result.WorkspaceDirectory);
             RecentProjectsStore.Remember(result.WorkspaceDirectory);
             StatusText.Text =
-                $"Открыта папка {Path.GetFileName(result.WorkspaceDirectory)}. Создайте новый проект через Ctrl+N или сохраните текущий.";
+                $"Открыта папка {Path.GetFileName(result.WorkspaceDirectory)}. Нажмите Ctrl+S, чтобы создать проект в этой папке.";
             return;
         }
 
