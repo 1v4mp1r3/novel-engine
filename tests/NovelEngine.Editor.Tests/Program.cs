@@ -11,6 +11,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
+    ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
 };
 
 var failed = 0;
@@ -202,6 +203,47 @@ static void RecentProjectsIgnoreMissingPaths()
             Assert(
                 entries[0].Path == existingProject,
                 "Recent projects lost the existing path while pruning missing entries.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsKeepOnlyNewestEntries()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var projectPaths = Enumerable.Range(0, 10)
+            .Select(index => Path.Combine(directory, $"project-{index}.novel.json"))
+            .ToList();
+        foreach (var projectPath in projectPaths)
+        {
+            File.WriteAllText(projectPath, "{}");
+        }
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            foreach (var projectPath in projectPaths)
+            {
+                RecentProjectsStore.Remember(projectPath);
+            }
+
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 8, "Recent projects did not enforce the maximum entry count.");
+            Assert(
+                entries[0].Path == projectPaths[^1],
+                "Recent projects did not keep the newest project first.");
+            Assert(
+                !entries.Any(entry => entry.Path == projectPaths[0]),
+                "Recent projects kept the oldest overflow entry.");
+            Assert(
+                !entries.Any(entry => entry.Path == projectPaths[1]),
+                "Recent projects kept the second oldest overflow entry.");
         });
     }
     finally
