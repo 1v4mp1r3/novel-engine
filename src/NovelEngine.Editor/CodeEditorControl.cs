@@ -57,6 +57,7 @@ public sealed class CodeEditorControl : RichTextBox
     private bool _restoringHistory;
     private bool _historyRecordingPending;
     private int? _caretOffsetCache;
+    private TextPointer? _caretPointerCache;
 
     private static Brush CreateFrozenBrush(byte red, byte green, byte blue) =>
         CreateFrozenBrush(255, red, green, blue);
@@ -177,7 +178,7 @@ public sealed class CodeEditorControl : RichTextBox
     }
 
     public int SourceCaretOffset =>
-        _caretOffsetCache ??= ReadCaretOffset();
+        _caretOffsetCache ?? RefreshCaretOffsetCache();
 
     public void ApplySyntax(
         IReadOnlyList<ProjectLanguageSyntaxSpan> spans,
@@ -218,6 +219,7 @@ public sealed class CodeEditorControl : RichTextBox
         }
         _sourceTextCache = null;
         _caretOffsetCache = null;
+        _caretPointerCache = null;
         InvalidateRenderedSyntax();
         ScheduleUserChangeRecord();
         _completionTimer.Stop();
@@ -234,13 +236,14 @@ public sealed class CodeEditorControl : RichTextBox
         if (_currentSnapshot.Source.Length > MaxTrackedCaretSourceLength)
         {
             _caretOffsetCache = null;
+            _caretPointerCache = null;
             base.OnSelectionChanged(e);
             return;
         }
-        _caretOffsetCache = null;
+        var caretOffset = RefreshCaretOffsetCache();
         _currentSnapshot = new EditorSnapshot(
             _currentSnapshot.Source,
-            Math.Clamp(SourceCaretOffset, 0, _currentSnapshot.Source.Length));
+            Math.Clamp(caretOffset, 0, _currentSnapshot.Source.Length));
         base.OnSelectionChanged(e);
     }
 
@@ -613,6 +616,7 @@ public sealed class CodeEditorControl : RichTextBox
             }
             Document.PageWidth = 100_000;
             _sourceTextCache = source;
+            _caretPointerCache = null;
             _renderedSource = source;
             _renderedSpans = spans.ToArray();
             _renderedErrorStart = errorStart;
@@ -704,6 +708,7 @@ public sealed class CodeEditorControl : RichTextBox
         {
             _caretOffsetCache = normalizedOffset;
             CaretPosition = position;
+            _caretPointerCache = CaretPosition;
         }
     }
 
@@ -748,7 +753,55 @@ public sealed class CodeEditorControl : RichTextBox
         return text.EndsWith('\n') ? text[..^1] : text;
     }
 
-    private int ReadCaretOffset() =>
+    private int RefreshCaretOffsetCache()
+    {
+        var offset = TryReadCaretOffsetFromCachedPointer(out var cachedOffset)
+            ? cachedOffset
+            : ReadCaretOffsetFromDocumentStart();
+        var sourceLength = _sourceTextCache?.Length;
+        if (sourceLength.HasValue)
+        {
+            offset = Math.Clamp(offset, 0, sourceLength.Value);
+        }
+        _caretOffsetCache = offset;
+        _caretPointerCache = CaretPosition;
+        return offset;
+    }
+
+    private bool TryReadCaretOffsetFromCachedPointer(out int offset)
+    {
+        offset = 0;
+        if (!_caretOffsetCache.HasValue || _caretPointerCache is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var comparison = _caretPointerCache.CompareTo(CaretPosition);
+            if (comparison == 0)
+            {
+                offset = _caretOffsetCache.Value;
+                return true;
+            }
+
+            var range = comparison < 0
+                ? new TextRange(_caretPointerCache, CaretPosition)
+                : new TextRange(CaretPosition, _caretPointerCache);
+            var delta = NormalizeText(range.Text).Length;
+            offset = comparison < 0
+                ? _caretOffsetCache.Value + delta
+                : _caretOffsetCache.Value - delta;
+            return true;
+        }
+        catch (Exception error) when (
+            error is InvalidOperationException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private int ReadCaretOffsetFromDocumentStart() =>
         NormalizeText(
             new TextRange(Document.ContentStart, CaretPosition).Text).Length;
 

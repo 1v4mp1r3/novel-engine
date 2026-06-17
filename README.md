@@ -155,6 +155,8 @@ currently installed on this workstation.
 - The code editor avoids persistent block guide overlays so large scripts stay
   responsive while scrolling and typing, and batches undo snapshots while the
   user is actively typing.
+- The code editor tracks caret movement from a cached pointer when possible, so
+  line/column updates avoid rereading the whole document on every cursor move.
 - The top-right IDE controls compile the current project, launch the compiled
   game, launch it with runtime diagnostics, or stop the separate player process.
 - Build and run commands perform project diagnostics first: errors block the
