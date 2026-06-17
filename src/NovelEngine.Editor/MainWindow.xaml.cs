@@ -1809,11 +1809,6 @@ public partial class MainWindow : Window
         {
             return;
         }
-        if (!IsInAssetFolder(asset, "voices"))
-        {
-            StatusText.Text = "Voice-блип нужно выбрать из папки voices";
-            return;
-        }
 
         var reference = AssetReference.Create(asset.Id);
         MarkOverrideIfChanged(node, "inheritMusic", node.InheritMusic, false);
