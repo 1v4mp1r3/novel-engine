@@ -81,8 +81,9 @@ snippets and context-specific values, including declared node targets after
 `->`, asset references after `@`, and user-defined node types. Use `Up`/`Down`
 to select a suggestion and `Tab` or `Enter` to insert it.
 
-Vertical scope guides connect each opening brace to its matching closing brace.
-Nested node, type, character, and transition blocks use different guide colors.
+The code editor keeps rendering lightweight: syntax highlighting, parser
+diagnostics, and completion are updated without drawing persistent block guide
+overlays.
 
 ## Minimal project
 
