@@ -106,6 +106,7 @@ public partial class MainWindow : Window
         _filesRefreshTimer.Tick += (_, _) =>
         {
             _filesRefreshTimer.Stop();
+            _assetSizeCache.Clear();
             if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
             {
                 RefreshAssets();
@@ -114,6 +115,7 @@ public partial class MainWindow : Window
             {
                 SyncFilesFromDisk(refreshCode: false);
             }
+            RequestDiagnosticsRefresh();
         };
         _diagnosticsTimer = new DispatcherTimer
         {
@@ -1258,6 +1260,7 @@ public partial class MainWindow : Window
         _filesWatcher.Created += (_, _) => ScheduleFilesRefresh();
         _filesWatcher.Renamed += (_, _) => ScheduleFilesRefresh();
         _filesWatcher.Changed += (_, _) => ScheduleFilesRefresh();
+        _filesWatcher.Deleted += (_, _) => ScheduleFilesRefresh();
     }
 
     private void ScheduleFilesRefresh()
