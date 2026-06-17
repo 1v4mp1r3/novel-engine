@@ -1686,6 +1686,8 @@ static void BuildCompilerEmitsPackage()
         Assert(
             builtCharacter.VoiceSounds.Count == 2
                 && builtCharacter.VoiceSounds.Contains(
+                    AssetReference.Create(voiceAsset.Id))
+                && builtCharacter.VoiceSounds.Contains(
                     AssetReference.Create(voiceAltAsset.Id)),
             "Runtime project lost character voice sound list.");
         Assert(
