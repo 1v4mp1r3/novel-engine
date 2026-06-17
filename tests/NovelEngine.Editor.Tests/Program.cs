@@ -10,6 +10,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
+    ("project resolver treats empty folder as workspace", ProjectResolverTreatsEmptyFolderAsWorkspace),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver prefers folder-named json project", ProjectResolverPrefersFolderNamedJsonProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
@@ -167,6 +168,23 @@ static void ProjectResolverOpensOnlyJsonProject()
         Assert(result.ProjectPath == projectPath, "Resolver did not open the only .json project file.");
         Assert(result.WorkspaceDirectory == directory, "Resolver changed .json workspace directory.");
         Assert(!result.CreatedEmptyWorkspace, "Resolver marked a folder with one .json project as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverTreatsEmptyFolderAsWorkspace()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath is null, "Resolver picked a project from an empty folder.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed empty workspace directory.");
+        Assert(result.CreatedEmptyWorkspace, "Resolver did not mark an empty folder as workspace.");
     }
     finally
     {
