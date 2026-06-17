@@ -766,6 +766,7 @@ public partial class MainWindow : Window
             var compiled = GetParsedCodeProject(source);
             _parsedCodeSource = null;
             _parsedCodeProject = null;
+            VisualScriptBlockPreserver.PreserveFrom(_project, compiled);
 
             _project = compiled;
             _project.SourceCode = source;

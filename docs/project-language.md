@@ -85,6 +85,11 @@ The code editor keeps rendering lightweight: syntax highlighting, parser
 diagnostics, and completion are updated without drawing persistent block guide
 overlays.
 
+Visual script blocks created from the node or choice property dialogs are stored
+beside the DSL source. They compile to the same runtime script commands as
+hand-written `script` text and are preserved when the `Код` tab is applied back
+to the graph by matching node ids and choice outputs.
+
 ## Minimal project
 
 ```text

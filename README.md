@@ -114,6 +114,9 @@ currently installed on this workstation.
   code.
 - In the node properties panel, use `Блоки скрипта` to edit entry-script blocks;
   in a choice editor, use the same button to attach blocks to that transition.
+- Applying source from the `Код` tab preserves existing visual script blocks by
+  matching node ids and choice outputs, so block-authored logic is not lost
+  during DSL edits.
 - Open the `Файлы` tab to import assets into the project and address them from
   code through stable references such as `@city_night` or `@main_theme`.
 - Entry scripts and choice conditions use the language documented in

@@ -111,3 +111,108 @@ public static class VisualScriptCompiler
             ? block.Kind.ToString()
             : $"«{block.Id}»";
 }
+
+public static class VisualScriptBlockPreserver
+{
+    public static void PreserveFrom(NovelProject source, NovelProject target)
+    {
+        var sourceNodes = source.Nodes.ToDictionary(
+            node => node.Id,
+            StringComparer.Ordinal);
+
+        foreach (var targetNode in target.Nodes)
+        {
+            if (!sourceNodes.TryGetValue(targetNode.Id, out var sourceNode))
+            {
+                continue;
+            }
+
+            CopyBlocksIfEmpty(sourceNode.ScriptBlocks, targetNode.ScriptBlocks);
+            PreserveOutputBlocks(sourceNode, targetNode);
+        }
+    }
+
+    private static void PreserveOutputBlocks(
+        NovelNode sourceNode,
+        NovelNode targetNode)
+    {
+        var usedSourceOutputs = new HashSet<NodeOutput>();
+        for (var index = 0; index < targetNode.Outputs.Count; index++)
+        {
+            var targetOutput = targetNode.Outputs[index];
+            var sourceOutput = FindMatchingOutput(
+                sourceNode,
+                targetOutput,
+                index,
+                usedSourceOutputs);
+            if (sourceOutput is null)
+            {
+                continue;
+            }
+
+            usedSourceOutputs.Add(sourceOutput);
+            CopyBlocksIfEmpty(
+                sourceOutput.ScriptBlocks,
+                targetOutput.ScriptBlocks);
+        }
+    }
+
+    private static NodeOutput? FindMatchingOutput(
+        NovelNode sourceNode,
+        NodeOutput targetOutput,
+        int targetIndex,
+        ISet<NodeOutput> usedSourceOutputs)
+    {
+        var match = sourceNode.Outputs.FirstOrDefault(output =>
+            !usedSourceOutputs.Contains(output)
+            && output.Id.Equals(targetOutput.Id, StringComparison.Ordinal));
+        if (match is not null)
+        {
+            return match;
+        }
+
+        match = sourceNode.Outputs.FirstOrDefault(output =>
+            !usedSourceOutputs.Contains(output)
+            && output.Label.Equals(
+                targetOutput.Label,
+                StringComparison.Ordinal)
+            && string.Equals(
+                output.TargetNodeId,
+                targetOutput.TargetNodeId,
+                StringComparison.Ordinal));
+        if (match is not null)
+        {
+            return match;
+        }
+
+        match = sourceNode.Outputs.FirstOrDefault(output =>
+            !usedSourceOutputs.Contains(output)
+            && output.Label.Equals(
+                targetOutput.Label,
+                StringComparison.Ordinal));
+        if (match is not null)
+        {
+            return match;
+        }
+
+        return targetIndex < sourceNode.Outputs.Count
+            && !usedSourceOutputs.Contains(sourceNode.Outputs[targetIndex])
+                ? sourceNode.Outputs[targetIndex]
+                : null;
+    }
+
+    private static void CopyBlocksIfEmpty(
+        IEnumerable<VisualScriptBlock> sourceBlocks,
+        ICollection<VisualScriptBlock> targetBlocks)
+    {
+        if (targetBlocks.Count > 0)
+        {
+            return;
+        }
+
+        foreach (var block in sourceBlocks)
+        {
+            targetBlocks.Add(block.Clone());
+        }
+    }
+}

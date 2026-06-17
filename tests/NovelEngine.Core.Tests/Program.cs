@@ -18,6 +18,7 @@ var tests = new (string Name, Action Run)[]
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
+    ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
@@ -583,6 +584,40 @@ static void VisualScriptBlocksValidateGeneratedScripts()
     AssertThrows<InvalidDataException>(
         project.Validate,
         "Visual script block validation accepted an invalid generated command.");
+}
+
+static void VisualScriptBlocksSurviveProjectLanguageApply()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-flag",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "visited_intro",
+            Value = "true",
+        });
+    dialogue.Outputs[0].ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "choice-score",
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "score",
+            Value = "1",
+        });
+
+    var parsed = ProjectLanguage.Parse(ProjectLanguage.Format(project));
+    VisualScriptBlockPreserver.PreserveFrom(project, parsed);
+
+    Assert(
+        parsed.FindNode(scene.Id)?.ScriptBlocks.Single().Id == "scene-flag",
+        "Project language apply dropped node visual script blocks.");
+    Assert(
+        parsed.FindNode(dialogue.Id)?.Outputs[0].ScriptBlocks.Single().Id == "choice-score",
+        "Project language apply dropped output visual script blocks.");
 }
 
 static void RemovingNodeDisconnectsOutputs()
