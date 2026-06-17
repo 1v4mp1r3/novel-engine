@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -566,7 +567,7 @@ public partial class PreviewWindow : Window
     {
         var text = node.Text;
         var voice = ResolveVoice(node);
-        var visible = string.Empty;
+        var visible = new StringBuilder(text.Length);
         var voicedCharacters = 0;
         try
         {
@@ -578,8 +579,8 @@ public partial class PreviewWindow : Window
                     await Task.Delay(35, cancellationToken);
                 }
 
-                visible += character;
-                DialogueText.Text = visible;
+                visible.Append(character);
+                DialogueText.Text = visible.ToString();
                 if (!char.IsWhiteSpace(character) && voice is not null)
                 {
                     voicedCharacters++;
