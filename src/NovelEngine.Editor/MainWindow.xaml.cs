@@ -971,6 +971,12 @@ public partial class MainWindow : Window
 
     private void SetCodeCursorCache(string source)
     {
+        if (!_codeCursorCacheDirty
+            && _codeCursorSource.Equals(source, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         _codeCursorSource = source;
         _codeLineStarts = BuildLineStarts(source);
         _lastCodeCursorOffset = -1;
