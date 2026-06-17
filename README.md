@@ -88,7 +88,7 @@ currently installed on this workstation.
 - Move dialogue choices up or down to control their in-game order.
 - A node may inherit or replace the current background and character set.
 - The node context menu can enable inherited background, music, or characters
-  and shows the linked node that currently provides that inherited state.
+  and shows what will be inherited when the player enters from each linked node.
 - Selected scene characters can be moved up or down in the character list to
   control their scene order.
 - Selected scene characters can be duplicated with their sprite, voice, and

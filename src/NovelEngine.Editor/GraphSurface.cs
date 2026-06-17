@@ -689,7 +689,7 @@ public sealed class GraphSurface : FrameworkElement
         foreach (var source in sources)
         {
             item.Items.Add(CreateMenuItem(
-                $"Из «{source.Title}»: {DescribeInheritanceSource(source, resource)}",
+                $"Если прийти из «{source.Title}»: {DescribeInheritanceSource(source, resource)}",
                 () => ApplyInheritance(node, resource)));
         }
 
