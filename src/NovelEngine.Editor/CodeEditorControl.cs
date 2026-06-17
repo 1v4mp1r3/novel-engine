@@ -12,6 +12,7 @@ namespace NovelEngine.Editor;
 public sealed class CodeEditorControl : RichTextBox
 {
     private const int HistoryLimit = 200;
+    private const int MaxAutomaticCompletionSourceLength = 60_000;
 
     private static readonly IReadOnlyDictionary<ProjectLanguageSyntaxKind, Brush>
         SyntaxBrushes = new Dictionary<ProjectLanguageSyntaxKind, Brush>
@@ -282,6 +283,11 @@ public sealed class CodeEditorControl : RichTextBox
 
         var source = SourceText;
         var caretOffset = Math.Clamp(SourceCaretOffset, 0, source.Length);
+        if (!force && source.Length > MaxAutomaticCompletionSourceLength)
+        {
+            CloseCompletions();
+            return;
+        }
         if (!force && !ShouldAutoComplete(source, caretOffset))
         {
             CloseCompletions();
