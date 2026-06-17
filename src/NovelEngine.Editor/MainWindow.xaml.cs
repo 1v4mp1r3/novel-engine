@@ -3266,11 +3266,57 @@ public partial class MainWindow : Window
         MarkDirty();
     }
 
+    private void MoveCharacterLeft_Click(object sender, RoutedEventArgs e) =>
+        SetSelectedCharacterPosition(CharacterPosition.Left);
+
+    private void MoveCharacterCenter_Click(object sender, RoutedEventArgs e) =>
+        SetSelectedCharacterPosition(CharacterPosition.Center);
+
+    private void MoveCharacterRight_Click(object sender, RoutedEventArgs e) =>
+        SetSelectedCharacterPosition(CharacterPosition.Right);
+
+    private void SetSelectedCharacterPosition(CharacterPosition position)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var character = SelectedCharacter();
+        if (node is null || character is null || character.Position == position)
+        {
+            return;
+        }
+
+        var characterId = character.Id;
+        character.Position = position;
+        character.HasCustomTransform = false;
+        character.Scale = 1;
+        character.Rotation = 0;
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
+        MarkDirty();
+        SelectCharacterView(characterId);
+        StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён: {CharacterPositionLabel(position)}";
+    }
+
     private CharacterPlacement? SelectedCharacter()
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var view = CharactersGrid.SelectedItem as CharacterView;
         return node?.Characters.FirstOrDefault(character => character.Id == view?.Id);
+    }
+
+    private void SelectCharacterView(string characterId)
+    {
+        var characterView = CharactersGrid.Items
+            .OfType<CharacterView>()
+            .FirstOrDefault(view => view.Id == characterId);
+        if (characterView is null)
+        {
+            return;
+        }
+
+        CharactersGrid.SelectedItem = characterView;
+        CharactersGrid.ScrollIntoView(characterView);
     }
 
     private IReadOnlyList<NovelAsset> GetCharacterSpriteAssets() =>
@@ -3295,13 +3341,17 @@ public partial class MainWindow : Window
 
     private void SetCharacterButtons(bool canEdit)
     {
+        var hasSelectedCharacter = CharactersGrid.SelectedItem is CharacterView;
         CharactersGrid.IsEnabled = canEdit;
         AddCharacterButton.IsEnabled = canEdit;
         AddLibraryCharacterButton.IsEnabled = canEdit && _project.Characters.Count > 0;
         SaveCharacterToLibraryButton.IsEnabled =
-            canEdit && CharactersGrid.SelectedItem is CharacterView;
-        EditCharacterButton.IsEnabled = canEdit && CharactersGrid.SelectedItem is CharacterView;
-        DeleteCharacterButton.IsEnabled = canEdit && CharactersGrid.SelectedItem is CharacterView;
+            canEdit && hasSelectedCharacter;
+        EditCharacterButton.IsEnabled = canEdit && hasSelectedCharacter;
+        MoveCharacterLeftButton.IsEnabled = canEdit && hasSelectedCharacter;
+        MoveCharacterCenterButton.IsEnabled = canEdit && hasSelectedCharacter;
+        MoveCharacterRightButton.IsEnabled = canEdit && hasSelectedCharacter;
+        DeleteCharacterButton.IsEnabled = canEdit && hasSelectedCharacter;
     }
 
     private void AddOutput_Click(object sender, RoutedEventArgs e) => AddOutput();
@@ -4233,16 +4283,19 @@ public partial class MainWindow : Window
             _ => kind.ToString(),
         };
 
-    private sealed record CharacterView(CharacterPlacement Character)
-    {
-        public string Id => Character.Id;
-        public string Name => Character.Name;
-        public string Position => Character.Position switch
+    private static string CharacterPositionLabel(CharacterPosition position) =>
+        position switch
         {
             CharacterPosition.Left => "Слева",
             CharacterPosition.Right => "Справа",
             _ => "По центру",
         };
+
+    private sealed record CharacterView(CharacterPlacement Character)
+    {
+        public string Id => Character.Id;
+        public string Name => Character.Name;
+        public string Position => CharacterPositionLabel(Character.Position);
         public int VoiceCount => CharacterVoiceReferences(Character).Count;
     }
 
