@@ -185,6 +185,7 @@ public partial class App : Application
         catch (Exception error) when (
             error is IOException
             or InvalidDataException
+            or UnauthorizedAccessException
             or System.Text.Json.JsonException)
         {
             MessageBox.Show(
