@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -229,6 +230,11 @@ internal static class ScreenshotRenderer
             Items =
             {
                 new MenuItem { Header = "Проверка пункта" },
+                new MenuItem
+                {
+                    Header = "Недоступный пункт",
+                    IsEnabled = false,
+                },
                 new Separator(),
                 submenu,
             },
@@ -238,9 +244,83 @@ internal static class ScreenshotRenderer
         window.Dispatcher.Invoke(
             () => { },
             DispatcherPriority.ApplicationIdle);
+        AssertDarkMenuRender(menu, "root context menu");
+        var submenuPopup = submenu.Template.FindName("PART_Popup", submenu) as Popup;
+        if (submenuPopup?.Child is not FrameworkElement submenuSurface)
+        {
+            throw new InvalidOperationException("Submenu popup template was not rendered.");
+        }
+
+        AssertDarkMenuRender(submenuSurface, "submenu popup");
         submenu.IsSubmenuOpen = false;
         menu.IsOpen = false;
         window.Close();
+    }
+
+    private static void AssertDarkMenuRender(FrameworkElement element, string name)
+    {
+        element.UpdateLayout();
+        if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+        {
+            element.Measure(new Size(800, 600));
+            element.Arrange(new Rect(element.DesiredSize));
+            element.UpdateLayout();
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(element);
+        var width = Math.Max(1, (int)Math.Ceiling(element.ActualWidth * dpi.DpiScaleX));
+        var height = Math.Max(1, (int)Math.Ceiling(element.ActualHeight * dpi.DpiScaleY));
+        var bitmap = new RenderTargetBitmap(
+            width,
+            height,
+            dpi.PixelsPerInchX,
+            dpi.PixelsPerInchY,
+            PixelFormats.Pbgra32);
+        bitmap.Render(element);
+
+        var pixels = new byte[width * height * 4];
+        bitmap.CopyPixels(pixels, width * 4, 0);
+
+        var visible = 0;
+        var dark = 0;
+        var lightNeutral = 0;
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            var alpha = pixels[i + 3];
+            if (alpha < 200)
+            {
+                continue;
+            }
+
+            visible++;
+            var blue = pixels[i];
+            var green = pixels[i + 1];
+            var red = pixels[i + 2];
+            var luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+            var max = Math.Max(red, Math.Max(green, blue));
+            var min = Math.Min(red, Math.Min(green, blue));
+            if (luma < 130)
+            {
+                dark++;
+            }
+            if (luma > 215 && max - min < 35)
+            {
+                lightNeutral++;
+            }
+        }
+
+        if (visible == 0)
+        {
+            throw new InvalidOperationException($"{name} rendered no visible pixels.");
+        }
+
+        var darkRatio = (double)dark / visible;
+        var lightNeutralRatio = (double)lightNeutral / visible;
+        if (darkRatio < 0.55 || lightNeutralRatio > 0.12)
+        {
+            throw new InvalidOperationException(
+                $"{name} contrast smoke failed: dark={darkRatio:P1}, light-neutral={lightNeutralRatio:P1}.");
+        }
     }
 
     private static void RenderWindow(Window window, string path)
