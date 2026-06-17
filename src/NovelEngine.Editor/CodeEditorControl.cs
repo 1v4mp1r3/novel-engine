@@ -502,6 +502,11 @@ public sealed class CodeEditorControl : RichTextBox
             }
 
             var positions = boundaries.ToArray();
+            var orderedSpans = spans
+                .OrderBy(span => span.Start)
+                .ThenByDescending(span => span.Length)
+                .ToArray();
+            var spanIndex = 0;
             for (var index = 0; index < positions.Length - 1; index++)
             {
                 var start = positions[index];
@@ -510,9 +515,18 @@ public sealed class CodeEditorControl : RichTextBox
                 {
                     continue;
                 }
-                var syntax = spans.FirstOrDefault(
-                    span => start >= span.Start
-                        && start < span.Start + span.Length);
+                while (spanIndex < orderedSpans.Length
+                    && start >= orderedSpans[spanIndex].Start
+                        + orderedSpans[spanIndex].Length)
+                {
+                    spanIndex++;
+                }
+                var syntax = spanIndex < orderedSpans.Length
+                    && start >= orderedSpans[spanIndex].Start
+                    && start < orderedSpans[spanIndex].Start
+                        + orderedSpans[spanIndex].Length
+                    ? orderedSpans[spanIndex]
+                    : null;
                 var isError = errorStart.HasValue
                     && start >= errorStart.Value
                     && start < errorEnd;
