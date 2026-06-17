@@ -17,6 +17,7 @@ public sealed class GraphSurface : FrameworkElement
     private const double GridSize = 32;
     private const double HoverHitCacheDistance = 4;
     private const double DragRenderEpsilon = 0.5;
+    private const int TextLayoutCacheLimit = 2048;
 
     private static readonly Typeface NodeTypeface = new("Segoe UI");
     private static readonly Brush SurfaceBrush = FrozenBrush(15, 22, 31);
@@ -57,6 +58,7 @@ public sealed class GraphSurface : FrameworkElement
     private Point _lastHoverHitPoint = new(double.NaN, double.NaN);
     private Cursor? _lastHoverCursor;
     private double _pixelsPerDip = 1;
+    private readonly Dictionary<TextLayoutKey, FormattedText> _textLayoutCache = [];
 
     public GraphSurface()
     {
@@ -1053,21 +1055,39 @@ public sealed class GraphSurface : FrameworkElement
         double maxWidth,
         TextAlignment alignment = TextAlignment.Left)
     {
-        var formatted = new FormattedText(
+        var key = new TextLayoutKey(
             text,
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            NodeTypeface,
             size,
+            weight,
             brush,
-            _pixelsPerDip)
+            Math.Round(Math.Max(1, maxWidth), 2),
+            alignment,
+            Math.Round(_pixelsPerDip, 3),
+            CultureInfo.CurrentCulture.Name);
+        if (!_textLayoutCache.TryGetValue(key, out var formatted))
         {
-            MaxTextWidth = Math.Max(1, maxWidth),
-            MaxLineCount = 1,
-            Trimming = TextTrimming.CharacterEllipsis,
-            TextAlignment = alignment,
-        };
-        formatted.SetFontWeight(weight);
+            if (_textLayoutCache.Count >= TextLayoutCacheLimit)
+            {
+                _textLayoutCache.Clear();
+            }
+
+            formatted = new FormattedText(
+                text,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                NodeTypeface,
+                size,
+                brush,
+                _pixelsPerDip)
+            {
+                MaxTextWidth = Math.Max(1, maxWidth),
+                MaxLineCount = 1,
+                Trimming = TextTrimming.CharacterEllipsis,
+                TextAlignment = alignment,
+            };
+            formatted.SetFontWeight(weight);
+            _textLayoutCache[key] = formatted;
+        }
         drawingContext.DrawText(formatted, origin);
     }
 
@@ -1205,6 +1225,16 @@ public sealed class GraphSurface : FrameworkElement
         string SourceNodeId,
         string OutputId,
         StreamGeometry Geometry);
+
+    private sealed record TextLayoutKey(
+        string Text,
+        double Size,
+        FontWeight Weight,
+        Brush Brush,
+        double MaxWidth,
+        TextAlignment Alignment,
+        double PixelsPerDip,
+        string Culture);
 
     private readonly record struct InputPort(
         string NodeId,
