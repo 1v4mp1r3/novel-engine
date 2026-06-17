@@ -14,6 +14,7 @@ var tests = new (string Name, Action Run)[]
     ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
     ("autosave pruning keeps newest snapshots", AutoSavePruningKeepsNewestSnapshots),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
+    ("recent projects ignore corrupt cache", RecentProjectsIgnoreCorruptCache),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
@@ -284,6 +285,27 @@ static void RecentProjectsDeduplicateAndOrderEntries()
                     "first",
                     StringComparison.OrdinalIgnoreCase),
                 "Recent project display name was not derived from the project file.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsIgnoreCorruptCache()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        File.WriteAllText(storePath, "{ this is not json");
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 0, "Recent projects did not ignore a corrupt cache.");
         });
     }
     finally
