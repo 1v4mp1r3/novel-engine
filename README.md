@@ -51,6 +51,8 @@ New projects create the default managed asset folders:
 
 ## Build and test
 
+Double-click `test.bat`, or run:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/test.ps1
 ```
