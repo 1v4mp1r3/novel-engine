@@ -623,11 +623,12 @@ public partial class MainWindow : Window
         {
             RequestCodeRefresh(useStoredSource: false);
         }
+        var snapshot = CaptureProjectSnapshot();
         if (!_restoringProjectHistory)
         {
-            RecordProjectHistorySnapshot(Graph.SelectedNodeId);
+            snapshot = RecordProjectHistorySnapshot(Graph.SelectedNodeId, snapshot);
         }
-        _dirty = !CurrentProjectMatchesSavedSnapshot();
+        _dirty = !CurrentProjectMatchesSavedSnapshot(snapshot);
         RefreshWindowTitle();
         RefreshExplorer();
         RefreshProperties();
@@ -646,16 +647,18 @@ public partial class MainWindow : Window
         UpdateHistoryControls();
     }
 
-    private void RecordProjectHistorySnapshot(string? selectedNodeId)
+    private string RecordProjectHistorySnapshot(
+        string? selectedNodeId,
+        string? snapshot = null)
     {
-        var snapshot = CaptureProjectSnapshot();
+        snapshot ??= CaptureProjectSnapshot();
         if (_projectHistoryIndex >= 0
             && _projectHistory[_projectHistoryIndex].Snapshot == snapshot)
         {
             _projectHistory[_projectHistoryIndex] =
                 _projectHistory[_projectHistoryIndex] with { SelectedNodeId = selectedNodeId };
             UpdateHistoryControls();
-            return;
+            return snapshot;
         }
 
         if (_projectHistoryIndex < _projectHistory.Count - 1)
@@ -672,6 +675,7 @@ public partial class MainWindow : Window
         }
         _projectHistoryIndex = _projectHistory.Count - 1;
         UpdateHistoryControls();
+        return snapshot;
     }
 
     private string CaptureProjectSnapshot()
@@ -680,9 +684,12 @@ public partial class MainWindow : Window
         return ProjectSerializer.ToJson(_project);
     }
 
-    private bool CurrentProjectMatchesSavedSnapshot() =>
-        _savedProjectSnapshot.Length > 0
-        && CaptureProjectSnapshot() == _savedProjectSnapshot;
+    private bool CurrentProjectMatchesSavedSnapshot(string? snapshot = null)
+    {
+        snapshot ??= CaptureProjectSnapshot();
+        return _savedProjectSnapshot.Length > 0
+            && snapshot == _savedProjectSnapshot;
+    }
 
     private bool CanUndoProject => _projectHistoryIndex > 0;
 
@@ -828,8 +835,8 @@ public partial class MainWindow : Window
             RefreshExplorer();
             RefreshProperties();
             RefreshAssets(syncFromDisk: false);
-            RecordProjectHistorySnapshot(selectedNodeId);
-            _dirty = !CurrentProjectMatchesSavedSnapshot();
+            var snapshot = RecordProjectHistorySnapshot(selectedNodeId);
+            _dirty = !CurrentProjectMatchesSavedSnapshot(snapshot);
             RefreshWindowTitle();
             CodeStatusText.Foreground = (Brush)FindResource("AccentBrush");
             CodeStatusText.Text =
