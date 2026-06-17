@@ -19,25 +19,25 @@ public sealed class CodeEditorControl : RichTextBox
         SyntaxBrushes = new Dictionary<ProjectLanguageSyntaxKind, Brush>
         {
             [ProjectLanguageSyntaxKind.Keyword] =
-                new SolidColorBrush(Color.FromRgb(116, 214, 255)),
+                CreateFrozenBrush(116, 214, 255),
             [ProjectLanguageSyntaxKind.Declaration] =
-                new SolidColorBrush(Color.FromRgb(232, 221, 143)),
+                CreateFrozenBrush(232, 221, 143),
             [ProjectLanguageSyntaxKind.String] =
-                new SolidColorBrush(Color.FromRgb(173, 220, 151)),
+                CreateFrozenBrush(173, 220, 151),
             [ProjectLanguageSyntaxKind.Number] =
-                new SolidColorBrush(Color.FromRgb(211, 159, 255)),
+                CreateFrozenBrush(211, 159, 255),
             [ProjectLanguageSyntaxKind.Comment] =
-                new SolidColorBrush(Color.FromRgb(104, 126, 148)),
+                CreateFrozenBrush(104, 126, 148),
             [ProjectLanguageSyntaxKind.AssetReference] =
-                new SolidColorBrush(Color.FromRgb(255, 190, 92)),
+                CreateFrozenBrush(255, 190, 92),
             [ProjectLanguageSyntaxKind.Punctuation] =
-                new SolidColorBrush(Color.FromRgb(157, 177, 200)),
+                CreateFrozenBrush(157, 177, 200),
         };
 
     private static readonly Brush ErrorForeground =
-        new SolidColorBrush(Color.FromRgb(255, 135, 135));
+        CreateFrozenBrush(255, 135, 135);
     private static readonly Brush ErrorBackground =
-        new SolidColorBrush(Color.FromArgb(60, 220, 72, 72));
+        CreateFrozenBrush(60, 220, 72, 72);
 
     private readonly Popup _completionPopup;
     private readonly ListBox _completionList;
@@ -54,6 +54,20 @@ public sealed class CodeEditorControl : RichTextBox
     private int _renderedErrorLength;
     private bool _updatingDocument;
     private bool _restoringHistory;
+
+    private static Brush CreateFrozenBrush(byte red, byte green, byte blue) =>
+        CreateFrozenBrush(255, red, green, blue);
+
+    private static Brush CreateFrozenBrush(
+        byte alpha,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(alpha, red, green, blue));
+        brush.Freeze();
+        return brush;
+    }
 
     public CodeEditorControl()
     {
