@@ -879,7 +879,9 @@ public static class ProjectLanguage
                 new ScriptState());
             foreach (var output in node.Outputs)
             {
-                _ = NovelScript.Evaluate(output.Condition, new ScriptState());
+                _ = VisualConditionCompiler.Evaluate(
+                    output.Condition,
+                    new ScriptState());
                 VisualScriptCompiler.Execute(
                     output.Script,
                     output.ScriptBlocks,

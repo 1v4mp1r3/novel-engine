@@ -94,6 +94,12 @@ public static partial class VisualConditionCompiler
         _ = NovelScript.Evaluate(condition, new ScriptState());
     }
 
+    public static bool Evaluate(string condition, ScriptState state) =>
+        Evaluate(Parse(condition), state);
+
+    public static bool Evaluate(VisualConditionExpression expression, ScriptState state) =>
+        NovelScript.Evaluate(Compile(expression), state);
+
     private static string RequiredVariableName(VisualConditionExpression expression)
     {
         var name = expression.VariableName.Trim();

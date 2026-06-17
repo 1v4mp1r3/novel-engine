@@ -739,6 +739,14 @@ static void VisualConditionsParseAndCompile()
     Assert(
         VisualConditionCompiler.Compile(expression) == "route == \"good\"",
         "Structured condition did not compile.");
+    var state = new ScriptState();
+    state.Variables["route"] = "good";
+    Assert(
+        VisualConditionCompiler.Evaluate(expression, state),
+        "Structured condition did not evaluate.");
+    Assert(
+        VisualConditionCompiler.Evaluate("route == \"good\"", state),
+        "String condition did not evaluate through visual condition compiler.");
     AssertThrows<InvalidDataException>(
         () => VisualConditionCompiler.Parse("route && score"),
         "Unsupported condition syntax was accepted.");

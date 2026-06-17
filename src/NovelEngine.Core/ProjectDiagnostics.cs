@@ -95,7 +95,9 @@ public static class ProjectDiagnostics
                     TryAddScriptError(
                         diagnostics,
                         $"Нода «{DisplayNode(node)}», условие «{output.Label}»",
-                        () => NovelScript.Evaluate(output.Condition, new ScriptState()));
+                        () => VisualConditionCompiler.Evaluate(
+                            output.Condition,
+                            new ScriptState()));
                 }
                 if (!string.IsNullOrWhiteSpace(output.Script))
                 {
