@@ -1273,6 +1273,16 @@ static void AssetFoldersMoveFiles()
             () => ProjectAssets.DeleteFolder(project, projectPath, "unused"),
             "Deleting a folder with nested folders should fail.");
 
+        var looseFile = Path.Combine(unusedChildDirectory, "loose.txt");
+        File.WriteAllText(looseFile, "not imported yet");
+        AssertThrows<InvalidOperationException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, "unused/child"),
+            "Deleting a physical folder with untracked files should fail.");
+        Assert(
+            project.AssetFolders.Contains("unused/child"),
+            "Folder was removed from the model after a failed physical delete.");
+        File.Delete(looseFile);
+
         ProjectAssets.DeleteFolder(project, projectPath, "unused/child");
         ProjectAssets.DeleteFolder(project, projectPath, "unused");
         Assert(

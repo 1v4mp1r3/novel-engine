@@ -254,14 +254,23 @@ public static class ProjectAssets
             throw new InvalidOperationException(
                 "Сначала удалите вложенные папки.");
         }
-        project.AssetFolders.RemoveAll(
-            candidate => candidate.Equals(folder, StringComparison.OrdinalIgnoreCase));
+        var directories = ManagedFolderDirectories(projectPath, folder)
+            .Where(Directory.Exists)
+            .ToList();
         foreach (var directory in ManagedFolderDirectories(projectPath, folder))
         {
-            if (Directory.Exists(directory))
+            if (Directory.Exists(directory)
+                && Directory.EnumerateFileSystemEntries(directory).Any())
             {
-                Directory.Delete(directory, recursive: false);
+                throw new InvalidOperationException(
+                    "Сначала удалите файлы из этой папки.");
             }
+        }
+        project.AssetFolders.RemoveAll(
+            candidate => candidate.Equals(folder, StringComparison.OrdinalIgnoreCase));
+        foreach (var directory in directories)
+        {
+            Directory.Delete(directory, recursive: false);
         }
     }
 
