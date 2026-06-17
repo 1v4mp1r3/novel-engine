@@ -16,6 +16,28 @@ public sealed class GraphSurface : FrameworkElement
     private const double PortRadius = 7;
     private const double GridSize = 32;
 
+    private static readonly Typeface NodeTypeface = new("Segoe UI");
+    private static readonly Brush SurfaceBrush = FrozenBrush(15, 22, 31);
+    private static readonly Brush GridBrush = FrozenBrush(26, 36, 49);
+    private static readonly Brush NodeBodyBrush = FrozenBrush(25, 35, 48);
+    private static readonly Brush StartHeaderBrush = FrozenBrush(68, 91, 126);
+    private static readonly Brush SceneHeaderBrush = FrozenBrush(47, 94, 89);
+    private static readonly Brush DialogueHeaderBrush = FrozenBrush(83, 65, 113);
+    private static readonly Brush FallbackHeaderBrush = FrozenBrush(45, 57, 73);
+    private static readonly Brush MutedTextBrush = FrozenBrush(113, 129, 150);
+    private static readonly Brush PreviewTextBrush = FrozenBrush(184, 198, 214);
+    private static readonly Brush OutputTextBrush = FrozenBrush(190, 203, 218);
+    private static readonly Brush PortActiveBrush = FrozenBrush(100, 218, 183);
+    private static readonly Brush PortInactiveBrush = FrozenBrush(113, 129, 150);
+    private static readonly Pen GridPen = FrozenPen(GridBrush, 1);
+    private static readonly Pen ConnectionPen = FrozenPen(PortActiveBrush, 2.4);
+    private static readonly Pen SelectedNodePen = FrozenPen(FrozenBrush(245, 190, 80), 2.2);
+    private static readonly Pen NodePen = FrozenPen(FrozenBrush(58, 75, 96), 1.2);
+    private static readonly Pen PortOutlinePen = FrozenPen(SurfaceBrush, 2);
+    private static readonly Pen ConnectionHitPen = FrozenPen(Brushes.Transparent, 12);
+    private static readonly Pen DragConnectionPen =
+        FrozenPen(FrozenBrush(245, 190, 80), 2.4, DashStyles.Dash);
+
     private readonly List<ConnectionVisual> _connections = [];
     private Vector _viewOffset = new(80, 80);
     private string? _dragNodeId;
@@ -156,7 +178,7 @@ public sealed class GraphSurface : FrameworkElement
             CenterGraph();
         }
         drawingContext.DrawRectangle(
-            new SolidColorBrush(Color.FromRgb(15, 22, 31)),
+            SurfaceBrush,
             null,
             new Rect(RenderSize));
         DrawGrid(drawingContext);
@@ -177,8 +199,7 @@ public sealed class GraphSurface : FrameworkElement
                     drawingContext,
                     source.Value.Center,
                     _connectionDrag.Cursor,
-                    Color.FromRgb(245, 190, 80),
-                    dashed: true);
+                    DragConnectionPen);
             }
         }
     }
@@ -720,16 +741,15 @@ public sealed class GraphSurface : FrameworkElement
 
     private void DrawGrid(DrawingContext drawingContext)
     {
-        var pen = new Pen(new SolidColorBrush(Color.FromRgb(26, 36, 49)), 1);
         var startX = _viewOffset.X % GridSize;
         var startY = _viewOffset.Y % GridSize;
         for (var x = startX; x < ActualWidth; x += GridSize)
         {
-            drawingContext.DrawLine(pen, new Point(x, 0), new Point(x, ActualHeight));
+            drawingContext.DrawLine(GridPen, new Point(x, 0), new Point(x, ActualHeight));
         }
         for (var y = startY; y < ActualHeight; y += GridSize)
         {
-            drawingContext.DrawLine(pen, new Point(0, y), new Point(ActualWidth, y));
+            drawingContext.DrawLine(GridPen, new Point(0, y), new Point(ActualWidth, y));
         }
     }
 
@@ -749,10 +769,7 @@ public sealed class GraphSurface : FrameworkElement
 
                 var source = GetOutputPort(node, output, outputIndex);
                 var geometry = CreateCurveGeometry(source.Center, GetInputPort(target).Center);
-                drawingContext.DrawGeometry(
-                    null,
-                    new Pen(new SolidColorBrush(Color.FromRgb(100, 218, 183)), 2.4),
-                    geometry);
+                drawingContext.DrawGeometry(null, ConnectionPen, geometry);
                 _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
             }
         }
@@ -762,15 +779,8 @@ public sealed class GraphSurface : FrameworkElement
         DrawingContext drawingContext,
         Point start,
         Point end,
-        Color color,
-        bool dashed)
+        Pen pen)
     {
-        var pen = new Pen(new SolidColorBrush(color), 2.4)
-        {
-            DashStyle = dashed ? DashStyles.Dash : DashStyles.Solid,
-            StartLineCap = PenLineCap.Round,
-            EndLineCap = PenLineCap.Round,
-        };
         drawingContext.DrawGeometry(null, pen, CreateCurveGeometry(start, end));
     }
 
@@ -796,21 +806,16 @@ public sealed class GraphSurface : FrameworkElement
     {
         var rectangle = GetNodeRectangle(node);
         var selected = node.Id == SelectedNodeId;
-        var headerColor = node.Kind switch
+        var headerBrush = node.Kind switch
         {
-            NodeKind.Start => Color.FromRgb(68, 91, 126),
-            NodeKind.Scene => Color.FromRgb(47, 94, 89),
-            NodeKind.Dialogue => Color.FromRgb(83, 65, 113),
-            _ => Color.FromRgb(45, 57, 73),
+            NodeKind.Start => StartHeaderBrush,
+            NodeKind.Scene => SceneHeaderBrush,
+            NodeKind.Dialogue => DialogueHeaderBrush,
+            _ => FallbackHeaderBrush,
         };
         drawingContext.DrawRoundedRectangle(
-            new SolidColorBrush(Color.FromRgb(25, 35, 48)),
-            new Pen(
-                new SolidColorBrush(
-                    selected
-                        ? Color.FromRgb(245, 190, 80)
-                        : Color.FromRgb(58, 75, 96)),
-                selected ? 2.2 : 1.2),
+            NodeBodyBrush,
+            selected ? SelectedNodePen : NodePen,
             rectangle,
             8,
             8);
@@ -818,7 +823,7 @@ public sealed class GraphSurface : FrameworkElement
             new RectangleGeometry(
                 new Rect(rectangle.X, rectangle.Y, rectangle.Width, HeaderHeight)));
         drawingContext.DrawRoundedRectangle(
-            new SolidColorBrush(headerColor),
+            headerBrush,
             null,
             new Rect(rectangle.X, rectangle.Y, rectangle.Width, HeaderHeight + 8),
             8,
@@ -838,7 +843,7 @@ public sealed class GraphSurface : FrameworkElement
             KindName(node.Kind).ToUpperInvariant(),
             10,
             FontWeights.SemiBold,
-            new SolidColorBrush(Color.FromRgb(113, 129, 150)),
+            MutedTextBrush,
             new Point(rectangle.X + 16, rectangle.Y + HeaderHeight + 10),
             rectangle.Width - 32);
 
@@ -854,13 +859,13 @@ public sealed class GraphSurface : FrameworkElement
             preview,
             12,
             FontWeights.Normal,
-            new SolidColorBrush(Color.FromRgb(184, 198, 214)),
+            PreviewTextBrush,
             new Point(rectangle.X + 16, rectangle.Y + HeaderHeight + 29),
             rectangle.Width - 32);
 
         if (node.Kind != NodeKind.Start)
         {
-            DrawPort(drawingContext, GetInputPort(node).Center, Color.FromRgb(100, 218, 183));
+            DrawPort(drawingContext, GetInputPort(node).Center, PortActiveBrush);
         }
 
         for (var index = 0; index < node.Outputs.Count; index++)
@@ -872,16 +877,14 @@ public sealed class GraphSurface : FrameworkElement
                 output.Label,
                 12,
                 FontWeights.Normal,
-                new SolidColorBrush(Color.FromRgb(190, 203, 218)),
+                OutputTextBrush,
                 new Point(rectangle.X + 16, port.Center.Y - 9),
                 rectangle.Width - 38,
                 TextAlignment.Right);
             DrawPort(
                 drawingContext,
                 port.Center,
-                output.TargetNodeId is null
-                    ? Color.FromRgb(113, 129, 150)
-                    : Color.FromRgb(100, 218, 183));
+                output.TargetNodeId is null ? PortInactiveBrush : PortActiveBrush);
         }
     }
 
@@ -899,7 +902,7 @@ public sealed class GraphSurface : FrameworkElement
             text,
             CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
-            new Typeface("Segoe UI"),
+            NodeTypeface,
             size,
             brush,
             VisualTreeHelper.GetDpi(this).PixelsPerDip)
@@ -913,11 +916,11 @@ public sealed class GraphSurface : FrameworkElement
         drawingContext.DrawText(formatted, origin);
     }
 
-    private static void DrawPort(DrawingContext drawingContext, Point center, Color color)
+    private static void DrawPort(DrawingContext drawingContext, Point center, Brush brush)
     {
         drawingContext.DrawEllipse(
-            new SolidColorBrush(color),
-            new Pen(new SolidColorBrush(Color.FromRgb(15, 22, 31)), 2),
+            brush,
+            PortOutlinePen,
             center,
             PortRadius,
             PortRadius);
@@ -925,11 +928,29 @@ public sealed class GraphSurface : FrameworkElement
 
     private ConnectionVisual? HitConnection(Point point)
     {
-        var hitPen = new Pen(Brushes.Transparent, 12);
         return _connections
             .AsEnumerable()
             .Reverse()
-            .FirstOrDefault(connection => connection.Geometry.StrokeContains(hitPen, point));
+            .FirstOrDefault(connection => connection.Geometry.StrokeContains(ConnectionHitPen, point));
+    }
+
+    private static SolidColorBrush FrozenBrush(byte red, byte green, byte blue)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+        brush.Freeze();
+        return brush;
+    }
+
+    private static Pen FrozenPen(Brush brush, double thickness, DashStyle? dashStyle = null)
+    {
+        var pen = new Pen(brush, thickness)
+        {
+            DashStyle = dashStyle ?? DashStyles.Solid,
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+        };
+        pen.Freeze();
+        return pen;
     }
 
     private NovelNode? HitNode(Point point) =>
