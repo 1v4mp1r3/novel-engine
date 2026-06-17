@@ -136,6 +136,8 @@ currently installed on this workstation.
 - Choice conditions can combine checks with `&&` and `||` from the visual
   builder or hand-written DSL; runtime and diagnostics use the same compiler
   path for both.
+- In grouped choice conditions, double-click or press `Enter` to edit a child,
+  `Delete` to remove it, and `Alt+Up/Down` to reorder checks.
 - Choice editors include a one-click condition reset for returning a branch to
   "always available" without leaving stale structured condition data behind.
 - Visual-block dialogs can import simple text scripts (`set`, `add`,

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
@@ -83,6 +84,8 @@ public sealed class ConditionBuilderWindow : Window
         _variableBox.KeyUp += (_, _) => UpdatePreview();
         _valueEditor.LiteralChanged += (_, _) => UpdatePreview();
         _childrenList.SelectionChanged += (_, _) => UpdateChildButtons();
+        _childrenList.MouseDoubleClick += (_, _) => EditChild();
+        _childrenList.PreviewKeyDown += (_, e) => HandleChildrenListKey(e);
 
         Content = CreateContent();
         if (expression is null)
@@ -356,6 +359,39 @@ public sealed class ConditionBuilderWindow : Window
         (_groupChildren[index + 1], _groupChildren[index]) =
             (_groupChildren[index], _groupChildren[index + 1]);
         RefreshChildrenList(index + 1);
+    }
+
+    private void HandleChildrenListKey(KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            EditChild();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            DeleteChild();
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.Alt)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Up)
+        {
+            MoveChildUp();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            MoveChildDown();
+            e.Handled = true;
+        }
     }
 
     private void RefreshChildrenList(int selectedIndex = -1)
