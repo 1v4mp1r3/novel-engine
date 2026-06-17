@@ -106,7 +106,7 @@ public sealed class VisualScriptBlocksWindow : Window
         return panel;
     }
 
-    private static StackPanel CreateButtonPanel() =>
+    private static WrapPanel CreateButtonPanel() =>
         new()
         {
             Orientation = Orientation.Horizontal,

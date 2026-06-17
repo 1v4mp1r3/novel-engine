@@ -83,6 +83,12 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        if (e.Args.Length == 1 && e.Args[0] == "--visual-script-blocks-smoke")
+        {
+            ScreenshotRenderer.SmokeVisualScriptBlocks();
+            Shutdown();
+            return;
+        }
 
         var startupProjectPath = GetStartupProjectPath(e.Args);
         if (startupProjectPath is null

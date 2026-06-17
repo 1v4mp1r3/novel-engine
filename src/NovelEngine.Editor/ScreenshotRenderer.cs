@@ -284,6 +284,49 @@ internal static class ScreenshotRenderer
         window.Close();
     }
 
+    public static void SmokeVisualScriptBlocks()
+    {
+        var window = new VisualScriptBlocksWindow(
+            [
+                new VisualScriptBlock
+                {
+                    Id = "smoke-toggle",
+                    Kind = VisualScriptBlockKind.ToggleVariable,
+                    VariableName = "met_hero",
+                },
+                new VisualScriptBlock
+                {
+                    Id = "smoke-set",
+                    Kind = VisualScriptBlockKind.SetVariable,
+                    VariableName = "route",
+                    Value = "\"good\"",
+                },
+            ],
+            "Visual script blocks smoke",
+            ["met_hero", "route"],
+            "toggle imported_flag")
+        {
+            Width = 560,
+            Height = 520,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        window.Dispatcher.Invoke(
+            () => { },
+            DispatcherPriority.ApplicationIdle);
+        var script = VisualScriptCompiler.Compile(window.Blocks);
+        if (!script.Contains("toggle met_hero", StringComparison.Ordinal)
+            || !script.Contains("set route = \"good\"", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Visual script blocks smoke compiled unexpected script: {script}");
+        }
+        window.Close();
+    }
+
     private static void AssertDarkMenuRender(FrameworkElement element, string name)
     {
         element.UpdateLayout();
