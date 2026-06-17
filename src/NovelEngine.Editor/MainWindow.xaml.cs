@@ -2369,7 +2369,8 @@ public partial class MainWindow : Window
         }
         catch (Exception error) when (
             error is IOException
-            or InvalidDataException)
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             MessageBox.Show(
                 this,
@@ -2408,6 +2409,8 @@ public partial class MainWindow : Window
         }
         catch (Exception error) when (
             error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException
             or InvalidOperationException)
         {
             MessageBox.Show(
