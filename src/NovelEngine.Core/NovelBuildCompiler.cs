@@ -179,6 +179,13 @@ public static class NovelBuildCompiler
                 usedTargets);
         }
 
+        CompileMainMenuAssets(
+            project.MainMenu,
+            projectDirectory,
+            outputDirectory,
+            copiedPaths,
+            usedTargets);
+
         foreach (var character in project.Characters)
         {
             CompileCharacterAssets(
@@ -248,6 +255,30 @@ public static class NovelBuildCompiler
             }
         }
         return copiedPaths.Count;
+    }
+
+    private static void CompileMainMenuAssets(
+        MainMenuDesign mainMenu,
+        string projectDirectory,
+        string outputDirectory,
+        IDictionary<string, string> copiedPaths,
+        ISet<string> usedTargets)
+    {
+        mainMenu.Background = CompileDirectValue(
+            mainMenu.Background,
+            projectDirectory,
+            outputDirectory,
+            copiedPaths,
+            usedTargets) ?? string.Empty;
+        foreach (var element in mainMenu.Elements)
+        {
+            element.Image = CompileDirectValue(
+                element.Image,
+                projectDirectory,
+                outputDirectory,
+                copiedPaths,
+                usedTargets) ?? string.Empty;
+        }
     }
 
     private static void CompileCharacterAssets(

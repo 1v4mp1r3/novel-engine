@@ -1651,6 +1651,8 @@ static void BuildCompilerEmitsPackage()
         File.WriteAllBytes(sourceVoice, [73, 68, 51, 3]);
         var sourceVoiceAlt = Path.Combine(directory, "voice-alt.wav");
         File.WriteAllBytes(sourceVoiceAlt, [82, 73, 70, 70, 40, 0, 0, 0]);
+        var sourceLogo = Path.Combine(directory, "logo.png");
+        File.WriteAllBytes(sourceLogo, [137, 80, 78, 71, 13]);
         var projectPath = Path.Combine(directory, "story.novel.json");
         var project = NovelProject.CreateDefault();
         var asset = ProjectAssets.Import(
@@ -1686,8 +1688,9 @@ static void BuildCompilerEmitsPackage()
             new MainMenuElement
             {
                 Id = "custom-title",
-                Kind = MainMenuElementKind.Label,
+                Kind = MainMenuElementKind.ImageLabel,
                 Text = "Custom title",
+                Image = sourceLogo,
                 X = 120,
                 Y = 80,
                 CustomStyleCode = "align left; italic true",
@@ -1814,6 +1817,18 @@ static void BuildCompilerEmitsPackage()
                 && builtMenuElement.Text == "Custom title"
                 && builtMenuElement.CustomStyleCode == "align left; italic true",
             "Runtime project lost custom main menu elements.");
+        Assert(
+            !Path.IsPathRooted(builtMenuElement.Image)
+                && builtMenuElement.Image.StartsWith(
+                    "assets/external/",
+                    StringComparison.Ordinal),
+            "Compiled main menu image did not become a build-relative path.");
+        Assert(
+            File.Exists(
+                Path.Combine(
+                    result.OutputDirectory,
+                    builtMenuElement.Image.Replace('/', Path.DirectorySeparatorChar))),
+            "Compiled main menu image was not copied.");
 
         var foreignDirectory = Path.Combine(directory, "foreign-output");
         Directory.CreateDirectory(foreignDirectory);
