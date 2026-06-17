@@ -52,10 +52,12 @@ New projects create the default managed asset folders:
 ## Build and test
 
 ```powershell
-dotnet build NovelEngine.sln
-dotnet run --project tests/NovelEngine.Core.Tests/NovelEngine.Core.Tests.csproj
-dotnet run --project tests/NovelEngine.Editor.Tests/NovelEngine.Editor.Tests.csproj
+powershell -ExecutionPolicy Bypass -File tools/test.ps1
 ```
+
+The test script runs the solution build, core tests, and editor-level tests
+sequentially. Keep these commands sequential because WPF generated files share
+`obj` directories during build.
 
 The C++ runtime requires a separate C++20 compiler and CMake. They are not
 currently installed on this workstation.
