@@ -254,9 +254,11 @@ public static class ProjectDiagnostics
         List<ProjectDiagnostic> diagnostics,
         string? projectPath)
     {
+        var assetReferenceCounts = project.CountAssetReferencesById();
         foreach (var asset in project.Assets)
         {
-            if (project.CountAssetReferences(asset.Id) == 0)
+            if (!assetReferenceCounts.TryGetValue(asset.Id, out var referenceCount)
+                || referenceCount == 0)
             {
                 diagnostics.Add(
                     new ProjectDiagnostic(
