@@ -60,6 +60,11 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, BitmapImage?> _assetPreviewImageCache =
         new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
+    private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
+        _nodeAssetFolderOptionsCache = [];
+    private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
+        _nodeAssetChoicesCache = [];
+    private AssetPickerCacheStamp? _assetPickerCacheStamp;
 
     public MainWindow()
         : this(null)
@@ -1182,6 +1187,7 @@ public partial class MainWindow : Window
         _assetSizeCache.Clear();
         _assetPreviewImageCache.Clear();
         _assetUsageCountCache = null;
+        ClearNodeAssetPickerCaches();
     }
 
     private void ClearProjectAnalysisCaches()
@@ -1200,6 +1206,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        EnsureAssetPickerCachesCurrent();
         var backgroundEnabled = node.Kind == NodeKind.Start
             || InheritBackgroundCheck.IsChecked != true;
         var musicEnabled = node.Kind == NodeKind.Start
@@ -1228,7 +1235,8 @@ public partial class MainWindow : Window
         bool enabled,
         IReadOnlyList<string> preferredFolders)
     {
-        var folderOptions = CreateFolderOptions(kind);
+        EnsureAssetPickerCachesCurrent();
+        var folderOptions = GetCachedFolderOptions(kind);
         folderBox.ItemsSource = folderOptions;
         var currentAsset = ResolveAssetChoice(currentReference);
         var selectedFolder =
@@ -1243,8 +1251,22 @@ public partial class MainWindow : Window
         assetBox.IsEnabled = enabled;
     }
 
-    private List<NodeAssetFolderOption> CreateFolderOptions(AssetKind kind)
+    private List<NodeAssetFolderOption> GetCachedFolderOptions(AssetKind kind)
     {
+        if (_nodeAssetFolderOptionsCache.TryGetValue(kind, out var cached))
+        {
+            return cached;
+        }
+
+        var folderCounts = _project.Assets
+            .Where(asset => asset.Kind == kind)
+            .GroupBy(
+                asset => asset.Folder,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.OrdinalIgnoreCase);
         var folders = _project.AssetFolders
             .Concat(_project.Assets.Select(asset => asset.Folder))
             .Select(ProjectAssets.NormalizeFolder)
@@ -1252,15 +1274,16 @@ public partial class MainWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(folder => folder, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
-        return
-        [
-            new NodeAssetFolderOption(string.Empty, "Все папки"),
-            .. folders.Select(folder => new NodeAssetFolderOption(
+        var options = new List<NodeAssetFolderOption>(folders.Count + 1)
+        {
+            new(string.Empty, "Все папки"),
+        };
+        options.AddRange(
+            folders.Select(folder => new NodeAssetFolderOption(
                 folder,
-                $"{folder} ({_project.Assets.Count(asset =>
-                    asset.Kind == kind
-                    && asset.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))})")),
-        ];
+                $"{folder} ({folderCounts.GetValueOrDefault(folder)})")));
+        _nodeAssetFolderOptionsCache[kind] = options;
+        return options;
     }
 
     private static string? PreferredFolder(
@@ -1300,18 +1323,9 @@ public partial class MainWindow : Window
         _refreshingAssetPickers = true;
         try
         {
+            EnsureAssetPickerCachesCurrent();
             var normalizedFolder = ProjectAssets.NormalizeFolder(folder);
-            var choices = _project.Assets
-                .Where(asset => asset.Kind == kind)
-                .Where(asset =>
-                    normalizedFolder.Length == 0
-                    || asset.Folder.Equals(normalizedFolder, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
-                .Select(asset => new NodeAssetChoice(
-                    asset,
-                    $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
-                .Prepend(new NodeAssetChoice(null, "Не выбрано"))
-                .ToList();
+            var choices = GetCachedAssetChoices(kind, normalizedFolder);
             assetBox.ItemsSource = choices;
             var currentAsset = ResolveAssetChoice(currentReference);
             assetBox.SelectedItem = currentAsset is null
@@ -1324,6 +1338,71 @@ public partial class MainWindow : Window
         {
             _refreshingAssetPickers = false;
         }
+    }
+
+    private List<NodeAssetChoice> GetCachedAssetChoices(
+        AssetKind kind,
+        string normalizedFolder)
+    {
+        var key = new NodeAssetChoiceCacheKey(kind, normalizedFolder);
+        if (_nodeAssetChoicesCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var choices = _project.Assets
+            .Where(asset => asset.Kind == kind)
+            .Where(asset =>
+                normalizedFolder.Length == 0
+                || asset.Folder.Equals(normalizedFolder, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+            .Select(asset => new NodeAssetChoice(
+                asset,
+                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
+            .Prepend(new NodeAssetChoice(null, "Не выбрано"))
+            .ToList();
+        _nodeAssetChoicesCache[key] = choices;
+        return choices;
+    }
+
+    private void EnsureAssetPickerCachesCurrent()
+    {
+        var stamp = CreateAssetPickerCacheStamp();
+        if (_assetPickerCacheStamp == stamp)
+        {
+            return;
+        }
+
+        _nodeAssetFolderOptionsCache.Clear();
+        _nodeAssetChoicesCache.Clear();
+        _assetPickerCacheStamp = stamp;
+    }
+
+    private void ClearNodeAssetPickerCaches()
+    {
+        _nodeAssetFolderOptionsCache.Clear();
+        _nodeAssetChoicesCache.Clear();
+        _assetPickerCacheStamp = null;
+    }
+
+    private AssetPickerCacheStamp CreateAssetPickerCacheStamp()
+    {
+        var hash = new HashCode();
+        foreach (var folder in _project.AssetFolders)
+        {
+            hash.Add(ProjectAssets.NormalizeFolder(folder), StringComparer.OrdinalIgnoreCase);
+        }
+        foreach (var asset in _project.Assets)
+        {
+            hash.Add(asset.Id, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Path, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Folder, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Kind);
+        }
+        return new AssetPickerCacheStamp(
+            _project.Assets.Count,
+            _project.AssetFolders.Count,
+            hash.ToHashCode());
     }
 
     private bool SyncFilesFromDisk(bool refreshCode = true)
@@ -5000,6 +5079,15 @@ public partial class MainWindow : Window
     private sealed record NodeAssetFolderOption(string Folder, string Name);
 
     private sealed record NodeAssetChoice(NovelAsset? Asset, string Name);
+
+    private readonly record struct NodeAssetChoiceCacheKey(
+        AssetKind Kind,
+        string Folder);
+
+    private readonly record struct AssetPickerCacheStamp(
+        int AssetCount,
+        int FolderCount,
+        int Hash);
 
     private sealed record ProjectHistoryEntry(string Snapshot, string? SelectedNodeId);
 
