@@ -2,6 +2,8 @@ using System.IO;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Media;
 using Microsoft.Win32;
 using NovelEngine.Core;
@@ -187,7 +189,7 @@ public sealed class CharacterEditorWindow : Window
         var list = new ListBox
         {
             ItemsSource = values,
-            DisplayMemberPath = nameof(AssetChoice.Name),
+            ItemTemplate = CreateCheckedAssetTemplate(),
             SelectionMode = SelectionMode.Multiple,
             Height = 92,
             Background = (System.Windows.Media.Brush)Application.Current.Resources["FieldBrush"],
@@ -202,6 +204,28 @@ public sealed class CharacterEditorWindow : Window
             list.SelectedItems.Add(item);
         }
         return list;
+    }
+
+    private static DataTemplate CreateCheckedAssetTemplate()
+    {
+        var checkbox = new FrameworkElementFactory(typeof(CheckBox));
+        checkbox.SetValue(UIElement.IsHitTestVisibleProperty, false);
+        checkbox.SetValue(Control.ForegroundProperty, Application.Current.Resources["TextBrush"]);
+        checkbox.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 3, 2, 3));
+        checkbox.SetBinding(
+            ContentControl.ContentProperty,
+            new Binding(nameof(AssetChoice.Name)));
+        checkbox.SetBinding(
+            ToggleButton.IsCheckedProperty,
+            new Binding(nameof(ListBoxItem.IsSelected))
+            {
+                Mode = BindingMode.TwoWay,
+                RelativeSource = new RelativeSource(
+                    RelativeSourceMode.FindAncestor,
+                    typeof(ListBoxItem),
+                    1),
+            });
+        return new DataTemplate { VisualTree = checkbox };
     }
 
     private static ComboBox CreateAssetBox(
