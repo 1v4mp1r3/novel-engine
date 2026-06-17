@@ -89,6 +89,7 @@ public sealed class VisualScriptBlocksWindow : Window
         panel.Children.Add(CreateButton("+ set", () => AddBlock(VisualScriptBlockKind.SetVariable)));
         panel.Children.Add(CreateButton("+ add", () => AddBlock(VisualScriptBlockKind.AddVariable)));
         panel.Children.Add(CreateButton("+ unset", () => AddBlock(VisualScriptBlockKind.UnsetVariable)));
+        panel.Children.Add(CreateButton("+ toggle", () => AddBlock(VisualScriptBlockKind.ToggleVariable)));
         panel.Children.Add(CreateButton("+ comment", () => AddBlock(VisualScriptBlockKind.Comment)));
         panel.Children.Add(CreateButton("Импорт из скрипта", ImportFromScript));
         return panel;
@@ -131,6 +132,7 @@ public sealed class VisualScriptBlocksWindow : Window
             Kind = kind,
             VariableName = kind == VisualScriptBlockKind.Comment ? string.Empty : "flag",
             Value = kind == VisualScriptBlockKind.UnsetVariable
+                || kind == VisualScriptBlockKind.ToggleVariable
                 || kind == VisualScriptBlockKind.Comment
                     ? string.Empty
                     : "true",
@@ -480,6 +482,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         new(VisualScriptBlockKind.SetVariable, "Установить переменную"),
         new(VisualScriptBlockKind.AddVariable, "Прибавить к переменной"),
         new(VisualScriptBlockKind.UnsetVariable, "Удалить переменную"),
+        new(VisualScriptBlockKind.ToggleVariable, "Переключить флаг"),
         new(VisualScriptBlockKind.Comment, "Комментарий"),
     ];
 

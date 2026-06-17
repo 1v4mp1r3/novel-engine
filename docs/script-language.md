@@ -13,14 +13,18 @@ set player_name = "Макс"
 set score = 2
 add score 1
 unset temporary_flag
+toggle met_alice
 ```
 
 Variable names use Latin letters, digits, and `_`, and cannot start with a
 digit. Values may be strings, numbers, booleans, or `null`.
+`toggle name` flips a variable through the same truthiness rules used by
+conditions; a missing variable becomes `true`.
 The visual-block editor can import these simple commands from text scripts:
-comments, `set`, `add`, and `unset`. Unsupported commands stay text-only until
-the block system grows matching block types. After an import, the editor can
-clear the original text script so the same commands are not executed twice.
+comments, `set`, `add`, `unset`, and `toggle`. Unsupported commands stay
+text-only until the block system grows matching block types. After an import,
+the editor can clear the original text script so the same commands are not
+executed twice.
 
 ## Choice conditions
 

@@ -123,8 +123,8 @@ currently installed on this workstation.
   builder or hand-written DSL; runtime and diagnostics use the same compiler
   path for both.
 - Visual-block dialogs can import simple text scripts (`set`, `add`, `unset`,
-  comments) into editable blocks and optionally clear the original text to avoid
-  double execution.
+  `toggle`, comments) into editable blocks and optionally clear the original
+  text to avoid double execution.
 - Applying source from the `Код` tab preserves existing visual script blocks by
   matching node ids and choice outputs, and keeps structured choice conditions
   when their generated `when` text still matches.

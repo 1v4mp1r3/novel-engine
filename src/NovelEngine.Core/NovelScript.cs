@@ -63,6 +63,14 @@ public static partial class NovelScript
                 continue;
             }
 
+            var toggleMatch = ToggleCommand().Match(line);
+            if (toggleMatch.Success)
+            {
+                var name = toggleMatch.Groups["name"].Value;
+                state.Variables[name] = !IsTruthy(GetVariable(name, state));
+                continue;
+            }
+
             throw new InvalidDataException($"Неизвестная команда языка: {line}");
         }
     }
@@ -192,6 +200,11 @@ public static partial class NovelScript
         "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex UnsetCommand();
+
+    [GeneratedRegex(
+        "^toggle\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex ToggleCommand();
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
     private static partial Regex Identifier();

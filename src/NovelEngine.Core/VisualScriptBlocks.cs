@@ -8,6 +8,7 @@ public enum VisualScriptBlockKind
     SetVariable,
     AddVariable,
     UnsetVariable,
+    ToggleVariable,
     Comment,
 }
 
@@ -97,6 +98,19 @@ public static partial class VisualScriptCompiler
                 continue;
             }
 
+            var toggleMatch = ToggleCommand().Match(line);
+            if (toggleMatch.Success)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.ToggleVariable,
+                        VariableName = toggleMatch.Groups["name"].Value,
+                    });
+                continue;
+            }
+
             throw new InvalidDataException(
                 $"Команда не поддерживается visual blocks: {line}");
         }
@@ -150,6 +164,8 @@ public static partial class VisualScriptCompiler
                 $"add {RequiredVariableName(block)} {RequiredValue(block)}",
             VisualScriptBlockKind.UnsetVariable =>
                 $"unset {RequiredVariableName(block)}",
+            VisualScriptBlockKind.ToggleVariable =>
+                $"toggle {RequiredVariableName(block)}",
             VisualScriptBlockKind.Comment =>
                 block.Text.Trim().Length == 0
                     ? string.Empty
@@ -199,6 +215,11 @@ public static partial class VisualScriptCompiler
         "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex UnsetCommand();
+
+    [GeneratedRegex(
+        "^toggle\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex ToggleCommand();
 }
 
 public static class VisualScriptBlockPreserver

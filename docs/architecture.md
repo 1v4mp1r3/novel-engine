@@ -28,10 +28,10 @@ The graph and code editor are two representations of the same project model.
 
 Visual script blocks are stored in project JSON on nodes and outputs as
 `VisualScriptBlock` lists. They compile into the same small `NovelScript`
-commands used by hand-written scripts (`set`, `add`, `unset`) and are executed
-after the matching text script. This keeps a future Scratch-like block editor on
-top of the same runtime semantics instead of introducing a second scripting
-engine.
+commands used by hand-written scripts (`set`, `add`, `unset`, `toggle`) and are
+executed after the matching text script. This keeps a future Scratch-like block
+editor on top of the same runtime semantics instead of introducing a second
+scripting engine.
 
 Choice condition authoring uses the same approach: `VisualConditionExpression`
 parses and compiles the supported condition forms (`always`, variable truth,

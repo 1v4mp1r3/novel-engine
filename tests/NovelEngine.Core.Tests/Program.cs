@@ -16,6 +16,7 @@ var tests = new (string Name, Action Run)[]
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
+    ("novel script toggles variables", NovelScriptTogglesVariables),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks import simple scripts", VisualScriptBlocksImportSimpleScripts),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
@@ -567,6 +568,33 @@ static void RuntimeStateFlows()
         "Script variables did not flow through transitions.");
 }
 
+static void NovelScriptTogglesVariables()
+{
+    var state = new ScriptState();
+    NovelScript.Execute(
+        """
+        toggle met_hero
+        toggle locked
+        toggle locked
+        set route = "good"
+        toggle route
+        """,
+        state);
+
+    Assert(
+        state.Variables.TryGetValue("met_hero", out var metHero)
+            && metHero is true,
+        "Toggle did not create a true flag for a missing variable.");
+    Assert(
+        state.Variables.TryGetValue("locked", out var locked)
+            && locked is false,
+        "Toggle did not flip a true flag back to false.");
+    Assert(
+        state.Variables.TryGetValue("route", out var route)
+            && route is false,
+        "Toggle did not use truthiness for non-boolean values.");
+}
+
 static void VisualScriptBlocksRoundTripAndRun()
 {
     var project = NovelProject.CreateDefault();
@@ -617,18 +645,22 @@ static void VisualScriptBlocksImportSimpleScripts()
         # setup route
         set route = "good"
         add score 2
+        toggle met_hero
         unset temporary_flag
         """);
 
     var script = VisualScriptCompiler.Compile(blocks);
 
-    Assert(blocks.Count == 4, "Script import produced the wrong block count.");
+    Assert(blocks.Count == 5, "Script import produced the wrong block count.");
     Assert(
         script.Contains("set route = \"good\"", StringComparison.Ordinal),
         "Imported set command was not compiled back.");
     Assert(
         script.Contains("add score 2", StringComparison.Ordinal),
         "Imported add command was not compiled back.");
+    Assert(
+        script.Contains("toggle met_hero", StringComparison.Ordinal),
+        "Imported toggle command was not compiled back.");
     Assert(
         script.Contains("unset temporary_flag", StringComparison.Ordinal),
         "Imported unset command was not compiled back.");
@@ -720,7 +752,7 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
     var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
 
-    scene.Script = "set score = 1\nadd courage 2";
+    scene.Script = "set score = 1\nadd courage 2\ntoggle visited_intro";
     scene.ScriptBlocks.Add(
         new VisualScriptBlock
         {
@@ -750,6 +782,7 @@ static void ProjectScriptVariablesCollectAuthoredNames()
 
     Assert(variables.Contains("score"), "Script variable was not collected.");
     Assert(variables.Contains("courage"), "Add variable was not collected.");
+    Assert(variables.Contains("visited_intro"), "Toggle variable was not collected.");
     Assert(variables.Contains("temporary_flag"), "Type script variable was not collected.");
     Assert(variables.Contains("route"), "Node visual block variable was not collected.");
     Assert(variables.Contains("met_hero"), "Condition variable was not collected.");

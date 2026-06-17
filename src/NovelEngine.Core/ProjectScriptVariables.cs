@@ -133,7 +133,7 @@ public static partial class ProjectScriptVariables
     }
 
     [GeneratedRegex(
-        "^(?:set|add|unset)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\b",
+        "^(?:set|add|unset|toggle)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex ScriptCommandVariable();
 
