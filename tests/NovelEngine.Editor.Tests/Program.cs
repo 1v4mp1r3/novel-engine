@@ -9,6 +9,8 @@ var tests = new (string Name, Action Run)[]
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
+    ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
+    ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
 };
 
 var failed = 0;
@@ -140,6 +142,86 @@ static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
     finally
     {
         Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsDeduplicateAndOrderEntries()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var firstProject = Path.Combine(directory, "first.novel.json");
+        var secondProject = Path.Combine(directory, "second.novel.json");
+        File.WriteAllText(firstProject, "{}");
+        File.WriteAllText(secondProject, "{}");
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            RecentProjectsStore.Remember(firstProject);
+            RecentProjectsStore.Remember(secondProject);
+            RecentProjectsStore.Remember(firstProject.ToUpperInvariant());
+
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 2, "Recent projects did not deduplicate paths.");
+            Assert(
+                entries[0].Path.Equals(firstProject, StringComparison.OrdinalIgnoreCase),
+                "Recent projects did not move the reopened project to the top.");
+            Assert(
+                entries[0].DisplayName.Equals(
+                    "first",
+                    StringComparison.OrdinalIgnoreCase),
+                "Recent project display name was not derived from the project file.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsIgnoreMissingPaths()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var existingProject = Path.Combine(directory, "existing.novel.json");
+        var missingProject = Path.Combine(directory, "missing.novel.json");
+        File.WriteAllText(existingProject, "{}");
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            RecentProjectsStore.Remember(existingProject);
+            RecentProjectsStore.Remember(missingProject);
+
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 1, "Recent projects kept a missing path.");
+            Assert(
+                entries[0].Path == existingProject,
+                "Recent projects lost the existing path while pruning missing entries.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void WithRecentProjectsStore(string storePath, Action action)
+{
+    const string variable = "NOVEL_ENGINE_RECENT_PROJECTS_PATH";
+    var previous = Environment.GetEnvironmentVariable(variable);
+    Environment.SetEnvironmentVariable(variable, storePath);
+    try
+    {
+        action();
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable(variable, previous);
     }
 }
 

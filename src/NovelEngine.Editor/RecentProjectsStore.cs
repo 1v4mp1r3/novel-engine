@@ -100,6 +100,13 @@ internal static class RecentProjectsStore
 
     private static string GetStorePath()
     {
+        var overridePath = Environment.GetEnvironmentVariable(
+            "NOVEL_ENGINE_RECENT_PROJECTS_PATH");
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            return Path.GetFullPath(overridePath);
+        }
+
         var root = Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(root, "NovelEngine", "recent-projects.json");
