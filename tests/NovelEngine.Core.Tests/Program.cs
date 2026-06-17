@@ -1329,6 +1329,25 @@ static void ProjectAssetImportCopiesFiles()
                 asset,
                 ProjectAssets.Import(project, projectPath, target)),
             "Importing the registered file created a duplicate asset.");
+
+        var managedCharacterDirectory = Path.Combine(directory, "files", "characters");
+        Directory.CreateDirectory(managedCharacterDirectory);
+        var managedCharacterSource = Path.Combine(managedCharacterDirectory, "Alice.png");
+        File.WriteAllBytes(managedCharacterSource, [137, 80, 78, 71, 3]);
+        var managedCharacterAsset = ProjectAssets.Import(
+            project,
+            projectPath,
+            managedCharacterSource);
+
+        Assert(
+            managedCharacterAsset.Folder == "characters",
+            "Importing a file already in files/characters did not keep its folder.");
+        Assert(
+            managedCharacterAsset.Path == "files/characters/Alice.png",
+            "Importing a managed file changed its path.");
+        Assert(
+            Directory.GetFiles(Path.Combine(directory, "files", "backgrounds"), "Alice*.png").Length == 0,
+            "Importing a managed character file copied it into backgrounds.");
     }
     finally
     {

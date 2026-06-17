@@ -64,8 +64,11 @@ public static class ProjectAssets
 
         var projectDirectory = GetProjectDirectory(projectPath);
         var kind = AssetReference.GuessKind(source);
+        var managedFolder = folder is null
+            ? TryGetManagedFolder(projectPath, source)
+            : null;
         folder = NormalizeFolder(
-            folder ?? kind switch
+            folder ?? managedFolder ?? kind switch
             {
                 AssetKind.Image => "backgrounds",
                 AssetKind.Audio => "audio",
@@ -112,6 +115,26 @@ public static class ProjectAssets
         };
         project.Assets.Add(asset);
         return asset;
+    }
+
+    private static string? TryGetManagedFolder(string projectPath, string sourcePath)
+    {
+        var root = GetAssetsDirectory(projectPath);
+        var relative = Path.GetRelativePath(root, sourcePath);
+        if (relative == "."
+            || relative.StartsWith(
+                $"..{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal)
+            || relative.StartsWith(
+                $"..{Path.AltDirectorySeparatorChar}",
+                StringComparison.Ordinal)
+            || Path.IsPathRooted(relative))
+        {
+            return null;
+        }
+
+        return NormalizeFolder(
+            Path.GetDirectoryName(relative)?.Replace('\\', '/') ?? string.Empty);
     }
 
     public static string ResolvePath(string projectPath, NovelAsset asset)
