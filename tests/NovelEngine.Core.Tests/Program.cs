@@ -29,6 +29,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
     ("voice sound picker supports multiple blips", VoiceSoundPickerSupportsMultipleBlips),
+    ("voice playback cadence skips expected characters", VoicePlaybackCadenceSkipsExpectedCharacters),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
@@ -1049,6 +1050,28 @@ static void VoiceSoundPickerSupportsMultipleBlips()
     Assert(
         picked.Distinct(StringComparer.Ordinal).Count() > 1,
         "Voice sound picker did not vary multiple blips.");
+}
+
+static void VoicePlaybackCadenceSkipsExpectedCharacters()
+{
+    Assert(
+        VoicePlaybackCadence.ShouldPlay(1, 1),
+        "Voice cadence should play the first voiced character when frequency is one.");
+    Assert(
+        !VoicePlaybackCadence.ShouldPlay(1, 3),
+        "Voice cadence played too early for every third character.");
+    Assert(
+        VoicePlaybackCadence.ShouldPlay(3, 3),
+        "Voice cadence did not play the third voiced character.");
+    Assert(
+        !VoicePlaybackCadence.ShouldPlay(4, 3),
+        "Voice cadence played between expected beats.");
+    Assert(
+        VoicePlaybackCadence.ShouldPlay(1, 0),
+        "Voice cadence should clamp too-small frequencies to one.");
+    Assert(
+        !VoicePlaybackCadence.ShouldPlay(0, 1),
+        "Voice cadence should ignore zero voiced characters.");
 }
 
 static void ProjectLanguageRejectsCycles()

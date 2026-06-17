@@ -585,7 +585,9 @@ public partial class PreviewWindow : Window
                 if (!char.IsWhiteSpace(character) && voice is not null)
                 {
                     voicedCharacters++;
-                    if (voicedCharacters % voice.EveryNthCharacter == 0)
+                    if (VoicePlaybackCadence.ShouldPlay(
+                        voicedCharacters,
+                        voice.EveryNthCharacter))
                     {
                         PlayCharacterVoice(voice);
                     }
