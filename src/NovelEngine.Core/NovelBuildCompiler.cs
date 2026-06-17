@@ -147,7 +147,7 @@ public static class NovelBuildCompiler
                 var sourceOutput = sourceNode.Outputs[index];
                 var destinationOutput = destinationNode.Outputs[index];
                 if (sourceOutput.ConditionExpression is not null
-                    && sourceOutput.Condition.Equals(
+                    && VisualConditionCompiler.Compile(sourceOutput).Equals(
                         destinationOutput.Condition,
                         StringComparison.Ordinal))
                 {

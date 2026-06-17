@@ -684,7 +684,6 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
         Operator = ">=",
         Value = "1",
     };
-    VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
 
     var source = ProjectLanguage.Format(project);
     Assert(
@@ -2086,7 +2085,6 @@ static void BuildCompilerPreservesVisualScriptBlocks()
             Operator = ">=",
             Value = "1",
         };
-        VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
         project.SourceCode = ProjectLanguage.Format(project);
         ProjectSerializer.Save(project, projectPath);
 

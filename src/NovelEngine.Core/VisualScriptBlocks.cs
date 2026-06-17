@@ -253,7 +253,7 @@ public static class VisualScriptBlockPreserver
     {
         if (sourceOutput.ConditionExpression is null
             || targetOutput.ConditionExpression is not null
-            || !sourceOutput.Condition.Equals(
+            || !VisualConditionCompiler.Compile(sourceOutput).Equals(
                 targetOutput.Condition,
                 StringComparison.Ordinal))
         {
