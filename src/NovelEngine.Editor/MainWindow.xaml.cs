@@ -538,6 +538,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        EditNodeScriptBlocks(node);
+    }
+
+    private void EditNodeScriptBlocks(NovelNode node)
+    {
         var dialog = new VisualScriptBlocksWindow(
             node.ScriptBlocks,
             "Блоки скрипта при входе",
@@ -555,6 +560,29 @@ public partial class MainWindow : Window
         MarkDirty();
         StatusText.Text =
             $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}";
+    }
+
+    private void EditOutputScriptBlocks(NovelNode node, NodeOutput output)
+    {
+        var dialog = new VisualScriptBlocksWindow(
+            output.ScriptBlocks,
+            $"Блоки скрипта варианта «{output.Label}»",
+            ProjectScriptVariables.Collect(_project))
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        output.ScriptBlocks.Clear();
+        output.ScriptBlocks.AddRange(
+            dialog.Blocks.Select(block => block.Clone()));
+        MarkDirty();
+        RefreshProperties();
+        StatusText.Text =
+            $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
     }
 
     private static void MarkOverrideIfChanged<T>(
@@ -4765,6 +4793,10 @@ public partial class MainWindow : Window
         }
 
         Graph.SelectNode(node.Id);
+        if (TryNavigateToDiagnosticVisualBlocks(location, node))
+        {
+            return true;
+        }
         if (location.Contains("скрипт", StringComparison.OrdinalIgnoreCase)
             || location.Contains("условие", StringComparison.OrdinalIgnoreCase))
         {
@@ -4775,6 +4807,38 @@ public partial class MainWindow : Window
             WorkspaceTabs.SelectedItem = GraphTab;
             StatusText.Text = $"Выбрана нода «{DiagnosticNodeDisplay(node)}»";
         }
+        return true;
+    }
+
+    private bool TryNavigateToDiagnosticVisualBlocks(
+        string location,
+        NovelNode node)
+    {
+        if (!location.Contains("visual blocks", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        WorkspaceTabs.SelectedItem = GraphTab;
+        if (location.Contains("входа", StringComparison.OrdinalIgnoreCase))
+        {
+            EditNodeScriptBlocks(node);
+            return true;
+        }
+
+        var label = ReadQuotedSegmentAfter(location, "visual blocks ");
+        var output = label is null
+            ? null
+            : node.Outputs.FirstOrDefault(output =>
+                output.Label.Equals(label, StringComparison.Ordinal));
+        if (output is null)
+        {
+            StatusText.Text =
+                $"Выбрана нода «{DiagnosticNodeDisplay(node)}», вариант для visual blocks не найден";
+            return true;
+        }
+
+        EditOutputScriptBlocks(node, output);
         return true;
     }
 
@@ -4811,6 +4875,24 @@ public partial class MainWindow : Window
 
     private static string DiagnosticNodeDisplay(NovelNode node) =>
         string.IsNullOrWhiteSpace(node.Title) ? node.Id : node.Title;
+
+    private static string? ReadQuotedSegmentAfter(string source, string marker)
+    {
+        var markerStart = source.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerStart < 0)
+        {
+            return null;
+        }
+
+        var start = source.IndexOf('«', markerStart + marker.Length);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var end = source.IndexOf('»', start + 1);
+        return end < 0 ? null : source[(start + 1)..end];
+    }
 
     private static string KindName(NodeKind kind) =>
         kind switch
