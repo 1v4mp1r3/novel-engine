@@ -4256,6 +4256,53 @@ public partial class MainWindow : Window
             () => DeleteOutput_Click(this, new RoutedEventArgs())));
     }
 
+    private void OutputsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            EditOutput_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            DuplicateOutput_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            DeleteOutput_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Back && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            DisconnectOutput_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.Alt)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Up)
+        {
+            MoveSelectedOutput(-1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            MoveSelectedOutput(1);
+            e.Handled = true;
+        }
+    }
+
     private static MenuItem CreateOutputMenuItem(
         string header,
         Action action,
