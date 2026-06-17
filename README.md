@@ -27,11 +27,14 @@ Open a specific project file or project folder:
 dotnet run --project src/NovelEngine.Editor/NovelEngine.Editor.csproj -- --open-project "D:\Games\MyNovel"
 ```
 
-Install the Windows Explorer folder context menu item for the current user:
+Install the Windows Explorer folder context menu item for the current user by
+double-clicking `install-context-menu.bat`, or run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/install-explorer-context-menu.ps1
 ```
+
+Remove it later with `uninstall-context-menu.bat`.
 
 After installation, right-click a project folder or empty space inside it and
 choose `Открыть с помощью Novel Engine`. The editor will find the
