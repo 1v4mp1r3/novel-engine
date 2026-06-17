@@ -282,6 +282,36 @@ internal static class ScreenshotRenderer
                 $"Condition builder smoke expected `{condition}`, got `{window.Condition}`.");
         }
         window.Close();
+
+        var output = new NodeOutput
+        {
+            Id = "smoke-choice",
+            Label = "Проверить",
+            Condition = condition,
+            ConditionExpression = VisualConditionCompiler.Parse(condition),
+        };
+        var outputWindow = new OutputEditorWindow(
+            output,
+            ["met_hero", "score", "route"])
+        {
+            Width = 560,
+            Height = 535,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        outputWindow.Show();
+        outputWindow.Dispatcher.Invoke(
+            () => { },
+            DispatcherPriority.ApplicationIdle);
+        if (!outputWindow.Condition.Equals(condition, StringComparison.Ordinal)
+            || outputWindow.ConditionExpression is null)
+        {
+            throw new InvalidOperationException(
+                "Output editor smoke lost the structured condition expression.");
+        }
+        outputWindow.Close();
     }
 
     public static void SmokeVisualScriptBlocks()

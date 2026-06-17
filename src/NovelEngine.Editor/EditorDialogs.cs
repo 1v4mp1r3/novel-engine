@@ -69,15 +69,7 @@ public sealed class OutputEditorWindow : Window
         panel.Children.Add(_labelBox);
         panel.Children.Add(DialogUi.Label("Условие показа, например: score >= 3"));
         panel.Children.Add(_conditionBox);
-        var conditionButton = new Button
-        {
-            Content = "Собрать условие...",
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 0, 0, 12),
-            MinWidth = 150,
-        };
-        conditionButton.Click += (_, _) => BuildCondition();
-        panel.Children.Add(conditionButton);
+        panel.Children.Add(CreateConditionButtons());
         panel.Children.Add(DialogUi.Label("Скрипт при выборе"));
         _scriptBox.Height = 150;
         panel.Children.Add(_scriptBox);
@@ -85,6 +77,33 @@ public sealed class OutputEditorWindow : Window
         panel.Children.Add(DialogUi.Buttons(Save, this));
         Content = panel;
         RefreshScriptBlocksButton();
+    }
+
+    private UIElement CreateConditionButtons()
+    {
+        var panel = new WrapPanel
+        {
+            Margin = new Thickness(0, 0, 0, 12),
+        };
+        var conditionButton = new Button
+        {
+            Content = "Собрать условие...",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MinWidth = 150,
+        };
+        conditionButton.Click += (_, _) => BuildCondition();
+        panel.Children.Add(conditionButton);
+
+        var clearButton = new Button
+        {
+            Content = "Сбросить условие",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MinWidth = 150,
+        };
+        clearButton.Click += (_, _) => ClearCondition();
+        panel.Children.Add(clearButton);
+
+        return panel;
     }
 
     public string OutputLabel => _labelBox.Text.Trim();
@@ -148,6 +167,12 @@ public sealed class OutputEditorWindow : Window
             _conditionExpression = dialog.Expression;
             _conditionBox.Text = dialog.Condition;
         }
+    }
+
+    private void ClearCondition()
+    {
+        _conditionExpression = null;
+        _conditionBox.Text = string.Empty;
     }
 
     private void RefreshScriptBlocksButton() =>
