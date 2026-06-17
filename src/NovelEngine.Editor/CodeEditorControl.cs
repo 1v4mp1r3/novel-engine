@@ -13,6 +13,7 @@ public sealed class CodeEditorControl : RichTextBox
 {
     private const int HistoryLimit = 200;
     private const int MaxAutomaticCompletionSourceLength = 60_000;
+    private const int MaxTrackedCaretSourceLength = 60_000;
 
     private static readonly IReadOnlyDictionary<ProjectLanguageSyntaxKind, Brush>
         SyntaxBrushes = new Dictionary<ProjectLanguageSyntaxKind, Brush>
@@ -202,6 +203,10 @@ public sealed class CodeEditorControl : RichTextBox
     {
         base.OnSelectionChanged(e);
         if (_updatingDocument || _restoringHistory)
+        {
+            return;
+        }
+        if (_currentSnapshot.Source.Length > MaxTrackedCaretSourceLength)
         {
             return;
         }

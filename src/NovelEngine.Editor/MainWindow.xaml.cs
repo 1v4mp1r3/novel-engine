@@ -824,6 +824,16 @@ public partial class MainWindow : Window
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
     {
         var source = EnsureCodeCursorCache();
+        if (source.Length > MaxHighlightedCodeLength)
+        {
+            if (_lastCodeCursorOffset != -2)
+            {
+                _lastCodeCursorOffset = -2;
+                CodeCursorText.Text = "Большой файл: позиция курсора отключена";
+            }
+            return;
+        }
+
         var offset = Math.Clamp(CodeEditor.SourceCaretOffset, 0, source.Length);
         if (offset == _lastCodeCursorOffset)
         {
