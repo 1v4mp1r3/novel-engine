@@ -1799,6 +1799,7 @@ public partial class MainWindow : Window
         node.InheritBackground = false;
         node.Background = reference;
         MarkDirty();
+        RefreshAfterAssetBinding();
         StatusText.Text = $"Фон ноды «{node.Title}»: {reference}";
     }
 
@@ -1816,6 +1817,7 @@ public partial class MainWindow : Window
         node.InheritMusic = false;
         node.Music = reference;
         MarkDirty();
+        RefreshAfterAssetBinding();
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
 
@@ -1862,8 +1864,18 @@ public partial class MainWindow : Window
         }
 
         MarkDirty();
+        RefreshAfterAssetBinding();
         StatusText.Text =
             $"Voice-блипы персонажа «{character.Name}»: {character.VoiceSounds.Count}";
+    }
+
+    private void RefreshAfterAssetBinding()
+    {
+        Graph.RefreshGraph();
+        RefreshProperties();
+        RefreshAssets(syncFromDisk: false);
+        RequestCodeRefresh(useStoredSource: false);
+        RequestDiagnosticsRefresh();
     }
 
     private static bool IsInAssetFolder(NovelAsset asset, string folder)
