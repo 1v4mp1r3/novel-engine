@@ -1309,7 +1309,7 @@ static void ProjectAssetImportCopiesFiles()
             "Second imported asset did not receive a unique file name.");
         Assert(
             target.Contains(
-                Path.Combine("files", "images"),
+                Path.Combine("files", "backgrounds"),
                 StringComparison.OrdinalIgnoreCase),
             "Imported image was placed in the wrong folder.");
         Assert(

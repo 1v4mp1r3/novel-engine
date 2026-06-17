@@ -29,7 +29,7 @@ The graph and code editor are two representations of the same project model.
 ## Asset catalog
 
 Each project owns a typed asset catalog. Imported files are copied into
-nested logical folders below `assets` next to the project file. The catalog
+nested logical folders below `files` next to the project file. The catalog
 stores folder declarations separately from assets so empty folders survive
 serialization. Code uses stable `@asset_id` references instead of physical
 paths. Runtime preview resolves those references through the catalog before

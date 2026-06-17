@@ -67,7 +67,7 @@ public static class ProjectAssets
         folder = NormalizeFolder(
             folder ?? kind switch
             {
-                AssetKind.Image => "images",
+                AssetKind.Image => "backgrounds",
                 AssetKind.Audio => "audio",
                 _ => "other",
             });
