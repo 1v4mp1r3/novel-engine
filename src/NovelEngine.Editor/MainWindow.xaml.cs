@@ -2901,7 +2901,9 @@ public partial class MainWindow : Window
         {
             return SaveProjectAs();
         }
-        var path = Path.Combine(_workspaceDirectory, GetDefaultProjectFileName());
+        var path = _workspaceNeedsProjectFile
+            ? ProjectWorkspace.GetAvailableProjectPath(_workspaceDirectory)
+            : Path.Combine(_workspaceDirectory, GetDefaultProjectFileName());
         return WriteProject(path);
     }
 

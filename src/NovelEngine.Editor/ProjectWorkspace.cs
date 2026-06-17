@@ -27,7 +27,7 @@ internal static class ProjectWorkspace
         return projectPath;
     }
 
-    private static string GetAvailableProjectPath(string workspaceDirectory)
+    public static string GetAvailableProjectPath(string workspaceDirectory)
     {
         var baseName = MakeSafeFileStem(Path.GetFileName(
             workspaceDirectory.TrimEnd(
