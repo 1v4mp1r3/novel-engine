@@ -754,6 +754,9 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     Assert(variables.Contains("route"), "Node visual block variable was not collected.");
     Assert(variables.Contains("met_hero"), "Condition variable was not collected.");
     Assert(variables.Contains("mood"), "Structured condition variable was not collected.");
+    dialogue.Outputs[1].Condition = "route && courage >= 2";
+    variables = ProjectScriptVariables.Collect(project);
+    Assert(variables.Contains("route"), "Compound condition variable was not collected.");
     Assert(variables.Contains("trust"), "Output visual block variable was not collected.");
 }
 
@@ -771,6 +774,15 @@ static void VisualConditionsParseAndCompile()
     Assert(
         VisualConditionCompiler.Compile(VisualConditionCompiler.Parse("score >= 3")) == "score >= 3",
         "Comparison condition did not round trip.");
+    Assert(
+        VisualConditionCompiler.Compile(VisualConditionCompiler.Parse("met_hero && score >= 3"))
+            == "met_hero && score >= 3",
+        "AND condition did not round trip.");
+    Assert(
+        VisualConditionCompiler.Compile(
+            VisualConditionCompiler.Parse("met_hero && score >= 3 || route == \"good\""))
+            == "met_hero && score >= 3 || route == \"good\"",
+        "Mixed AND/OR condition did not round trip.");
 
     var expression = new VisualConditionExpression
     {
@@ -791,9 +803,15 @@ static void VisualConditionsParseAndCompile()
     Assert(
         VisualConditionCompiler.Evaluate("route == \"good\"", state),
         "String condition did not evaluate through visual condition compiler.");
-    AssertThrows<InvalidDataException>(
-        () => VisualConditionCompiler.Parse("route && score"),
-        "Unsupported condition syntax was accepted.");
+    state.Variables["met_hero"] = true;
+    state.Variables["score"] = 3;
+    Assert(
+        VisualConditionCompiler.Evaluate("met_hero && score >= 3", state),
+        "AND condition did not evaluate.");
+    state.Variables["score"] = 1;
+    Assert(
+        VisualConditionCompiler.Evaluate("met_hero && score >= 3 || route == \"good\"", state),
+        "OR condition did not evaluate.");
 }
 
 static void VisualConditionExpressionsSurviveJsonAndRuntime()
@@ -802,15 +820,13 @@ static void VisualConditionExpressionsSurviveJsonAndRuntime()
     var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
     var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
     var end = project.AddNode(NodeKind.Scene, 980, 120);
-    scene.Script = "set score = 2";
+    scene.Script = """
+        set score = 2
+        set route = "good"
+        """;
     dialogue.Outputs[0].TargetNodeId = end.Id;
-    dialogue.Outputs[0].ConditionExpression = new VisualConditionExpression
-    {
-        Kind = VisualConditionKind.Comparison,
-        VariableName = "score",
-        Operator = ">=",
-        Value = "2",
-    };
+    dialogue.Outputs[0].ConditionExpression =
+        VisualConditionCompiler.Parse("score >= 2 && route == \"good\"");
     VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
     dialogue.Outputs[1].ConditionExpression = new VisualConditionExpression
     {
@@ -831,7 +847,8 @@ static void VisualConditionExpressionsSurviveJsonAndRuntime()
     var available = player.GetAvailableOutputs();
 
     Assert(
-        restoredDialogue.Outputs[0].ConditionExpression?.VariableName == "score",
+        restoredDialogue.Outputs[0].ConditionExpression?.Kind == VisualConditionKind.All
+            && restoredDialogue.Outputs[0].ConditionExpression?.Children.Count == 2,
         "JSON round trip dropped the structured choice condition.");
     Assert(
         available.Any(output => output.Id == restoredDialogue.Outputs[0].Id),

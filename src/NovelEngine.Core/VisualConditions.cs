@@ -8,6 +8,8 @@ public enum VisualConditionKind
     VariableTrue,
     VariableFalse,
     Comparison,
+    All,
+    Any,
 }
 
 public sealed class VisualConditionExpression
@@ -16,6 +18,7 @@ public sealed class VisualConditionExpression
     public string VariableName { get; set; } = string.Empty;
     public string Operator { get; set; } = "==";
     public string Value { get; set; } = string.Empty;
+    public List<VisualConditionExpression> Children { get; init; } = [];
 
     public VisualConditionExpression Clone() =>
         new()
@@ -24,6 +27,7 @@ public sealed class VisualConditionExpression
             VariableName = VariableName,
             Operator = Operator,
             Value = Value,
+            Children = Children.Select(child => child.Clone()).ToList(),
         };
 }
 
@@ -38,6 +42,18 @@ public static partial class VisualConditionCompiler
         if (condition.Length == 0)
         {
             return new VisualConditionExpression();
+        }
+
+        var anyParts = SplitLogical(condition, "||");
+        if (anyParts.Count > 1)
+        {
+            return CreateGroup(VisualConditionKind.Any, anyParts);
+        }
+
+        var allParts = SplitLogical(condition, "&&");
+        if (allParts.Count > 1)
+        {
+            return CreateGroup(VisualConditionKind.All, allParts);
         }
 
         if (Identifier().IsMatch(condition))
@@ -84,6 +100,16 @@ public static partial class VisualConditionCompiler
                 $"!{RequiredVariableName(expression)}",
             VisualConditionKind.Comparison =>
                 $"{RequiredVariableName(expression)} {RequiredOperator(expression)} {RequiredValue(expression)}",
+            VisualConditionKind.All =>
+                string.Join(
+                    " && ",
+                    RequiredChildren(expression).Select(child =>
+                        CompileChild(expression.Kind, child))),
+            VisualConditionKind.Any =>
+                string.Join(
+                    " || ",
+                    RequiredChildren(expression).Select(child =>
+                        CompileChild(expression.Kind, child))),
             _ => throw new InvalidDataException(
                 $"Неизвестный тип visual condition: {expression.Kind}"),
         };
@@ -103,7 +129,14 @@ public static partial class VisualConditionCompiler
             : Evaluate(output.ConditionExpression, state);
 
     public static bool Evaluate(VisualConditionExpression expression, ScriptState state) =>
-        NovelScript.Evaluate(Compile(expression), state);
+        expression.Kind switch
+        {
+            VisualConditionKind.All =>
+                RequiredChildren(expression).All(child => Evaluate(child, state)),
+            VisualConditionKind.Any =>
+                RequiredChildren(expression).Any(child => Evaluate(child, state)),
+            _ => NovelScript.Evaluate(Compile(expression), state),
+        };
 
     public static string Compile(NodeOutput output) =>
         output.ConditionExpression is null
@@ -147,6 +180,85 @@ public static partial class VisualConditionCompiler
             throw new InvalidDataException("Укажите значение для сравнения.");
         }
         return value;
+    }
+
+    private static IReadOnlyList<VisualConditionExpression> RequiredChildren(
+        VisualConditionExpression expression)
+    {
+        if (expression.Children.Count == 0)
+        {
+            throw new InvalidDataException("Группа условий должна содержать хотя бы одно условие.");
+        }
+        return expression.Children;
+    }
+
+    private static string CompileChild(
+        VisualConditionKind parentKind,
+        VisualConditionExpression child)
+    {
+        if (parentKind is VisualConditionKind.All
+            && child.Kind is VisualConditionKind.Any)
+        {
+            throw new InvalidDataException(
+                "OR-группа внутри AND пока не поддерживается без скобок.");
+        }
+        return Compile(child);
+    }
+
+    private static VisualConditionExpression CreateGroup(
+        VisualConditionKind kind,
+        IReadOnlyList<string> parts)
+    {
+        var expression = new VisualConditionExpression { Kind = kind };
+        foreach (var part in parts)
+        {
+            expression.Children.Add(Parse(part));
+        }
+        return expression;
+    }
+
+    private static List<string> SplitLogical(string condition, string operation)
+    {
+        var parts = new List<string>();
+        var start = 0;
+        var inString = false;
+        var escaped = false;
+        for (var index = 0; index <= condition.Length - operation.Length; index++)
+        {
+            var current = condition[index];
+            if (inString && current == '\\' && !escaped)
+            {
+                escaped = true;
+                continue;
+            }
+            if (current == '"' && !escaped)
+            {
+                inString = !inString;
+            }
+            escaped = false;
+
+            if (inString
+                || !condition.AsSpan(index, operation.Length)
+                    .SequenceEqual(operation))
+            {
+                continue;
+            }
+
+            parts.Add(condition[start..index].Trim());
+            index += operation.Length - 1;
+            start = index + 1;
+        }
+
+        if (parts.Count == 0)
+        {
+            return [];
+        }
+        parts.Add(condition[start..].Trim());
+        if (parts.Any(part => part.Length == 0))
+        {
+            throw new InvalidDataException($"Некорректное условие: {condition}");
+        }
+        return parts;
     }
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]

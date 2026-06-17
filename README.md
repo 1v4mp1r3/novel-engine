@@ -119,6 +119,8 @@ currently installed on this workstation.
 - Conditions created through the visual builder are saved as structured data
   beside their generated text form, so future condition blocks can survive DSL
   edits, builds, and JSON round trips.
+- Hand-written choice conditions can combine checks with `&&` and `||`; the
+  runtime and diagnostics use the same compiler path as visual conditions.
 - Visual-block dialogs can import simple text scripts (`set`, `add`, `unset`,
   comments) into editable blocks and optionally clear the original text to avoid
   double execution.

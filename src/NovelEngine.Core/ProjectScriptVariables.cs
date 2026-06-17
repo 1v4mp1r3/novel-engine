@@ -63,6 +63,15 @@ public static partial class ProjectScriptVariables
         VisualConditionExpression expression,
         ISet<string> variables)
     {
+        if (expression.Kind is VisualConditionKind.All or VisualConditionKind.Any)
+        {
+            foreach (var child in expression.Children)
+            {
+                AddCondition(child, variables);
+            }
+            return;
+        }
+
         var variable = expression.VariableName.Trim();
         if ((expression.Kind is VisualConditionKind.VariableTrue
                 or VisualConditionKind.VariableFalse
@@ -79,6 +88,15 @@ public static partial class ProjectScriptVariables
         if (condition.Length == 0)
         {
             return;
+        }
+
+        try
+        {
+            AddCondition(VisualConditionCompiler.Parse(condition), variables);
+            return;
+        }
+        catch (InvalidDataException)
+        {
         }
 
         if (condition.StartsWith('!')

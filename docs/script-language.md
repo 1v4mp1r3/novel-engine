@@ -30,8 +30,12 @@ met_alice
 score >= 3
 player_name == "Макс"
 route != "bad"
+met_alice && score >= 3
+route == "good" || route == "true"
 ```
 
 An empty condition means that the choice is always available.
-The condition builder stores these forms through a core expression model, so
-future condition blocks and hand-written conditions stay aligned.
+Use `&&` for AND and `||` for OR. AND is evaluated before OR; parentheses are
+not part of the MVP condition syntax yet.
+The core condition model stores these forms, so future condition blocks and
+hand-written conditions stay aligned.

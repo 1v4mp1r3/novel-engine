@@ -13,6 +13,7 @@ public sealed class ConditionBuilderWindow : Window
     private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBlock _previewText;
     private string _rawFallbackCondition = string.Empty;
+    private VisualConditionExpression? _rawFallbackExpression;
 
     public ConditionBuilderWindow(
         string condition,
@@ -98,6 +99,7 @@ public sealed class ConditionBuilderWindow : Window
         catch (InvalidDataException)
         {
             _rawFallbackCondition = condition.Trim();
+            _rawFallbackExpression = null;
             SelectMode(VisualConditionKind.Comparison);
             _operatorBox.SelectedItem = "==";
             _valueEditor.LoadLiteral(_rawFallbackCondition);
@@ -106,6 +108,17 @@ public sealed class ConditionBuilderWindow : Window
 
     private void LoadExpression(VisualConditionExpression expression)
     {
+        if (!ModeChoices.Any(choice => choice.Mode == expression.Kind))
+        {
+            _rawFallbackExpression = expression.Clone();
+            _rawFallbackCondition = VisualConditionCompiler.Compile(expression);
+            SelectMode(VisualConditionKind.Comparison);
+            _operatorBox.SelectedItem = "==";
+            _valueEditor.LoadLiteral(_rawFallbackCondition);
+            return;
+        }
+
+        _rawFallbackExpression = null;
         SelectMode(expression.Kind);
         _variableBox.Text = expression.VariableName;
         _operatorBox.SelectedItem = expression.Operator;
@@ -163,6 +176,7 @@ public sealed class ConditionBuilderWindow : Window
     private void Save()
     {
         if (SelectedMode is VisualConditionKind.Comparison
+            && !IsRawFallbackSelected
             && !_valueEditor.TryValidate(this, "Собрать условие"))
         {
             return;
@@ -197,14 +211,26 @@ public sealed class ConditionBuilderWindow : Window
 
     private string VariableName => _variableBox.Text.Trim();
 
-    private VisualConditionExpression BuildExpression() =>
-        new()
+    private bool IsRawFallbackSelected =>
+        _rawFallbackCondition.Length > 0
+        && SelectedMode is VisualConditionKind.Comparison
+        && VariableName.Length == 0;
+
+    private VisualConditionExpression BuildExpression()
+    {
+        if (IsRawFallbackSelected && _rawFallbackExpression is not null)
+        {
+            return _rawFallbackExpression.Clone();
+        }
+
+        return new()
         {
             Kind = SelectedMode,
             VariableName = VariableName,
             Operator = Convert.ToString(_operatorBox.SelectedItem) ?? "==",
             Value = _valueEditor.Literal,
         };
+    }
 
     private static IReadOnlyList<string> NormalizeVariables(
         IEnumerable<string>? variables) =>

@@ -35,11 +35,11 @@ engine.
 
 Choice condition authoring uses the same approach: `VisualConditionExpression`
 parses and compiles the supported condition forms (`always`, variable truth,
-variable false, and comparisons) through the core layer. The WPF builder is only
-an editor for that model, so future condition blocks can reuse the same runtime
-semantics instead of adding a UI-only parser. Runtime choice filtering, project
-diagnostics, and project-language validation all evaluate conditions through
-this compiler.
+variable false, comparisons, and AND/OR groups) through the core layer. The WPF
+builder is only an editor for that model, so future condition blocks can reuse
+the same runtime semantics instead of adding a UI-only parser. Runtime choice
+filtering, project diagnostics, and project-language validation all evaluate
+conditions through this compiler.
 
 ## Asset catalog
 
