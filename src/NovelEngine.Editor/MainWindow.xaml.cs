@@ -1677,18 +1677,6 @@ public partial class MainWindow : Window
 
     private MenuItem CreateCharacterAssetVoiceMenu(NovelAsset asset, NovelNode? node)
     {
-        if (node is null)
-        {
-            return CreateDisabledAssetMenuItem("Подвязать voice-блип: выберите ноду");
-        }
-
-        var character = FindEffectiveCharacterBySprite(node, asset);
-        if (character is null)
-        {
-            return CreateDisabledAssetMenuItem(
-                "Подвязать voice-блип: персонаж со спрайтом не в ноде");
-        }
-
         var voices = _project.Assets
             .Where(candidate => candidate.Kind == AssetKind.Audio)
             .Where(candidate => IsInAssetFolder(candidate, "voices"))
@@ -1699,21 +1687,55 @@ public partial class MainWindow : Window
             return CreateDisabledAssetMenuItem("Подвязать voice-блип: в voices нет аудио");
         }
 
-        var characterLabel = CharacterLabel(character);
-        if (voices.Count == 1)
+        var targets = new List<(string Label, Action<NovelAsset> Bind)>();
+        if (node is not null && FindEffectiveCharacterBySprite(node, asset) is { } nodeCharacter)
+        {
+            targets.Add((
+                $"в выбранной ноде: «{CharacterLabel(nodeCharacter)}»",
+                voice => BindVoiceAssetToCharacter(voice, nodeCharacter.Id)));
+        }
+
+        if (FindLibraryCharacterBySprite(asset) is { } libraryCharacter)
+        {
+            targets.Add((
+                $"в библиотеке: «{CharacterLabel(libraryCharacter)}»",
+                voice => BindVoiceAssetToLibraryCharacter(voice, libraryCharacter.Id)));
+        }
+
+        if (targets.Count == 0)
+        {
+            return CreateDisabledAssetMenuItem(
+                "Подвязать voice-блип: персонаж со спрайтом не найден");
+        }
+
+        if (voices.Count == 1 && targets.Count == 1)
         {
             var voice = voices[0];
             return CreateAssetMenuItem(
-                $"Добавить «{voice.Id}» к «{characterLabel}»",
-                () => BindVoiceAssetToCharacter(voice, character.Id));
+                $"Добавить «{voice.Id}» {targets[0].Label}",
+                () => targets[0].Bind(voice));
         }
 
         var menu = CreateHoverSubmenu("Добавить voice-блип из voices");
         foreach (var voice in voices)
         {
-            menu.Items.Add(CreateAssetMenuItem(
-                $"{voice.Id}  ·  {Path.GetFileName(voice.Path)}",
-                () => BindVoiceAssetToCharacter(voice, character.Id)));
+            if (targets.Count == 1)
+            {
+                menu.Items.Add(CreateAssetMenuItem(
+                    $"{voice.Id}  ·  {Path.GetFileName(voice.Path)}",
+                    () => targets[0].Bind(voice)));
+                continue;
+            }
+
+            var voiceMenu = CreateHoverSubmenu(
+                $"{voice.Id}  ·  {Path.GetFileName(voice.Path)}");
+            foreach (var target in targets)
+            {
+                voiceMenu.Items.Add(CreateAssetMenuItem(
+                    target.Label,
+                    () => target.Bind(voice)));
+            }
+            menu.Items.Add(voiceMenu);
         }
         return menu;
     }
@@ -1793,6 +1815,10 @@ public partial class MainWindow : Window
         NovelNode node,
         NovelAsset asset) =>
         GetEffectiveCharacters(node).FirstOrDefault(
+            character => ReferencesAsset(character.Sprite, asset));
+
+    private CharacterPlacement? FindLibraryCharacterBySprite(NovelAsset asset) =>
+        _project.Characters.FirstOrDefault(
             character => ReferencesAsset(character.Sprite, asset));
 
     private static bool ReferencesAsset(string value, NovelAsset asset)
