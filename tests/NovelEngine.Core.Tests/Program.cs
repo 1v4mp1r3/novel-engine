@@ -5,6 +5,7 @@ var tests = new (string Name, Action Run)[]
     ("default project is valid", DefaultProjectIsValid),
     ("project diagnostics report authoring issues", ProjectDiagnosticsReportAuthoringIssues),
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
+    ("project diagnostics check character voice references", ProjectDiagnosticsCheckCharacterVoiceReferences),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
@@ -122,6 +123,44 @@ static void ProjectDiagnosticsCheckPhysicalAssets()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void ProjectDiagnosticsCheckCharacterVoiceReferences()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "alice_sprite",
+            Kind = AssetKind.Image,
+            Path = "files/characters/alice.png",
+        });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "alice_voice",
+            Kind = AssetKind.Audio,
+            Path = "files/voices/alice.wav",
+        });
+    project.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "alice",
+            Name = "Alice",
+            Sprite = "@alice_sprite",
+            VoiceSounds = ["@alice_voice", "@missing_voice"],
+        });
+
+    var report = ProjectDiagnostics.Analyze(project);
+
+    Assert(report.HasErrors, "Missing character voice asset reference was not reported.");
+    Assert(
+        report.Diagnostics.Any(
+            diagnostic =>
+                diagnostic.Location.Contains("Проект", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("@missing_voice", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("библиотека персонажей", StringComparison.Ordinal)),
+        "Missing character voice diagnostic did not point to the library character.");
 }
 
 static void CharacterLibraryRoundTrip()
