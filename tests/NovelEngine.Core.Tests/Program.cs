@@ -537,6 +537,18 @@ static void NodeCharacterOperationsPreserveDataAndOrder()
             Name = "Герой из библиотеки",
         });
     Assert(added.Id == "hero-2", "Library character clone id was not made unique.");
+
+    var previewCharacters = scene.Characters.Select(character => character.Clone()).ToList();
+    var previewAdded = NovelProject.AddCharacterClone(
+        previewCharacters,
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой для визуального редактора",
+        });
+    Assert(
+        previewAdded.Id == "hero-3",
+        "Direct character collection clone id was not made unique.");
     project.Validate();
 }
 

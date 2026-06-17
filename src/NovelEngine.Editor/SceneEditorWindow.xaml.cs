@@ -443,10 +443,8 @@ public partial class SceneEditorWindow : Window
             return;
         }
 
-        var character = dialog.SelectedCharacter.CloneWithId(
-            CreateUniqueCharacterId(dialog.SelectedCharacter.Id));
+        var character = NovelProject.AddCharacterClone(_characters, dialog.SelectedCharacter);
         EnsureCustomTransform(character);
-        _characters.Add(character);
         RefreshCharacterList();
         BuildCharacterVisuals();
         SelectCharacter(character);
@@ -494,45 +492,6 @@ public partial class SceneEditorWindow : Window
     {
         AddLibraryCharacterButton.IsEnabled = _project.Characters.Count > 0;
         RemoveCharacterButton.IsEnabled = _selectedCharacter is not null;
-    }
-
-    private string CreateUniqueCharacterId(string preferredId)
-    {
-        var seed = SanitizeCharacterId(preferredId);
-        var existing = _characters
-            .Select(character => character.Id)
-            .ToHashSet(StringComparer.Ordinal);
-        if (!existing.Contains(seed))
-        {
-            return seed;
-        }
-
-        for (var index = 2; ; index++)
-        {
-            var candidate = $"{seed}-{index}";
-            if (!existing.Contains(candidate))
-            {
-                return candidate;
-            }
-        }
-    }
-
-    private static string SanitizeCharacterId(string value)
-    {
-        var cleaned = new string(
-            value
-                .Trim()
-                .Select(character =>
-                    character is '_' or '-' || char.IsLetterOrDigit(character)
-                        ? character
-                        : '-')
-                .ToArray())
-            .Trim('-');
-        if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
-        {
-            cleaned = $"character-{cleaned}";
-        }
-        return cleaned;
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

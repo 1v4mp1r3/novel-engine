@@ -628,9 +628,17 @@ public sealed class NovelProject
     {
         var node = FindNode(nodeId)
             ?? throw new InvalidOperationException("Нода не найдена.");
-        var character = source.CloneWithId(CreateUniqueCharacterId(source.Id, node.Characters));
-        node.Characters.Add(character);
+        var character = AddCharacterClone(node.Characters, source);
         MarkCharactersOverridden(node);
+        return character;
+    }
+
+    public static CharacterPlacement AddCharacterClone(
+        IList<CharacterPlacement> characters,
+        CharacterPlacement source)
+    {
+        var character = source.CloneWithId(CreateUniqueCharacterId(source.Id, characters));
+        characters.Add(character);
         return character;
     }
 
