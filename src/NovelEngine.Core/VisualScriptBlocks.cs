@@ -45,14 +45,14 @@ public static partial class VisualScriptCompiler
                 continue;
             }
 
-            if (line.StartsWith('#'))
+            if (TryReadComment(line, out var comment))
             {
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
                         Kind = VisualScriptBlockKind.Comment,
-                        Text = line[1..].Trim(),
+                        Text = comment,
                     });
                 continue;
             }
@@ -200,6 +200,23 @@ public static partial class VisualScriptCompiler
         string.IsNullOrWhiteSpace(block.Id)
             ? block.Kind.ToString()
             : $"«{block.Id}»";
+
+    private static bool TryReadComment(string line, out string comment)
+    {
+        if (line.StartsWith('#'))
+        {
+            comment = line[1..].Trim();
+            return true;
+        }
+        if (line.StartsWith("//", StringComparison.Ordinal))
+        {
+            comment = line[2..].Trim();
+            return true;
+        }
+
+        comment = string.Empty;
+        return false;
+    }
 
     [GeneratedRegex(
         "^set\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<value>.+)$",

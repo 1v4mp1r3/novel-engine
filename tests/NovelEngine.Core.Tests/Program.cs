@@ -573,6 +573,7 @@ static void NovelScriptTogglesVariables()
     var state = new ScriptState();
     NovelScript.Execute(
         """
+        // comment syntax mirrors project DSL comments
         toggle met_hero
         toggle locked
         toggle locked
@@ -643,6 +644,7 @@ static void VisualScriptBlocksImportSimpleScripts()
     var blocks = VisualScriptCompiler.ParseScript(
         """
         # setup route
+        // setup score
         set route = "good"
         add score 2
         toggle met_hero
@@ -651,7 +653,7 @@ static void VisualScriptBlocksImportSimpleScripts()
 
     var script = VisualScriptCompiler.Compile(blocks);
 
-    Assert(blocks.Count == 5, "Script import produced the wrong block count.");
+    Assert(blocks.Count == 6, "Script import produced the wrong block count.");
     Assert(
         script.Contains("set route = \"good\"", StringComparison.Ordinal),
         "Imported set command was not compiled back.");

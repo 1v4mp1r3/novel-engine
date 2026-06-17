@@ -37,7 +37,9 @@ public static partial class ProjectScriptVariables
         foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
         {
             var line = sourceLine.Trim();
-            if (line.Length == 0 || line.StartsWith('#'))
+            if (line.Length == 0
+                || line.StartsWith('#')
+                || line.StartsWith("//", StringComparison.Ordinal))
             {
                 continue;
             }

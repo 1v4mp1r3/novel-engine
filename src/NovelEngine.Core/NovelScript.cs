@@ -29,7 +29,7 @@ public static partial class NovelScript
         foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
         {
             var line = sourceLine.Trim();
-            if (line.Length == 0 || line.StartsWith('#'))
+            if (line.Length == 0 || IsComment(line))
             {
                 continue;
             }
@@ -185,6 +185,9 @@ public static partial class NovelScript
             _ when TryNumber(value, out var number) => number != 0,
             _ => true,
         };
+
+    private static bool IsComment(string line) =>
+        line.StartsWith('#') || line.StartsWith("//", StringComparison.Ordinal);
 
     [GeneratedRegex(
         "^set\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<value>.+)$",
