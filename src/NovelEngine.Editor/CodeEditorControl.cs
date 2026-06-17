@@ -56,6 +56,7 @@ public sealed class CodeEditorControl : RichTextBox
     private bool _updatingDocument;
     private bool _restoringHistory;
     private bool _historyRecordingPending;
+    private int? _caretOffsetCache;
 
     private static Brush CreateFrozenBrush(byte red, byte green, byte blue) =>
         CreateFrozenBrush(255, red, green, blue);
@@ -176,8 +177,7 @@ public sealed class CodeEditorControl : RichTextBox
     }
 
     public int SourceCaretOffset =>
-        NormalizeText(
-            new TextRange(Document.ContentStart, CaretPosition).Text).Length;
+        _caretOffsetCache ??= ReadCaretOffset();
 
     public void ApplySyntax(
         IReadOnlyList<ProjectLanguageSyntaxSpan> spans,
@@ -217,6 +217,7 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
         _sourceTextCache = null;
+        _caretOffsetCache = null;
         InvalidateRenderedSyntax();
         ScheduleUserChangeRecord();
         _completionTimer.Stop();
@@ -225,18 +226,22 @@ public sealed class CodeEditorControl : RichTextBox
 
     protected override void OnSelectionChanged(RoutedEventArgs e)
     {
-        base.OnSelectionChanged(e);
         if (_updatingDocument || _restoringHistory)
         {
+            base.OnSelectionChanged(e);
             return;
         }
         if (_currentSnapshot.Source.Length > MaxTrackedCaretSourceLength)
         {
+            _caretOffsetCache = null;
+            base.OnSelectionChanged(e);
             return;
         }
+        _caretOffsetCache = null;
         _currentSnapshot = new EditorSnapshot(
             _currentSnapshot.Source,
             Math.Clamp(SourceCaretOffset, 0, _currentSnapshot.Source.Length));
+        base.OnSelectionChanged(e);
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -692,9 +697,12 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void SetCaretOffset(int offset)
     {
-        var position = GetPosition(offset);
+        var sourceLength = _sourceTextCache?.Length ?? ReadSourceText().Length;
+        var normalizedOffset = Math.Clamp(offset, 0, sourceLength);
+        var position = GetPosition(normalizedOffset);
         if (position is not null)
         {
+            _caretOffsetCache = normalizedOffset;
             CaretPosition = position;
         }
     }
@@ -739,6 +747,10 @@ public sealed class CodeEditorControl : RichTextBox
             new TextRange(Document.ContentStart, Document.ContentEnd).Text);
         return text.EndsWith('\n') ? text[..^1] : text;
     }
+
+    private int ReadCaretOffset() =>
+        NormalizeText(
+            new TextRange(Document.ContentStart, CaretPosition).Text).Length;
 
     private static string NormalizeText(string text) =>
         text.Replace("\r\n", "\n");
