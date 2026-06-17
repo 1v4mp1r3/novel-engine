@@ -281,7 +281,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
     private readonly string _blockId;
     private readonly ComboBox _kindBox;
     private readonly TextBox _variableBox;
-    private readonly TextBox _valueBox;
+    private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBox _commentBox;
 
     public VisualScriptBlockEditorWindow(VisualScriptBlock block)
@@ -304,7 +304,8 @@ public sealed class VisualScriptBlockEditorWindow : Window
         };
         _kindBox.SelectionChanged += (_, _) => UpdateFields();
         _variableBox = DialogUi.TextBox(block.VariableName);
-        _valueBox = DialogUi.TextBox(block.Value);
+        _valueEditor = new ScriptLiteralEditorControl();
+        _valueEditor.LoadLiteral(block.Value);
         _commentBox = DialogUi.TextBox(block.Text, multiline: true);
         _commentBox.Height = 80;
 
@@ -317,7 +318,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         Id = _blockId,
         Kind = SelectedKind,
         VariableName = _variableBox.Text.Trim(),
-        Value = _valueBox.Text.Trim(),
+        Value = _valueEditor.Literal,
         Text = _commentBox.Text.Trim(),
     };
 
@@ -333,7 +334,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         panel.Children.Add(DialogUi.Label("Переменная"));
         panel.Children.Add(_variableBox);
         panel.Children.Add(DialogUi.Label("Значение"));
-        panel.Children.Add(_valueBox);
+        panel.Children.Add(_valueEditor);
         panel.Children.Add(DialogUi.Label("Комментарий"));
         panel.Children.Add(_commentBox);
         panel.Children.Add(DialogUi.Buttons(Save, this));
@@ -347,7 +348,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         var needsValue = kind is VisualScriptBlockKind.SetVariable
             or VisualScriptBlockKind.AddVariable;
         _variableBox.IsEnabled = !isComment;
-        _valueBox.IsEnabled = needsValue;
+        _valueEditor.IsEnabled = needsValue;
         _commentBox.IsEnabled = isComment;
     }
 
@@ -355,6 +356,12 @@ public sealed class VisualScriptBlockEditorWindow : Window
     {
         try
         {
+            if ((SelectedKind is VisualScriptBlockKind.SetVariable
+                    or VisualScriptBlockKind.AddVariable)
+                && !_valueEditor.TryValidate(this, "Блок скрипта"))
+            {
+                return;
+            }
             VisualScriptCompiler.Validate([Block]);
             DialogResult = true;
         }

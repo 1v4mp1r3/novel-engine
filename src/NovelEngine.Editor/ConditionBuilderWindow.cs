@@ -11,7 +11,7 @@ public sealed partial class ConditionBuilderWindow : Window
     private readonly ComboBox _modeBox;
     private readonly ComboBox _operatorBox;
     private readonly TextBox _variableBox;
-    private readonly TextBox _valueBox;
+    private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBlock _previewText;
 
     public ConditionBuilderWindow(string condition)
@@ -35,7 +35,7 @@ public sealed partial class ConditionBuilderWindow : Window
             Margin = new Thickness(0, 4, 0, 12),
         };
         _variableBox = DialogUi.TextBox(string.Empty);
-        _valueBox = DialogUi.TextBox(string.Empty);
+        _valueEditor = new ScriptLiteralEditorControl();
         _previewText = new TextBlock
         {
             Margin = new Thickness(0, 8, 0, 12),
@@ -46,7 +46,7 @@ public sealed partial class ConditionBuilderWindow : Window
         _modeBox.SelectionChanged += (_, _) => UpdateFields();
         _operatorBox.SelectionChanged += (_, _) => UpdatePreview();
         _variableBox.TextChanged += (_, _) => UpdatePreview();
-        _valueBox.TextChanged += (_, _) => UpdatePreview();
+        _valueEditor.LiteralChanged += (_, _) => UpdatePreview();
 
         Content = CreateContent();
         LoadCondition(condition);
@@ -65,7 +65,7 @@ public sealed partial class ConditionBuilderWindow : Window
         panel.Children.Add(DialogUi.Label("Оператор"));
         panel.Children.Add(_operatorBox);
         panel.Children.Add(DialogUi.Label("Значение"));
-        panel.Children.Add(_valueBox);
+        panel.Children.Add(_valueEditor);
         panel.Children.Add(_previewText);
         panel.Children.Add(DialogUi.Buttons(Save, this));
         return panel;
@@ -104,13 +104,13 @@ public sealed partial class ConditionBuilderWindow : Window
             SelectMode(ConditionMode.Comparison);
             _variableBox.Text = match.Groups["name"].Value;
             _operatorBox.SelectedItem = match.Groups["operator"].Value;
-            _valueBox.Text = match.Groups["value"].Value.Trim();
+            _valueEditor.LoadLiteral(match.Groups["value"].Value.Trim());
             return;
         }
 
         SelectMode(ConditionMode.Comparison);
         _operatorBox.SelectedItem = "==";
-        _valueBox.Text = condition;
+        _valueEditor.LoadLiteral(condition);
     }
 
     private void SelectMode(ConditionMode mode) =>
@@ -121,7 +121,7 @@ public sealed partial class ConditionBuilderWindow : Window
         var mode = SelectedMode;
         _variableBox.IsEnabled = mode is not ConditionMode.Always;
         _operatorBox.IsEnabled = mode is ConditionMode.Comparison;
-        _valueBox.IsEnabled = mode is ConditionMode.Comparison;
+        _valueEditor.IsEnabled = mode is ConditionMode.Comparison;
         UpdatePreview();
     }
 
@@ -144,8 +144,8 @@ public sealed partial class ConditionBuilderWindow : Window
                 ? string.Empty
                 : $"!{variable}",
             ConditionMode.Comparison => variable.Length == 0
-                ? _valueBox.Text.Trim()
-                : $"{variable} {_operatorBox.SelectedItem ?? "=="} {_valueBox.Text.Trim()}",
+                ? _valueEditor.Literal
+                : $"{variable} {_operatorBox.SelectedItem ?? "=="} {_valueEditor.Literal}",
             _ => string.Empty,
         };
     }
@@ -169,14 +169,8 @@ public sealed partial class ConditionBuilderWindow : Window
             return;
         }
         if (SelectedMode is ConditionMode.Comparison
-            && _valueBox.Text.Trim().Length == 0)
+            && !_valueEditor.TryValidate(this, "Собрать условие"))
         {
-            MessageBox.Show(
-                this,
-                "Укажите значение для сравнения.",
-                "Собрать условие",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
             return;
         }
 
