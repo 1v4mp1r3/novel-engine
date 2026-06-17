@@ -4104,11 +4104,12 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(directory);
         var stem = Path.GetFileNameWithoutExtension(
             _projectPath ?? GetDefaultProjectFileName());
-        var path = Path.Combine(
+        var path = AutoSaveStore.CreateSnapshotPath(
             directory,
-            $"{stem}-{DateTime.Now:yyyyMMdd-HHmmss}.novel.json");
+            stem,
+            DateTime.UtcNow);
         ProjectSerializer.Save(_project, path);
-        PruneAutoSaves(directory, stem, keepCount: 24);
+        AutoSaveStore.Prune(directory, stem, keepCount: 24);
     }
 
     private string? GetAutoSaveDirectory()
@@ -4120,17 +4121,6 @@ public partial class MainWindow : Window
         return workspace is null
             ? null
             : Path.Combine(workspace, "autosaves");
-    }
-
-    private static void PruneAutoSaves(string directory, string stem, int keepCount)
-    {
-        foreach (var file in Directory
-            .EnumerateFiles(directory, $"{stem}-*.novel.json")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .Skip(keepCount))
-        {
-            File.Delete(file);
-        }
     }
 
     private int EnsureWorkspaceStructure()

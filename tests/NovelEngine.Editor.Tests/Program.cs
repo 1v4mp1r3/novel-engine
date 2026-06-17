@@ -11,6 +11,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
+    ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
@@ -196,6 +197,29 @@ static void ProjectResolverExpandsQuotedEnvironmentPaths()
     finally
     {
         Environment.SetEnvironmentVariable(variableName, previous);
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void AutoSaveSnapshotPathsAvoidSameSecondCollisions()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var timestamp = new DateTime(2026, 6, 17, 12, 34, 56, DateTimeKind.Utc);
+        var first = AutoSaveStore.CreateSnapshotPath(directory, "story", timestamp);
+        File.WriteAllText(first, "{}");
+
+        var second = AutoSaveStore.CreateSnapshotPath(directory, "story", timestamp);
+
+        Assert(first != second, "Autosave snapshot reused an existing path from the same second.");
+        Assert(
+            Path.GetFileName(second).StartsWith("story-", StringComparison.Ordinal)
+                && Path.GetFileName(second).EndsWith("-2.novel.json", StringComparison.Ordinal),
+            "Autosave snapshot did not use a deterministic collision suffix.");
+    }
+    finally
+    {
         Directory.Delete(directory, recursive: true);
     }
 }
