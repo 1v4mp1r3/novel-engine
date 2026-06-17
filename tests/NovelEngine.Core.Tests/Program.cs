@@ -350,6 +350,25 @@ static void NodeTemplatesCreateAuthoringScaffolds()
     Assert(scene.Outputs[0].TargetNodeId == connected.Id, "Connected template was not wired from the source.");
     Assert(connected.Title == "Реплика персонажа", "Connected template did not apply the requested scaffold.");
     Assert(connected.Outputs is [{ Label: "Дальше" }], "Connected line template should have one next output.");
+
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue && node.Id == "dialogue-1");
+    dialogue.Outputs[0].TargetNodeId = sceneTemplate.Id;
+    dialogue.Outputs[1].TargetNodeId = lineTemplate.Id;
+    var connectedChoice = project.AddConnectedNodeTemplate(
+        dialogue.Id,
+        NodeTemplateKind.ChoiceBranch,
+        dialogue.X + 480,
+        dialogue.Y);
+    Assert(dialogue.Outputs[^1].Label == "Новый выбор", "Choice template should add a semantic output label.");
+    Assert(dialogue.Outputs[^1].TargetNodeId == connectedChoice.Id, "Choice template output was not connected.");
+
+    var connectedLine = project.AddConnectedNodeTemplate(
+        dialogue.Id,
+        NodeTemplateKind.CharacterLine,
+        dialogue.X + 720,
+        dialogue.Y);
+    Assert(dialogue.Outputs[^1].Label == "Новая реплика", "Line template should add a semantic output label.");
+    Assert(dialogue.Outputs[^1].TargetNodeId == connectedLine.Id, "Line template output was not connected.");
     project.Validate();
 }
 

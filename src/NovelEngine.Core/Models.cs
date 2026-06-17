@@ -436,7 +436,20 @@ public sealed class NovelProject
         string sourceNodeId,
         NodeKind kind,
         float x,
-        float y)
+        float y) =>
+        AddConnectedNodeCore(
+            sourceNodeId,
+            kind,
+            x,
+            y,
+            kind == NodeKind.Dialogue ? "Новый диалог" : "Новая сцена");
+
+    private NovelNode AddConnectedNodeCore(
+        string sourceNodeId,
+        NodeKind kind,
+        float x,
+        float y,
+        string addedChoiceLabel)
     {
         if (kind == NodeKind.Start)
         {
@@ -455,7 +468,7 @@ public sealed class NovelProject
 
             output = AddChoice(
                 source.Id,
-                kind == NodeKind.Dialogue ? "Новый диалог" : "Новая сцена");
+                addedChoiceLabel);
         }
 
         var node = AddNode(kind, x, y);
@@ -469,11 +482,12 @@ public sealed class NovelProject
         float x,
         float y)
     {
-        var node = AddConnectedNode(
+        var node = AddConnectedNodeCore(
             sourceNodeId,
             GetTemplateNodeKind(template),
             x,
-            y);
+            y,
+            GetConnectedTemplateOutputLabel(template));
         ApplyNodeTemplate(node, template);
         return node;
     }
@@ -972,6 +986,15 @@ public sealed class NovelProject
         template == NodeTemplateKind.EstablishingScene
             ? NodeKind.Scene
             : NodeKind.Dialogue;
+
+    private static string GetConnectedTemplateOutputLabel(NodeTemplateKind template) =>
+        template switch
+        {
+            NodeTemplateKind.EstablishingScene => "Новая сцена",
+            NodeTemplateKind.CharacterLine => "Новая реплика",
+            NodeTemplateKind.ChoiceBranch => "Новый выбор",
+            _ => throw new ArgumentOutOfRangeException(nameof(template), template, null),
+        };
 
     private static void ApplyNodeTemplate(NovelNode node, NodeTemplateKind template)
     {
