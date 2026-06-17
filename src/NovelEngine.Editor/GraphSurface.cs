@@ -292,13 +292,22 @@ public sealed class GraphSurface : FrameworkElement
 
         if (_panning)
         {
-            _viewOffset = _panOffsetStart + (position - _panStart);
+            var nextOffset = _panOffsetStart + (position - _panStart);
+            if (nextOffset == _viewOffset)
+            {
+                return;
+            }
+            _viewOffset = nextOffset;
             RequestRender();
             return;
         }
 
         if (_connectionDrag is not null)
         {
+            if (_connectionDrag.Cursor == position)
+            {
+                return;
+            }
             _connectionDrag = _connectionDrag with { Cursor = position };
             RequestRender();
             return;
@@ -320,8 +329,15 @@ public sealed class GraphSurface : FrameworkElement
             return;
         }
 
-        node.X = (float)(_dragNodeStart.X + position.X - _dragStart.X);
-        node.Y = (float)(_dragNodeStart.Y + position.Y - _dragStart.Y);
+        var nextX = (float)(_dragNodeStart.X + position.X - _dragStart.X);
+        var nextY = (float)(_dragNodeStart.Y + position.Y - _dragStart.Y);
+        if (node.X == nextX && node.Y == nextY)
+        {
+            return;
+        }
+
+        node.X = nextX;
+        node.Y = nextY;
         _dragMoved = node.X != _dragNodeStart.X || node.Y != _dragNodeStart.Y;
         RequestRender();
     }
