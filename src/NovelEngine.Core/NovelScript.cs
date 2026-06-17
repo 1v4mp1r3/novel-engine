@@ -28,59 +28,63 @@ public static partial class NovelScript
     {
         foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
         {
-            var line = sourceLine.Trim();
-            if (line.Length == 0 || IsComment(line))
+            if (!NovelScriptCommands.TryParseLine(sourceLine, out var command))
+            {
+                if (command.Source.Length > 0)
+                {
+                    throw new InvalidDataException(
+                        $"Неизвестная команда языка: {command.Source}");
+                }
+                continue;
+            }
+
+            if (command.Kind == NovelScriptCommandKind.Comment)
             {
                 continue;
             }
 
-            var setMatch = SetCommand().Match(line);
-            if (setMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Set)
             {
-                state.Variables[setMatch.Groups["name"].Value] =
-                    ParseLiteral(setMatch.Groups["value"].Value);
+                state.Variables[command.Name] = ParseLiteral(command.Value);
                 continue;
             }
 
-            var addMatch = AddCommand().Match(line);
-            if (addMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Add)
             {
-                var name = addMatch.Groups["name"].Value;
-                var amountValue = ParseLiteral(addMatch.Groups["value"].Value);
+                var amountValue = ParseLiteral(command.Value);
                 if (!TryNumber(amountValue, out var amount))
                 {
                     throw new InvalidDataException(
-                        $"Команда add ожидает число: {line}");
+                        $"Команда add ожидает число: {command.Source}");
                 }
 
                 var current = 0d;
-                if (state.Variables.TryGetValue(name, out var existing)
+                if (state.Variables.TryGetValue(command.Name, out var existing)
                     && !TryNumber(existing, out current))
                 {
                     throw new InvalidDataException(
-                        $"Переменная «{name}» не является числом для add.");
+                        $"Переменная «{command.Name}» не является числом для add.");
                 }
 
-                state.Variables[name] = current + amount;
+                state.Variables[command.Name] = current + amount;
                 continue;
             }
 
-            var unsetMatch = UnsetCommand().Match(line);
-            if (unsetMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Unset)
             {
-                state.Variables.Remove(unsetMatch.Groups["name"].Value);
+                state.Variables.Remove(command.Name);
                 continue;
             }
 
-            var toggleMatch = ToggleCommand().Match(line);
-            if (toggleMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Toggle)
             {
-                var name = toggleMatch.Groups["name"].Value;
-                state.Variables[name] = !IsTruthy(GetVariable(name, state));
+                state.Variables[command.Name] =
+                    !IsTruthy(GetVariable(command.Name, state));
                 continue;
             }
 
-            throw new InvalidDataException($"Неизвестная команда языка: {line}");
+            throw new InvalidDataException(
+                $"Неизвестная команда языка: {command.Source}");
         }
     }
 
@@ -194,29 +198,6 @@ public static partial class NovelScript
             _ when TryNumber(value, out var number) => number != 0,
             _ => true,
         };
-
-    private static bool IsComment(string line) =>
-        line.StartsWith('#') || line.StartsWith("//", StringComparison.Ordinal);
-
-    [GeneratedRegex(
-        "^set\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<value>.+)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex SetCommand();
-
-    [GeneratedRegex(
-        "^add\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex AddCommand();
-
-    [GeneratedRegex(
-        "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex UnsetCommand();
-
-    [GeneratedRegex(
-        "^toggle\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex ToggleCommand();
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
     private static partial Regex Identifier();

@@ -36,18 +36,18 @@ public static partial class ProjectScriptVariables
 
         foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
         {
-            var line = sourceLine.Trim();
-            if (line.Length == 0
-                || line.StartsWith('#')
-                || line.StartsWith("//", StringComparison.Ordinal))
+            if (!NovelScriptCommands.TryParseLine(sourceLine, out var command)
+                || command.Kind == NovelScriptCommandKind.Comment)
             {
                 continue;
             }
 
-            var match = ScriptCommandVariable().Match(line);
-            if (match.Success)
+            if (command.Kind is NovelScriptCommandKind.Set
+                or NovelScriptCommandKind.Add
+                or NovelScriptCommandKind.Unset
+                or NovelScriptCommandKind.Toggle)
             {
-                variables.Add(match.Groups["name"].Value);
+                variables.Add(command.Name);
             }
         }
     }
@@ -133,11 +133,6 @@ public static partial class ProjectScriptVariables
             }
         }
     }
-
-    [GeneratedRegex(
-        "^(?:set|add|unset|toggle)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\b",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex ScriptCommandVariable();
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
     private static partial Regex Identifier();

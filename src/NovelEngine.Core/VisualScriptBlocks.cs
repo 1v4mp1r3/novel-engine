@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace NovelEngine.Core;
 
@@ -35,7 +34,7 @@ public sealed class VisualScriptBlock
         };
 }
 
-public static partial class VisualScriptCompiler
+public static class VisualScriptCompiler
 {
     public static IReadOnlyList<VisualScriptBlock> ParseScript(string script)
     {
@@ -43,47 +42,48 @@ public static partial class VisualScriptCompiler
         var index = 1;
         foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
         {
-            var line = sourceLine.Trim();
-            if (line.Length == 0)
+            if (!NovelScriptCommands.TryParseLine(sourceLine, out var command))
             {
+                if (command.Source.Length > 0)
+                {
+                    throw new InvalidDataException(
+                        $"Команда не поддерживается visual blocks: {command.Source}");
+                }
                 continue;
             }
 
-            if (TryReadComment(line, out var comment))
+            if (command.Kind == NovelScriptCommandKind.Comment)
             {
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
                         Kind = VisualScriptBlockKind.Comment,
-                        Text = comment,
+                        Text = command.Comment,
                     });
                 continue;
             }
 
-            var setMatch = SetCommand().Match(line);
-            if (setMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Set)
             {
-                var value = setMatch.Groups["value"].Value.Trim();
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
-                        Kind = value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                        Kind = command.Value.Equals("true", StringComparison.OrdinalIgnoreCase)
                             ? VisualScriptBlockKind.SetFlagTrue
-                            : value.Equals("false", StringComparison.OrdinalIgnoreCase)
+                            : command.Value.Equals("false", StringComparison.OrdinalIgnoreCase)
                                 ? VisualScriptBlockKind.SetFlagFalse
                                 : VisualScriptBlockKind.SetVariable,
-                        VariableName = setMatch.Groups["name"].Value,
-                        Value = value,
+                        VariableName = command.Name,
+                        Value = command.Value,
                     });
                 continue;
             }
 
-            var addMatch = AddCommand().Match(line);
-            if (addMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Add)
             {
-                var value = addMatch.Groups["value"].Value.Trim();
+                var value = command.Value;
                 var kind = VisualScriptBlockKind.AddVariable;
                 if (double.TryParse(
                         value,
@@ -101,40 +101,38 @@ public static partial class VisualScriptCompiler
                     {
                         Id = $"imported-{index++}",
                         Kind = kind,
-                        VariableName = addMatch.Groups["name"].Value,
+                        VariableName = command.Name,
                         Value = value,
                     });
                 continue;
             }
 
-            var unsetMatch = UnsetCommand().Match(line);
-            if (unsetMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Unset)
             {
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
                         Kind = VisualScriptBlockKind.UnsetVariable,
-                        VariableName = unsetMatch.Groups["name"].Value,
+                        VariableName = command.Name,
                     });
                 continue;
             }
 
-            var toggleMatch = ToggleCommand().Match(line);
-            if (toggleMatch.Success)
+            if (command.Kind == NovelScriptCommandKind.Toggle)
             {
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
                         Kind = VisualScriptBlockKind.ToggleVariable,
-                        VariableName = toggleMatch.Groups["name"].Value,
+                        VariableName = command.Name,
                     });
                 continue;
             }
 
             throw new InvalidDataException(
-                $"Команда не поддерживается visual blocks: {line}");
+                $"Команда не поддерживается visual blocks: {command.Source}");
         }
 
         Validate(blocks);
@@ -246,42 +244,6 @@ public static partial class VisualScriptCompiler
             ? block.Kind.ToString()
             : $"«{block.Id}»";
 
-    private static bool TryReadComment(string line, out string comment)
-    {
-        if (line.StartsWith('#'))
-        {
-            comment = line[1..].Trim();
-            return true;
-        }
-        if (line.StartsWith("//", StringComparison.Ordinal))
-        {
-            comment = line[2..].Trim();
-            return true;
-        }
-
-        comment = string.Empty;
-        return false;
-    }
-
-    [GeneratedRegex(
-        "^set\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<value>.+)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex SetCommand();
-
-    [GeneratedRegex(
-        "^add\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex AddCommand();
-
-    [GeneratedRegex(
-        "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex UnsetCommand();
-
-    [GeneratedRegex(
-        "^toggle\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.IgnoreCase)]
-    private static partial Regex ToggleCommand();
 }
 
 public static class VisualScriptBlockPreserver

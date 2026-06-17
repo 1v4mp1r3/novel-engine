@@ -605,6 +605,10 @@ static void NovelScriptTogglesVariables()
 static void NovelScriptRejectsInvalidAddOperands()
 {
     AssertThrows<InvalidDataException>(
+        () => NovelScript.Execute("dance now", new ScriptState()),
+        "Unknown script command was silently ignored.");
+
+    AssertThrows<InvalidDataException>(
         () => NovelScript.Execute("add score nope", new ScriptState()),
         "Add command accepted a non-numeric amount.");
 

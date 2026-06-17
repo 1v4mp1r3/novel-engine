@@ -32,6 +32,9 @@ commands used by hand-written scripts (`set`, `add`, `unset`, `toggle`) and are
 executed after the matching text script. This keeps a future Scratch-like block
 editor on top of the same runtime semantics instead of introducing a second
 scripting engine.
+Command parsing lives in the shared `NovelScriptCommands` layer so runtime
+execution, block import, and variable discovery cannot drift apart as new
+commands are added.
 
 Choice condition authoring uses the same approach: `VisualConditionExpression`
 parses and compiles the supported condition forms (`always`, variable truth,
