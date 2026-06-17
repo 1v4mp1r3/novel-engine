@@ -37,5 +37,5 @@ route == "good" || route == "true"
 An empty condition means that the choice is always available.
 Use `&&` for AND and `||` for OR. AND is evaluated before OR; parentheses are
 not part of the MVP condition syntax yet.
-The core condition model stores these forms, so future condition blocks and
-hand-written conditions stay aligned.
+The condition builder can assemble AND/OR groups visually and stores them in the
+same core condition model used by hand-written DSL.

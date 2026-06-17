@@ -11,7 +11,16 @@ public sealed class ConditionBuilderWindow : Window
     private readonly ComboBox _operatorBox;
     private readonly ComboBox _variableBox;
     private readonly ScriptLiteralEditorControl _valueEditor;
+    private readonly StackPanel _basicPanel;
+    private readonly StackPanel _groupPanel;
+    private readonly ListBox _childrenList;
+    private readonly Button _editChildButton;
+    private readonly Button _deleteChildButton;
+    private readonly Button _moveChildUpButton;
+    private readonly Button _moveChildDownButton;
     private readonly TextBlock _previewText;
+    private readonly IReadOnlyList<string> _knownVariables;
+    private readonly List<VisualConditionExpression> _groupChildren = [];
     private string _rawFallbackCondition = string.Empty;
     private VisualConditionExpression? _rawFallbackExpression;
 
@@ -21,11 +30,12 @@ public sealed class ConditionBuilderWindow : Window
         VisualConditionExpression? expression = null)
     {
         Title = "Собрать условие";
-        Width = 480;
-        Height = 380;
+        Width = 560;
+        Height = 540;
         MinWidth = 420;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        _knownVariables = NormalizeVariables(knownVariables);
 
         _modeBox = new ComboBox
         {
@@ -41,10 +51,25 @@ public sealed class ConditionBuilderWindow : Window
         _variableBox = new ComboBox
         {
             IsEditable = true,
-            ItemsSource = NormalizeVariables(knownVariables),
+            ItemsSource = _knownVariables,
             Margin = new Thickness(0, 4, 0, 12),
         };
         _valueEditor = new ScriptLiteralEditorControl();
+        _basicPanel = new StackPanel();
+        _groupPanel = new StackPanel
+        {
+            Visibility = Visibility.Collapsed,
+        };
+        _childrenList = new ListBox
+        {
+            DisplayMemberPath = nameof(ConditionChildView.Text),
+            Height = 150,
+            Margin = new Thickness(0, 4, 0, 8),
+        };
+        _editChildButton = CreateChildButton("Изменить", EditChild);
+        _deleteChildButton = CreateChildButton("Удалить", DeleteChild);
+        _moveChildUpButton = CreateChildButton("Выше", MoveChildUp);
+        _moveChildDownButton = CreateChildButton("Ниже", MoveChildDown);
         _previewText = new TextBlock
         {
             Margin = new Thickness(0, 8, 0, 12),
@@ -57,6 +82,7 @@ public sealed class ConditionBuilderWindow : Window
         _variableBox.SelectionChanged += (_, _) => UpdatePreview();
         _variableBox.KeyUp += (_, _) => UpdatePreview();
         _valueEditor.LiteralChanged += (_, _) => UpdatePreview();
+        _childrenList.SelectionChanged += (_, _) => UpdateChildButtons();
 
         Content = CreateContent();
         if (expression is null)
@@ -78,14 +104,45 @@ public sealed class ConditionBuilderWindow : Window
         var panel = DialogUi.Panel();
         panel.Children.Add(DialogUi.Label("Тип условия"));
         panel.Children.Add(_modeBox);
-        panel.Children.Add(DialogUi.Label("Переменная"));
-        panel.Children.Add(_variableBox);
-        panel.Children.Add(DialogUi.Label("Оператор"));
-        panel.Children.Add(_operatorBox);
-        panel.Children.Add(DialogUi.Label("Значение"));
-        panel.Children.Add(_valueEditor);
+        _basicPanel.Children.Add(DialogUi.Label("Переменная"));
+        _basicPanel.Children.Add(_variableBox);
+        _basicPanel.Children.Add(DialogUi.Label("Оператор"));
+        _basicPanel.Children.Add(_operatorBox);
+        _basicPanel.Children.Add(DialogUi.Label("Значение"));
+        _basicPanel.Children.Add(_valueEditor);
+        panel.Children.Add(_basicPanel);
+        _groupPanel.Children.Add(DialogUi.Label("Условия группы"));
+        _groupPanel.Children.Add(_childrenList);
+        _groupPanel.Children.Add(CreateChildButtons());
+        panel.Children.Add(_groupPanel);
         panel.Children.Add(_previewText);
         panel.Children.Add(DialogUi.Buttons(Save, this));
+        return panel;
+    }
+
+    private static Button CreateChildButton(string text, Action action)
+    {
+        var button = new Button
+        {
+            Content = text,
+            MinWidth = 95,
+        };
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private UIElement CreateChildButtons()
+    {
+        var panel = new WrapPanel
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+        var add = CreateChildButton("+ Условие", AddChild);
+        panel.Children.Add(add);
+        panel.Children.Add(_editChildButton);
+        panel.Children.Add(_deleteChildButton);
+        panel.Children.Add(_moveChildUpButton);
+        panel.Children.Add(_moveChildDownButton);
         return panel;
     }
 
@@ -120,6 +177,20 @@ public sealed class ConditionBuilderWindow : Window
 
         _rawFallbackExpression = null;
         SelectMode(expression.Kind);
+        if (IsGroupMode(expression.Kind))
+        {
+            _groupChildren.Clear();
+            _groupChildren.AddRange(
+                expression.Children.Select(child => child.Clone()));
+            _variableBox.Text = string.Empty;
+            _operatorBox.SelectedItem = "==";
+            _valueEditor.LoadLiteral(string.Empty);
+            RefreshChildrenList();
+            return;
+        }
+
+        _groupChildren.Clear();
+        RefreshChildrenList();
         _variableBox.Text = expression.VariableName;
         _operatorBox.SelectedItem = expression.Operator;
         _valueEditor.LoadLiteral(expression.Value);
@@ -131,27 +202,38 @@ public sealed class ConditionBuilderWindow : Window
     private void UpdateFields()
     {
         var mode = SelectedMode;
+        var groupMode = IsGroupMode(mode);
+        _basicPanel.Visibility = groupMode ? Visibility.Collapsed : Visibility.Visible;
+        _groupPanel.Visibility = groupMode ? Visibility.Visible : Visibility.Collapsed;
         _variableBox.IsEnabled = mode is not VisualConditionKind.Always;
         _operatorBox.IsEnabled = mode is VisualConditionKind.Comparison;
         _valueEditor.IsEnabled = mode is VisualConditionKind.Comparison;
+        UpdateChildButtons();
         UpdatePreview();
     }
 
     private void UpdatePreview()
     {
-        if (_rawFallbackCondition.Length > 0
-            && SelectedMode is VisualConditionKind.Comparison
-            && VariableName.Length == 0)
+        if (IsRawFallbackSelected)
         {
             _previewText.Text =
                 $"Текущее условие не входит в визуальные формы: {_rawFallbackCondition}";
             return;
         }
 
-        var condition = BuildCondition();
-        _previewText.Text = condition.Length == 0
-            ? "Показывать всегда"
-            : $"Условие: {condition}";
+        try
+        {
+            var condition = VisualConditionCompiler.Compile(BuildExpression());
+            _previewText.Text = condition.Length == 0
+                ? IsGroupMode(SelectedMode)
+                    ? "Добавьте хотя бы одно условие"
+                    : "Показывать всегда"
+                : $"Условие: {condition}";
+        }
+        catch (InvalidDataException error)
+        {
+            _previewText.Text = error.Message;
+        }
     }
 
     private string BuildCondition()
@@ -198,12 +280,130 @@ public sealed class ConditionBuilderWindow : Window
         }
     }
 
+    private void AddChild()
+    {
+        var dialog = new ConditionBuilderWindow(string.Empty, _knownVariables)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _groupChildren.Add(dialog.Expression);
+        RefreshChildrenList(_groupChildren.Count - 1);
+    }
+
+    private void EditChild()
+    {
+        var index = _childrenList.SelectedIndex;
+        if (index < 0 || index >= _groupChildren.Count)
+        {
+            return;
+        }
+
+        var child = _groupChildren[index];
+        var dialog = new ConditionBuilderWindow(
+            VisualConditionCompiler.Compile(child),
+            _knownVariables,
+            child)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _groupChildren[index] = dialog.Expression;
+        RefreshChildrenList(index);
+    }
+
+    private void DeleteChild()
+    {
+        var index = _childrenList.SelectedIndex;
+        if (index < 0 || index >= _groupChildren.Count)
+        {
+            return;
+        }
+
+        _groupChildren.RemoveAt(index);
+        RefreshChildrenList(Math.Min(index, _groupChildren.Count - 1));
+    }
+
+    private void MoveChildUp()
+    {
+        var index = _childrenList.SelectedIndex;
+        if (index <= 0 || index >= _groupChildren.Count)
+        {
+            return;
+        }
+
+        (_groupChildren[index - 1], _groupChildren[index]) =
+            (_groupChildren[index], _groupChildren[index - 1]);
+        RefreshChildrenList(index - 1);
+    }
+
+    private void MoveChildDown()
+    {
+        var index = _childrenList.SelectedIndex;
+        if (index < 0 || index >= _groupChildren.Count - 1)
+        {
+            return;
+        }
+
+        (_groupChildren[index + 1], _groupChildren[index]) =
+            (_groupChildren[index], _groupChildren[index + 1]);
+        RefreshChildrenList(index + 1);
+    }
+
+    private void RefreshChildrenList(int selectedIndex = -1)
+    {
+        _childrenList.ItemsSource = _groupChildren
+            .Select((child, index) => new ConditionChildView(
+                index + 1,
+                DescribeChild(child)))
+            .ToList();
+        if (selectedIndex >= 0 && selectedIndex < _groupChildren.Count)
+        {
+            _childrenList.SelectedIndex = selectedIndex;
+        }
+        UpdateChildButtons();
+        UpdatePreview();
+    }
+
+    private void UpdateChildButtons()
+    {
+        var selected = _childrenList.SelectedIndex >= 0
+            && _childrenList.SelectedIndex < _groupChildren.Count;
+        _editChildButton.IsEnabled = selected;
+        _deleteChildButton.IsEnabled = selected;
+        _moveChildUpButton.IsEnabled = selected && _childrenList.SelectedIndex > 0;
+        _moveChildDownButton.IsEnabled =
+            selected && _childrenList.SelectedIndex < _groupChildren.Count - 1;
+    }
+
+    private static string DescribeChild(VisualConditionExpression expression)
+    {
+        try
+        {
+            return VisualConditionCompiler.Compile(expression);
+        }
+        catch (InvalidDataException error)
+        {
+            return error.Message;
+        }
+    }
+
     private static readonly IReadOnlyList<ModeChoice> ModeChoices =
     [
         new(VisualConditionKind.Always, "Показывать всегда"),
         new(VisualConditionKind.VariableTrue, "Переменная истинна"),
         new(VisualConditionKind.VariableFalse, "Переменная ложна"),
         new(VisualConditionKind.Comparison, "Сравнение"),
+        new(VisualConditionKind.All, "Все условия (И)"),
+        new(VisualConditionKind.Any, "Любое условие (ИЛИ)"),
     ];
 
     private static readonly IReadOnlyList<string> Operators =
@@ -221,6 +421,15 @@ public sealed class ConditionBuilderWindow : Window
         if (IsRawFallbackSelected && _rawFallbackExpression is not null)
         {
             return _rawFallbackExpression.Clone();
+        }
+
+        if (IsGroupMode(SelectedMode))
+        {
+            return new()
+            {
+                Kind = SelectedMode,
+                Children = _groupChildren.Select(child => child.Clone()).ToList(),
+            };
         }
 
         return new()
@@ -241,5 +450,13 @@ public sealed class ConditionBuilderWindow : Window
             .ToList()
         ?? [];
 
+    private static bool IsGroupMode(VisualConditionKind mode) =>
+        mode is VisualConditionKind.All or VisualConditionKind.Any;
+
     private sealed record ModeChoice(VisualConditionKind Mode, string Label);
+
+    private sealed record ConditionChildView(int Number, string Condition)
+    {
+        public string Text => $"{Number}. {Condition}";
+    }
 }

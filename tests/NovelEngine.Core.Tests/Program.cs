@@ -812,6 +812,22 @@ static void VisualConditionsParseAndCompile()
     Assert(
         VisualConditionCompiler.Evaluate("met_hero && score >= 3 || route == \"good\"", state),
         "OR condition did not evaluate.");
+    AssertThrows<InvalidDataException>(
+        () => VisualConditionCompiler.Validate(
+            new VisualConditionExpression
+            {
+                Kind = VisualConditionKind.All,
+                Children =
+                [
+                    new(),
+                    new()
+                    {
+                        Kind = VisualConditionKind.VariableTrue,
+                        VariableName = "met_hero",
+                    },
+                ],
+            }),
+        "Empty child condition in group was accepted.");
 }
 
 static void VisualConditionExpressionsSurviveJsonAndRuntime()

@@ -116,8 +116,8 @@ public static partial class VisualConditionCompiler
 
     public static void Validate(VisualConditionExpression expression)
     {
-        var condition = Compile(expression);
-        _ = NovelScript.Evaluate(condition, new ScriptState());
+        _ = Compile(expression);
+        _ = Evaluate(expression, new ScriptState());
     }
 
     public static bool Evaluate(string condition, ScriptState state) =>
@@ -202,7 +202,12 @@ public static partial class VisualConditionCompiler
             throw new InvalidDataException(
                 "OR-группа внутри AND пока не поддерживается без скобок.");
         }
-        return Compile(child);
+        var condition = Compile(child);
+        if (condition.Length == 0)
+        {
+            throw new InvalidDataException("Группа условий не может содержать пустое условие.");
+        }
+        return condition;
     }
 
     private static VisualConditionExpression CreateGroup(

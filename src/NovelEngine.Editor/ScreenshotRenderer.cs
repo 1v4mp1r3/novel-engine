@@ -257,6 +257,33 @@ internal static class ScreenshotRenderer
         window.Close();
     }
 
+    public static void SmokeConditionBuilder()
+    {
+        const string condition = "met_hero && score >= 3 || route == \"good\"";
+        var window = new ConditionBuilderWindow(
+            string.Empty,
+            ["met_hero", "score", "route"],
+            VisualConditionCompiler.Parse(condition))
+        {
+            Width = 560,
+            Height = 540,
+            Left = -20_000,
+            Top = -20_000,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+        };
+        window.Show();
+        window.Dispatcher.Invoke(
+            () => { },
+            DispatcherPriority.ApplicationIdle);
+        if (!window.Condition.Equals(condition, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Condition builder smoke expected `{condition}`, got `{window.Condition}`.");
+        }
+        window.Close();
+    }
+
     private static void AssertDarkMenuRender(FrameworkElement element, string name)
     {
         element.UpdateLayout();
