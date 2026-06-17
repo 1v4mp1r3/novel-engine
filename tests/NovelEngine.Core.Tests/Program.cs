@@ -83,6 +83,14 @@ static void ProjectDiagnosticsReportAuthoringIssues()
     var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
     dialogue.Speaker = string.Empty;
     dialogue.Outputs[0].Script = "dance";
+    dialogue.Outputs[0].ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "broken-choice-block",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "bad-variable",
+            Value = "1",
+        });
     var orphan = project.AddNode(NodeKind.Scene, 900, 120);
     orphan.Title = "Lost scene";
 
@@ -97,6 +105,11 @@ static void ProjectDiagnosticsReportAuthoringIssues()
         report.Diagnostics.Any(
             diagnostic => diagnostic.Message.Contains("нет пути", StringComparison.Ordinal)),
         "Unreachable node warning was not reported.");
+    Assert(
+        report.Diagnostics.Any(
+            diagnostic => diagnostic.Location.Contains("visual blocks", StringComparison.Ordinal)
+                && diagnostic.Message.Contains("bad-variable", StringComparison.Ordinal)),
+        "Broken visual script block location was not reported.");
 }
 
 static void ProjectDiagnosticsCheckPhysicalAssets()

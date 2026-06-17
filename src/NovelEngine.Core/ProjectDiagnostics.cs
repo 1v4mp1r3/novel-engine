@@ -80,6 +80,13 @@ public static class ProjectDiagnostics
                     $"Нода «{DisplayNode(node)}», скрипт входа",
                     () => NovelScript.Execute(node.Script, new ScriptState()));
             }
+            if (node.ScriptBlocks.Count > 0)
+            {
+                TryAddScriptError(
+                    diagnostics,
+                    $"Нода «{DisplayNode(node)}», visual blocks входа",
+                    () => VisualScriptCompiler.Validate(node.ScriptBlocks));
+            }
 
             foreach (var output in node.Outputs)
             {
@@ -96,6 +103,13 @@ public static class ProjectDiagnostics
                         diagnostics,
                         $"Нода «{DisplayNode(node)}», скрипт «{output.Label}»",
                         () => NovelScript.Execute(output.Script, new ScriptState()));
+                }
+                if (output.ScriptBlocks.Count > 0)
+                {
+                    TryAddScriptError(
+                        diagnostics,
+                        $"Нода «{DisplayNode(node)}», visual blocks «{output.Label}»",
+                        () => VisualScriptCompiler.Validate(output.ScriptBlocks));
                 }
             }
         }
