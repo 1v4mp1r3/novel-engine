@@ -6,6 +6,7 @@ var tests = new (string Name, Action Run)[]
 {
     ("workspace project creates default folders", WorkspaceProjectCreatesDefaultFolders),
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
+    ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
@@ -85,6 +86,26 @@ static void WorkspaceProjectPathAvoidsExistingFile()
         Assert(
             Path.GetFileName(secondPath) == $"{Path.GetFileName(directory)}-2.novel.json",
             "Available project path did not use the expected numeric suffix.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverOpensDirectProjectFile()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var projectPath = Path.Combine(directory, "direct.novel.json");
+        File.WriteAllText(projectPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(projectPath);
+
+        Assert(result.ProjectPath == projectPath, "Resolver did not open the direct project file.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver did not use the project file directory as workspace.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a direct project file as empty workspace.");
     }
     finally
     {
