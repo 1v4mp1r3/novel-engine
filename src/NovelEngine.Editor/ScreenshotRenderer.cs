@@ -314,6 +314,20 @@ internal static class ScreenshotRenderer
                     VariableName = "score",
                     Value = "2",
                 },
+                new VisualScriptBlock
+                {
+                    Id = "smoke-multiply",
+                    Kind = VisualScriptBlockKind.MultiplyVariable,
+                    VariableName = "score",
+                    Value = "3",
+                },
+                new VisualScriptBlock
+                {
+                    Id = "smoke-divide",
+                    Kind = VisualScriptBlockKind.DivideVariable,
+                    VariableName = "score",
+                    Value = "2",
+                },
             ],
             "Visual script blocks smoke",
             ["met_hero", "route", "route_locked", "score"],
@@ -334,7 +348,9 @@ internal static class ScreenshotRenderer
         if (!script.Contains("toggle met_hero", StringComparison.Ordinal)
             || !script.Contains("set route = \"good\"", StringComparison.Ordinal)
             || !script.Contains("set route_locked = false", StringComparison.Ordinal)
-            || !script.Contains("add score -2", StringComparison.Ordinal))
+            || !script.Contains("add score -2", StringComparison.Ordinal)
+            || !script.Contains("multiply score 3", StringComparison.Ordinal)
+            || !script.Contains("divide score 2", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Visual script blocks smoke compiled unexpected script: {script}");

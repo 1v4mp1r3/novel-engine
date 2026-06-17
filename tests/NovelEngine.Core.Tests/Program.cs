@@ -16,6 +16,7 @@ var tests = new (string Name, Action Run)[]
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
+    ("novel script applies numeric commands", NovelScriptAppliesNumericCommands),
     ("novel script toggles variables", NovelScriptTogglesVariables),
     ("novel script rejects invalid add operands", NovelScriptRejectsInvalidAddOperands),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
@@ -574,6 +575,30 @@ static void RuntimeStateFlows()
         "Script variables did not flow through transitions.");
 }
 
+static void NovelScriptAppliesNumericCommands()
+{
+    var state = new ScriptState();
+    NovelScript.Execute(
+        """
+        set score = 2
+        multiply score 5
+        divide score 2
+        multiply missing 4
+        divide missing 2
+        """,
+        state);
+
+    Assert(
+        Convert.ToDouble(state.Variables["score"]) == 5,
+        "Multiply/divide commands did not update an existing numeric variable.");
+    Assert(
+        Convert.ToDouble(state.Variables["missing"]) == 0,
+        "Multiply/divide commands did not treat a missing variable as 0.");
+    AssertThrows<InvalidDataException>(
+        () => NovelScript.Execute("divide score 0", new ScriptState()),
+        "Divide by zero was accepted.");
+}
+
 static void NovelScriptTogglesVariables()
 {
     var state = new ScriptState();
@@ -653,6 +678,22 @@ static void VisualScriptBlocksRoundTripAndRun()
             VariableName = "score",
             Value = "1",
         });
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-multiply-score",
+            Kind = VisualScriptBlockKind.MultiplyVariable,
+            VariableName = "score",
+            Value = "3",
+        });
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-divide-score",
+            Kind = VisualScriptBlockKind.DivideVariable,
+            VariableName = "score",
+            Value = "2",
+        });
     dialogue.Outputs[0].ScriptBlocks.Add(
         new VisualScriptBlock
         {
@@ -670,7 +711,7 @@ static void VisualScriptBlocksRoundTripAndRun()
     player.Choose(dialogue.Outputs[0].Id);
 
     Assert(
-        Convert.ToDouble(player.State.Variables["score"]) == 2,
+        Convert.ToDouble(player.State.Variables["score"]) == 3,
         "Visual script blocks did not run after text script.");
     Assert(
         (string?)player.State.Variables["route"] == "good",
@@ -680,7 +721,7 @@ static void VisualScriptBlocksRoundTripAndRun()
             && visitedIntro is true,
         "Flag visual script block did not run.");
     Assert(
-        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 3,
+        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 5,
         "Visual script blocks were lost during JSON round trip.");
 }
 
@@ -695,13 +736,15 @@ static void VisualScriptBlocksImportSimpleScripts()
         set route_locked = false
         add score 2
         add score -2
+        multiply score 3
+        divide score 2
         toggle met_hero
         unset temporary_flag
         """);
 
     var script = VisualScriptCompiler.Compile(blocks);
 
-    Assert(blocks.Count == 9, "Script import produced the wrong block count.");
+    Assert(blocks.Count == 11, "Script import produced the wrong block count.");
     Assert(
         script.Contains("set route = \"good\"", StringComparison.Ordinal),
         "Imported set command was not compiled back.");
@@ -721,6 +764,16 @@ static void VisualScriptBlocksImportSimpleScripts()
             && block.VariableName == "score"
             && block.Value == "2"),
         "Imported negative add command did not become a subtract block.");
+    Assert(
+        blocks.Any(block => block.Kind == VisualScriptBlockKind.MultiplyVariable
+            && block.VariableName == "score"
+            && block.Value == "3"),
+        "Imported multiply command did not become a multiply block.");
+    Assert(
+        blocks.Any(block => block.Kind == VisualScriptBlockKind.DivideVariable
+            && block.VariableName == "score"
+            && block.Value == "2"),
+        "Imported divide command did not become a divide block.");
     Assert(
         script.Contains("toggle met_hero", StringComparison.Ordinal),
         "Imported toggle command was not compiled back.");
@@ -815,7 +868,7 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
     var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
 
-    scene.Script = "set score = 1\nadd courage 2\ntoggle visited_intro";
+    scene.Script = "set score = 1\nadd courage 2\ntoggle visited_intro\nmultiply multiplier 2\ndivide ratio 2";
     scene.ScriptBlocks.Add(
         new VisualScriptBlock
         {
@@ -846,6 +899,8 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     Assert(variables.Contains("score"), "Script variable was not collected.");
     Assert(variables.Contains("courage"), "Add variable was not collected.");
     Assert(variables.Contains("visited_intro"), "Toggle variable was not collected.");
+    Assert(variables.Contains("multiplier"), "Multiply variable was not collected.");
+    Assert(variables.Contains("ratio"), "Divide variable was not collected.");
     Assert(variables.Contains("temporary_flag"), "Type script variable was not collected.");
     Assert(variables.Contains("route"), "Node visual block variable was not collected.");
     Assert(variables.Contains("met_hero"), "Condition variable was not collected.");

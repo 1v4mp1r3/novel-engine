@@ -115,8 +115,8 @@ currently installed on this workstation.
 - In the node properties panel, use `Блоки скрипта` to edit entry-script blocks;
   in a choice editor, use the same button to attach blocks to that transition.
 - Visual blocks include dedicated flag on/off/toggle actions for common route
-  flags, plus score add/subtract actions, while still compiling to the same
-  text script commands.
+  flags, plus score add/subtract/multiply/divide actions, while still compiling
+  to the same text script commands.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
 - Conditions created through the visual builder are saved as structured data
@@ -125,9 +125,9 @@ currently installed on this workstation.
 - Choice conditions can combine checks with `&&` and `||` from the visual
   builder or hand-written DSL; runtime and diagnostics use the same compiler
   path for both.
-- Visual-block dialogs can import simple text scripts (`set`, `add`, `unset`,
-  `toggle`, comments) into editable blocks and optionally clear the original
-  text to avoid double execution.
+- Visual-block dialogs can import simple text scripts (`set`, `add`,
+  `multiply`, `divide`, `unset`, `toggle`, comments) into editable blocks and
+  optionally clear the original text to avoid double execution.
 - Applying source from the `Код` tab preserves existing visual script blocks by
   matching node ids and choice outputs, and keeps structured choice conditions
   when their generated `when` text still matches.

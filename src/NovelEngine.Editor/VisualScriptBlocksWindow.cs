@@ -91,6 +91,8 @@ public sealed class VisualScriptBlocksWindow : Window
         panel.Children.Add(CreateButton("+ flag off", () => AddBlock(VisualScriptBlockKind.SetFlagFalse)));
         panel.Children.Add(CreateButton("+ add", () => AddBlock(VisualScriptBlockKind.AddVariable)));
         panel.Children.Add(CreateButton("+ subtract", () => AddBlock(VisualScriptBlockKind.SubtractVariable)));
+        panel.Children.Add(CreateButton("+ multiply", () => AddBlock(VisualScriptBlockKind.MultiplyVariable)));
+        panel.Children.Add(CreateButton("+ divide", () => AddBlock(VisualScriptBlockKind.DivideVariable)));
         panel.Children.Add(CreateButton("+ unset", () => AddBlock(VisualScriptBlockKind.UnsetVariable)));
         panel.Children.Add(CreateButton("+ toggle", () => AddBlock(VisualScriptBlockKind.ToggleVariable)));
         panel.Children.Add(CreateButton("+ comment", () => AddBlock(VisualScriptBlockKind.Comment)));
@@ -363,7 +365,9 @@ public sealed class VisualScriptBlocksWindow : Window
         {
             VisualScriptBlockKind.SetVariable => "true",
             VisualScriptBlockKind.AddVariable
-                or VisualScriptBlockKind.SubtractVariable => "1",
+                or VisualScriptBlockKind.SubtractVariable
+                or VisualScriptBlockKind.MultiplyVariable
+                or VisualScriptBlockKind.DivideVariable => "1",
             _ => string.Empty,
         };
 
@@ -456,7 +460,9 @@ public sealed class VisualScriptBlockEditorWindow : Window
         var isComment = kind == VisualScriptBlockKind.Comment;
         var needsValue = kind is VisualScriptBlockKind.SetVariable
             or VisualScriptBlockKind.AddVariable
-            or VisualScriptBlockKind.SubtractVariable;
+            or VisualScriptBlockKind.SubtractVariable
+            or VisualScriptBlockKind.MultiplyVariable
+            or VisualScriptBlockKind.DivideVariable;
         _variableBox.IsEnabled = !isComment;
         _valueEditor.IsEnabled = needsValue;
         _commentBox.IsEnabled = isComment;
@@ -468,7 +474,9 @@ public sealed class VisualScriptBlockEditorWindow : Window
         {
             if ((SelectedKind is VisualScriptBlockKind.SetVariable
                     or VisualScriptBlockKind.AddVariable
-                    or VisualScriptBlockKind.SubtractVariable)
+                    or VisualScriptBlockKind.SubtractVariable
+                    or VisualScriptBlockKind.MultiplyVariable
+                    or VisualScriptBlockKind.DivideVariable)
                 && !_valueEditor.TryValidate(this, "Блок скрипта"))
             {
                 return;
@@ -494,6 +502,8 @@ public sealed class VisualScriptBlockEditorWindow : Window
         new(VisualScriptBlockKind.SetFlagFalse, "Выключить флаг"),
         new(VisualScriptBlockKind.AddVariable, "Прибавить к переменной"),
         new(VisualScriptBlockKind.SubtractVariable, "Уменьшить переменную"),
+        new(VisualScriptBlockKind.MultiplyVariable, "Умножить переменную"),
+        new(VisualScriptBlockKind.DivideVariable, "Разделить переменную"),
         new(VisualScriptBlockKind.UnsetVariable, "Удалить переменную"),
         new(VisualScriptBlockKind.ToggleVariable, "Переключить флаг"),
         new(VisualScriptBlockKind.Comment, "Комментарий"),

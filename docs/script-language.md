@@ -13,6 +13,8 @@ set met_alice = true
 set player_name = "Макс"
 set score = 2
 add score 1
+multiply score 2
+divide score 2
 unset temporary_flag
 toggle met_alice
 ```
@@ -20,8 +22,8 @@ toggle met_alice
 Both `#` and `//` comments are accepted. Variable names use Latin letters,
 digits, and `_`, and cannot start with a digit. Values may be strings, numbers,
 booleans, or `null`.
-`add name value` treats a missing variable as `0`; the added value and any
-existing variable value must be numeric.
+`add`, `multiply`, and `divide` treat a missing variable as `0`; their operand
+and any existing variable value must be numeric. `divide` rejects `0`.
 `toggle name` flips a variable through the same truthiness rules used by
 conditions; a missing variable becomes `true`.
 The visual-block editor can import these simple commands from text scripts:

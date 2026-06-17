@@ -7,6 +7,8 @@ internal enum NovelScriptCommandKind
     Comment,
     Set,
     Add,
+    Multiply,
+    Divide,
     Unset,
     Toggle,
 }
@@ -60,6 +62,28 @@ internal static partial class NovelScriptCommands
             return true;
         }
 
+        var multiplyMatch = MultiplyCommand().Match(line);
+        if (multiplyMatch.Success)
+        {
+            command = new NovelScriptCommand(
+                NovelScriptCommandKind.Multiply,
+                line,
+                multiplyMatch.Groups["name"].Value,
+                multiplyMatch.Groups["value"].Value.Trim());
+            return true;
+        }
+
+        var divideMatch = DivideCommand().Match(line);
+        if (divideMatch.Success)
+        {
+            command = new NovelScriptCommand(
+                NovelScriptCommandKind.Divide,
+                line,
+                divideMatch.Groups["name"].Value,
+                divideMatch.Groups["value"].Value.Trim());
+            return true;
+        }
+
         var unsetMatch = UnsetCommand().Match(line);
         if (unsetMatch.Success)
         {
@@ -110,6 +134,16 @@ internal static partial class NovelScriptCommands
         "^add\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
         RegexOptions.IgnoreCase)]
     private static partial Regex AddCommand();
+
+    [GeneratedRegex(
+        "^multiply\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex MultiplyCommand();
+
+    [GeneratedRegex(
+        "^divide\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex DivideCommand();
 
     [GeneratedRegex(
         "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",

@@ -44,6 +44,8 @@ public static partial class ProjectScriptVariables
 
             if (command.Kind is NovelScriptCommandKind.Set
                 or NovelScriptCommandKind.Add
+                or NovelScriptCommandKind.Multiply
+                or NovelScriptCommandKind.Divide
                 or NovelScriptCommandKind.Unset
                 or NovelScriptCommandKind.Toggle)
             {

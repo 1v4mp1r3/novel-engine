@@ -8,6 +8,8 @@ public enum VisualScriptBlockKind
     SetVariable,
     AddVariable,
     SubtractVariable,
+    MultiplyVariable,
+    DivideVariable,
     UnsetVariable,
     ToggleVariable,
     SetFlagTrue,
@@ -107,6 +109,32 @@ public static class VisualScriptCompiler
                 continue;
             }
 
+            if (command.Kind == NovelScriptCommandKind.Multiply)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.MultiplyVariable,
+                        VariableName = command.Name,
+                        Value = command.Value,
+                    });
+                continue;
+            }
+
+            if (command.Kind == NovelScriptCommandKind.Divide)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.DivideVariable,
+                        VariableName = command.Name,
+                        Value = command.Value,
+                    });
+                continue;
+            }
+
             if (command.Kind == NovelScriptCommandKind.Unset)
             {
                 blocks.Add(
@@ -188,6 +216,10 @@ public static class VisualScriptCompiler
                 $"add {RequiredVariableName(block)} {RequiredValue(block)}",
             VisualScriptBlockKind.SubtractVariable =>
                 $"add {RequiredVariableName(block)} -{RequiredPositiveNumber(block)}",
+            VisualScriptBlockKind.MultiplyVariable =>
+                $"multiply {RequiredVariableName(block)} {RequiredValue(block)}",
+            VisualScriptBlockKind.DivideVariable =>
+                $"divide {RequiredVariableName(block)} {RequiredNonZeroNumber(block)}",
             VisualScriptBlockKind.UnsetVariable =>
                 $"unset {RequiredVariableName(block)}",
             VisualScriptBlockKind.ToggleVariable =>
@@ -234,6 +266,23 @@ public static class VisualScriptCompiler
         {
             throw new InvalidDataException(
                 $"В блоке {DisplayBlockId(block)} нужно указать положительное число.");
+        }
+
+        return number.ToString("G", CultureInfo.InvariantCulture);
+    }
+
+    private static string RequiredNonZeroNumber(VisualScriptBlock block)
+    {
+        var value = RequiredValue(block);
+        if (!double.TryParse(
+                value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var number)
+            || number == 0)
+        {
+            throw new InvalidDataException(
+                $"В блоке {DisplayBlockId(block)} нужно указать число не равное 0.");
         }
 
         return number.ToString("G", CultureInfo.InvariantCulture);

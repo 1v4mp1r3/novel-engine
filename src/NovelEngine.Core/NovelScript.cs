@@ -51,22 +51,30 @@ public static partial class NovelScript
 
             if (command.Kind == NovelScriptCommandKind.Add)
             {
-                var amountValue = ParseLiteral(command.Value);
-                if (!TryNumber(amountValue, out var amount))
-                {
-                    throw new InvalidDataException(
-                        $"Команда add ожидает число: {command.Source}");
-                }
+                ApplyNumericCommand(command, state, (current, operand) => current + operand);
+                continue;
+            }
 
-                var current = 0d;
-                if (state.Variables.TryGetValue(command.Name, out var existing)
-                    && !TryNumber(existing, out current))
-                {
-                    throw new InvalidDataException(
-                        $"Переменная «{command.Name}» не является числом для add.");
-                }
+            if (command.Kind == NovelScriptCommandKind.Multiply)
+            {
+                ApplyNumericCommand(command, state, (current, operand) => current * operand);
+                continue;
+            }
 
-                state.Variables[command.Name] = current + amount;
+            if (command.Kind == NovelScriptCommandKind.Divide)
+            {
+                ApplyNumericCommand(
+                    command,
+                    state,
+                    (current, operand) =>
+                    {
+                        if (operand == 0)
+                        {
+                            throw new InvalidDataException(
+                                $"Команда divide не может делить на 0: {command.Source}");
+                        }
+                        return current / operand;
+                    });
                 continue;
             }
 
@@ -148,6 +156,29 @@ public static partial class NovelScript
 
     private static object? GetVariable(string name, ScriptState state) =>
         state.Variables.TryGetValue(name, out var value) ? value : null;
+
+    private static void ApplyNumericCommand(
+        NovelScriptCommand command,
+        ScriptState state,
+        Func<double, double, double> operation)
+    {
+        var operandValue = ParseLiteral(command.Value);
+        if (!TryNumber(operandValue, out var operand))
+        {
+            throw new InvalidDataException(
+                $"Команда {command.Kind.ToString().ToLowerInvariant()} ожидает число: {command.Source}");
+        }
+
+        var current = 0d;
+        if (state.Variables.TryGetValue(command.Name, out var existing)
+            && !TryNumber(existing, out current))
+        {
+            throw new InvalidDataException(
+                $"Переменная «{command.Name}» не является числом для {command.Kind.ToString().ToLowerInvariant()}.");
+        }
+
+        state.Variables[command.Name] = operation(current, operand);
+    }
 
     private static object? ParseLiteral(string source)
     {
