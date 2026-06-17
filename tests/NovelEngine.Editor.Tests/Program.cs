@@ -12,6 +12,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
+    ("autosave pruning keeps newest snapshots", AutoSavePruningKeepsNewestSnapshots),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
@@ -217,6 +218,37 @@ static void AutoSaveSnapshotPathsAvoidSameSecondCollisions()
             Path.GetFileName(second).StartsWith("story-", StringComparison.Ordinal)
                 && Path.GetFileName(second).EndsWith("-2.novel.json", StringComparison.Ordinal),
             "Autosave snapshot did not use a deterministic collision suffix.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void AutoSavePruningKeepsNewestSnapshots()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var oldest = Path.Combine(directory, "story-20260617-100000.novel.json");
+        var middle = Path.Combine(directory, "story-20260617-110000.novel.json");
+        var newest = Path.Combine(directory, "story-20260617-120000.novel.json");
+        var otherProject = Path.Combine(directory, "other-20260617-090000.novel.json");
+        File.WriteAllText(oldest, "{}");
+        File.WriteAllText(middle, "{}");
+        File.WriteAllText(newest, "{}");
+        File.WriteAllText(otherProject, "{}");
+        File.SetLastWriteTimeUtc(oldest, new DateTime(2026, 6, 17, 10, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(middle, new DateTime(2026, 6, 17, 11, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(newest, new DateTime(2026, 6, 17, 12, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(otherProject, new DateTime(2026, 6, 17, 9, 0, 0, DateTimeKind.Utc));
+
+        AutoSaveStore.Prune(directory, "story", keepCount: 2);
+
+        Assert(!File.Exists(oldest), "Autosave pruning kept the oldest snapshot.");
+        Assert(File.Exists(middle), "Autosave pruning deleted a retained snapshot.");
+        Assert(File.Exists(newest), "Autosave pruning deleted the newest snapshot.");
+        Assert(File.Exists(otherProject), "Autosave pruning deleted a different project's snapshot.");
     }
     finally
     {
