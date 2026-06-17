@@ -62,10 +62,19 @@ static void WorkspaceProjectCreatesDefaultFolders()
         Assert(
             Directory.Exists(Path.Combine(directory, "autosaves")),
             "Autosave directory was not created.");
+        var autoSaveStem = Path.GetFileNameWithoutExtension(projectPath);
+        var autoSaveFiles = Directory.GetFiles(
+            Path.Combine(directory, "autosaves"),
+            $"{autoSaveStem}-*.novel.json");
+        Assert(autoSaveFiles.Length == 1, "Initial autosave snapshot was not created.");
         var project = ProjectSerializer.Load(projectPath);
+        var snapshotProject = ProjectSerializer.Load(autoSaveFiles[0]);
         Assert(
             project.Title == Path.GetFileName(directory),
             "Project title did not use the workspace folder name.");
+        Assert(
+            snapshotProject.Title == project.Title,
+            "Initial autosave snapshot did not contain the created project.");
 
         foreach (var folder in ProjectAssets.DefaultProjectFolders)
         {

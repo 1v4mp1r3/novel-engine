@@ -22,8 +22,10 @@ internal static class ProjectWorkspace
 
         var projectPath = GetAvailableProjectPath(workspaceDirectory);
         ProjectAssets.EnsureDefaultStructure(project, projectPath);
-        Directory.CreateDirectory(Path.Combine(workspaceDirectory, "autosaves"));
+        var autoSaveDirectory = Path.Combine(workspaceDirectory, "autosaves");
+        Directory.CreateDirectory(autoSaveDirectory);
         ProjectSerializer.Save(project, projectPath);
+        WriteInitialAutoSaveSnapshot(project, projectPath, autoSaveDirectory);
         return projectPath;
     }
 
@@ -68,5 +70,19 @@ internal static class ProjectWorkspace
         return string.Concat(
             source.Select(character =>
                 invalid.Contains(character) ? '_' : character)).Trim();
+    }
+
+    private static void WriteInitialAutoSaveSnapshot(
+        NovelProject project,
+        string projectPath,
+        string autoSaveDirectory)
+    {
+        var stem = Path.GetFileNameWithoutExtension(projectPath);
+        var snapshotPath = AutoSaveStore.CreateSnapshotPath(
+            autoSaveDirectory,
+            stem,
+            DateTime.UtcNow);
+        ProjectSerializer.Save(project, snapshotPath);
+        AutoSaveStore.Prune(autoSaveDirectory, stem, keepCount: 24);
     }
 }
