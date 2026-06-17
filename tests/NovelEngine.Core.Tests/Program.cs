@@ -1026,6 +1026,11 @@ static void MainMenuAndVoiceAssetReferences()
     Assert(
         scene.Characters.Single().VoiceSounds.Contains("@voice_main"),
         "Voice asset list reference was not replaced.");
+    project.ReplaceAssetReference("voice_hero_alt", "@voice_main");
+    Assert(
+        scene.Characters.Single().VoiceSounds.Count(
+            value => value.Equals("@voice_main", StringComparison.OrdinalIgnoreCase)) == 1,
+        "Replacing voice assets with the same target should not store duplicates.");
 }
 
 static void RemovedVoiceAssetsAreClearedFromCharacters()

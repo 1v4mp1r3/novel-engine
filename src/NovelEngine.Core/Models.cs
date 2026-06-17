@@ -1440,6 +1440,15 @@ public sealed class NovelProject
                 values[index] = replacement;
             }
         }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = values.Count - 1; index >= 0; index--)
+        {
+            if (!seen.Add(values[index]))
+            {
+                values.RemoveAt(index);
+            }
+        }
     }
 
     private static string? ReplaceNullable(
