@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
+    ("visual conditions parse and compile", VisualConditionsParseAndCompile),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
@@ -710,6 +711,37 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     Assert(variables.Contains("route"), "Node visual block variable was not collected.");
     Assert(variables.Contains("met_hero"), "Condition variable was not collected.");
     Assert(variables.Contains("trust"), "Output visual block variable was not collected.");
+}
+
+static void VisualConditionsParseAndCompile()
+{
+    Assert(
+        VisualConditionCompiler.Compile(VisualConditionCompiler.Parse(string.Empty)) == string.Empty,
+        "Empty condition did not compile as always.");
+    Assert(
+        VisualConditionCompiler.Compile(VisualConditionCompiler.Parse("met_hero")) == "met_hero",
+        "Truthy variable condition did not round trip.");
+    Assert(
+        VisualConditionCompiler.Compile(VisualConditionCompiler.Parse("!met_hero")) == "!met_hero",
+        "False variable condition did not round trip.");
+    Assert(
+        VisualConditionCompiler.Compile(VisualConditionCompiler.Parse("score >= 3")) == "score >= 3",
+        "Comparison condition did not round trip.");
+
+    var expression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "route",
+        Operator = "==",
+        Value = "\"good\"",
+    };
+    VisualConditionCompiler.Validate(expression);
+    Assert(
+        VisualConditionCompiler.Compile(expression) == "route == \"good\"",
+        "Structured condition did not compile.");
+    AssertThrows<InvalidDataException>(
+        () => VisualConditionCompiler.Parse("route && score"),
+        "Unsupported condition syntax was accepted.");
 }
 
 static void RemovingNodeDisconnectsOutputs()

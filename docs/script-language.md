@@ -33,3 +33,5 @@ route != "bad"
 ```
 
 An empty condition means that the choice is always available.
+The condition builder stores these forms through a core expression model, so
+future condition blocks and hand-written conditions stay aligned.

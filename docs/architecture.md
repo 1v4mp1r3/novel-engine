@@ -33,6 +33,12 @@ after the matching text script. This keeps a future Scratch-like block editor on
 top of the same runtime semantics instead of introducing a second scripting
 engine.
 
+Choice condition authoring uses the same approach: `VisualConditionExpression`
+parses and compiles the supported condition forms (`always`, variable truth,
+variable false, and comparisons) through the core layer. The WPF builder is only
+an editor for that model, so future condition blocks can reuse the same runtime
+semantics instead of adding a UI-only parser.
+
 ## Asset catalog
 
 Each project owns a typed asset catalog. Imported files are copied into

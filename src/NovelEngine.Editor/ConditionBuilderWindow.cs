@@ -1,18 +1,18 @@
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
 
-public sealed partial class ConditionBuilderWindow : Window
+public sealed class ConditionBuilderWindow : Window
 {
     private readonly ComboBox _modeBox;
     private readonly ComboBox _operatorBox;
     private readonly ComboBox _variableBox;
     private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBlock _previewText;
+    private string _rawFallbackCondition = string.Empty;
 
     public ConditionBuilderWindow(
         string condition,
@@ -81,55 +81,32 @@ public sealed partial class ConditionBuilderWindow : Window
 
     private void LoadCondition(string condition)
     {
-        condition = condition.Trim();
-        if (condition.Length == 0)
+        try
         {
-            SelectMode(ConditionMode.Always);
+            var expression = VisualConditionCompiler.Parse(condition);
+            SelectMode(expression.Kind);
+            _variableBox.Text = expression.VariableName;
+            _operatorBox.SelectedItem = expression.Operator;
+            _valueEditor.LoadLiteral(expression.Value);
+        }
+        catch (InvalidDataException)
+        {
+            _rawFallbackCondition = condition.Trim();
+            SelectMode(VisualConditionKind.Comparison);
             _operatorBox.SelectedItem = "==";
-            return;
+            _valueEditor.LoadLiteral(_rawFallbackCondition);
         }
-
-        if (Identifier().IsMatch(condition))
-        {
-            SelectMode(ConditionMode.VariableTrue);
-            _variableBox.Text = condition;
-            _operatorBox.SelectedItem = "==";
-            return;
-        }
-
-        if (condition.StartsWith('!')
-            && Identifier().IsMatch(condition[1..]))
-        {
-            SelectMode(ConditionMode.VariableFalse);
-            _variableBox.Text = condition[1..];
-            _operatorBox.SelectedItem = "==";
-            return;
-        }
-
-        var match = Comparison().Match(condition);
-        if (match.Success)
-        {
-            SelectMode(ConditionMode.Comparison);
-            _variableBox.Text = match.Groups["name"].Value;
-            _operatorBox.SelectedItem = match.Groups["operator"].Value;
-            _valueEditor.LoadLiteral(match.Groups["value"].Value.Trim());
-            return;
-        }
-
-        SelectMode(ConditionMode.Comparison);
-        _operatorBox.SelectedItem = "==";
-        _valueEditor.LoadLiteral(condition);
     }
 
-    private void SelectMode(ConditionMode mode) =>
+    private void SelectMode(VisualConditionKind mode) =>
         _modeBox.SelectedItem = ModeChoices.First(choice => choice.Mode == mode);
 
     private void UpdateFields()
     {
         var mode = SelectedMode;
-        _variableBox.IsEnabled = mode is not ConditionMode.Always;
-        _operatorBox.IsEnabled = mode is ConditionMode.Comparison;
-        _valueEditor.IsEnabled = mode is ConditionMode.Comparison;
+        _variableBox.IsEnabled = mode is not VisualConditionKind.Always;
+        _operatorBox.IsEnabled = mode is VisualConditionKind.Comparison;
+        _valueEditor.IsEnabled = mode is VisualConditionKind.Comparison;
         UpdatePreview();
     }
 
@@ -143,40 +120,26 @@ public sealed partial class ConditionBuilderWindow : Window
 
     private string BuildCondition()
     {
-        var variable = VariableName;
-        return SelectedMode switch
+        try
         {
-            ConditionMode.Always => string.Empty,
-            ConditionMode.VariableTrue => variable,
-            ConditionMode.VariableFalse => variable.Length == 0
-                ? string.Empty
-                : $"!{variable}",
-            ConditionMode.Comparison => variable.Length == 0
-                ? _valueEditor.Literal
-                : $"{variable} {_operatorBox.SelectedItem ?? "=="} {_valueEditor.Literal}",
-            _ => string.Empty,
-        };
+            return VisualConditionCompiler.Compile(BuildExpression());
+        }
+        catch (InvalidDataException)
+        {
+            return SelectedMode is VisualConditionKind.Comparison
+                && VariableName.Length == 0
+                    ? _rawFallbackCondition
+                    : string.Empty;
+        }
     }
 
-    private ConditionMode SelectedMode =>
+    private VisualConditionKind SelectedMode =>
         (_modeBox.SelectedItem as ModeChoice)?.Mode
-        ?? ConditionMode.Always;
+        ?? VisualConditionKind.Always;
 
     private void Save()
     {
-        var condition = Condition;
-        if (SelectedMode is not ConditionMode.Always
-            && !Identifier().IsMatch(_variableBox.Text.Trim()))
-        {
-            MessageBox.Show(
-                this,
-                "Имя переменной должно начинаться с латинской буквы или _ и содержать только латиницу, цифры и _.",
-                "Собрать условие",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-        if (SelectedMode is ConditionMode.Comparison
+        if (SelectedMode is VisualConditionKind.Comparison
             && !_valueEditor.TryValidate(this, "Собрать условие"))
         {
             return;
@@ -184,7 +147,7 @@ public sealed partial class ConditionBuilderWindow : Window
 
         try
         {
-            _ = NovelScript.Evaluate(condition, new ScriptState());
+            VisualConditionCompiler.Validate(BuildExpression());
             DialogResult = true;
         }
         catch (InvalidDataException error)
@@ -200,16 +163,25 @@ public sealed partial class ConditionBuilderWindow : Window
 
     private static readonly IReadOnlyList<ModeChoice> ModeChoices =
     [
-        new(ConditionMode.Always, "Показывать всегда"),
-        new(ConditionMode.VariableTrue, "Переменная истинна"),
-        new(ConditionMode.VariableFalse, "Переменная ложна"),
-        new(ConditionMode.Comparison, "Сравнение"),
+        new(VisualConditionKind.Always, "Показывать всегда"),
+        new(VisualConditionKind.VariableTrue, "Переменная истинна"),
+        new(VisualConditionKind.VariableFalse, "Переменная ложна"),
+        new(VisualConditionKind.Comparison, "Сравнение"),
     ];
 
     private static readonly IReadOnlyList<string> Operators =
-        ["==", "!=", ">=", "<=", ">", "<"];
+        VisualConditionCompiler.ComparisonOperators;
 
     private string VariableName => _variableBox.Text.Trim();
+
+    private VisualConditionExpression BuildExpression() =>
+        new()
+        {
+            Kind = SelectedMode,
+            VariableName = VariableName,
+            Operator = Convert.ToString(_operatorBox.SelectedItem) ?? "==",
+            Value = _valueEditor.Literal,
+        };
 
     private static IReadOnlyList<string> NormalizeVariables(
         IEnumerable<string>? variables) =>
@@ -220,20 +192,5 @@ public sealed partial class ConditionBuilderWindow : Window
             .ToList()
         ?? [];
 
-    private sealed record ModeChoice(ConditionMode Mode, string Label);
-
-    private enum ConditionMode
-    {
-        Always,
-        VariableTrue,
-        VariableFalse,
-        Comparison,
-    }
-
-    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
-    private static partial Regex Identifier();
-
-    [GeneratedRegex(
-        "^(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*(?<operator>==|!=|>=|<=|>|<)\\s*(?<value>.+)$")]
-    private static partial Regex Comparison();
+    private sealed record ModeChoice(VisualConditionKind Mode, string Label);
 }
