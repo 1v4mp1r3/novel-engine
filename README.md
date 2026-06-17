@@ -136,7 +136,8 @@ currently installed on this workstation.
 - Code completion suggests properties, snippets, node targets, types, values,
   and assets. Use `Ctrl+Space` to open it explicitly, then `Tab` or `Enter`.
 - The code editor avoids persistent block guide overlays so large scripts stay
-  responsive while scrolling and typing.
+  responsive while scrolling and typing, and batches undo snapshots while the
+  user is actively typing.
 - The top-right IDE controls compile the current project, launch the compiled
   game, launch it with runtime diagnostics, or stop the separate player process.
 - Build and run commands perform project diagnostics first: errors block the

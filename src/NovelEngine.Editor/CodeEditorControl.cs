@@ -43,6 +43,7 @@ public sealed class CodeEditorControl : RichTextBox
     private readonly ListBox _completionList;
     private readonly TextBlock _completionDescription;
     private readonly DispatcherTimer _completionTimer;
+    private readonly DispatcherTimer _historyTimer;
     private ProjectLanguageCompletionContext? _completionContext;
     private readonly List<EditorSnapshot> _undoHistory = [];
     private readonly List<EditorSnapshot> _redoHistory = [];
@@ -54,6 +55,7 @@ public sealed class CodeEditorControl : RichTextBox
     private int _renderedErrorLength;
     private bool _updatingDocument;
     private bool _restoringHistory;
+    private bool _historyRecordingPending;
 
     private static Brush CreateFrozenBrush(byte red, byte green, byte blue) =>
         CreateFrozenBrush(255, red, green, blue);
@@ -146,6 +148,15 @@ public sealed class CodeEditorControl : RichTextBox
             _completionTimer.Stop();
             ShowCompletions(force: false);
         };
+        _historyTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(420),
+        };
+        _historyTimer.Tick += (_, _) =>
+        {
+            _historyTimer.Stop();
+            CommitPendingUserChange();
+        };
     }
 
     public Func<string, int, ProjectLanguageCompletionContext>?
@@ -157,6 +168,7 @@ public sealed class CodeEditorControl : RichTextBox
         set
         {
             CloseCompletions();
+            ClearPendingUserChange();
             ReplaceDocument(value, [], null, 0);
             SetCaretOffset(0);
             ResetHistory(value, 0);
@@ -206,7 +218,7 @@ public sealed class CodeEditorControl : RichTextBox
         }
         _sourceTextCache = null;
         InvalidateRenderedSyntax();
-        RecordUserChange();
+        ScheduleUserChangeRecord();
         _completionTimer.Stop();
         _completionTimer.Start();
     }
@@ -343,6 +355,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void AcceptCompletion()
     {
+        CommitPendingUserChange();
         if (_completionContext is null
             || _completionList.SelectedItem
                 is not ProjectLanguageCompletion completion)
@@ -385,6 +398,36 @@ public sealed class CodeEditorControl : RichTextBox
     private static bool IsSyntaxIdentifierPart(char character) =>
         character is '_' or '-' || char.IsLetterOrDigit(character);
 
+    private void ScheduleUserChangeRecord()
+    {
+        if (_restoringHistory)
+        {
+            return;
+        }
+
+        _historyRecordingPending = true;
+        _historyTimer.Stop();
+        _historyTimer.Start();
+    }
+
+    private void CommitPendingUserChange()
+    {
+        if (!_historyRecordingPending)
+        {
+            return;
+        }
+
+        _historyTimer.Stop();
+        _historyRecordingPending = false;
+        RecordUserChange();
+    }
+
+    private void ClearPendingUserChange()
+    {
+        _historyTimer.Stop();
+        _historyRecordingPending = false;
+    }
+
     private void RecordUserChange()
     {
         if (_restoringHistory)
@@ -405,6 +448,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void UndoUserChange()
     {
+        CommitPendingUserChange();
         if (_undoHistory.Count == 0)
         {
             return;
@@ -417,6 +461,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void RedoUserChange()
     {
+        CommitPendingUserChange();
         if (_redoHistory.Count == 0)
         {
             return;
@@ -436,6 +481,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void RestoreSnapshot(EditorSnapshot snapshot)
     {
+        ClearPendingUserChange();
         _restoringHistory = true;
         try
         {
@@ -459,6 +505,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void ResetHistory(string source, int caretOffset)
     {
+        ClearPendingUserChange();
         _undoHistory.Clear();
         _redoHistory.Clear();
         _currentSnapshot = new EditorSnapshot(
