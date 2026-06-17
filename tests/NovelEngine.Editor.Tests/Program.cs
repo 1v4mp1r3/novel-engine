@@ -17,6 +17,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects ignore corrupt cache", RecentProjectsIgnoreCorruptCache),
     ("recent projects ignore blank cache entries", RecentProjectsIgnoreBlankCacheEntries),
     ("recent projects normalize quoted cache paths", RecentProjectsNormalizeQuotedCachePaths),
+    ("recent projects remember quoted paths", RecentProjectsRememberQuotedPaths),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
@@ -383,6 +384,32 @@ static void RecentProjectsNormalizeQuotedCachePaths()
             Assert(entries.Count == 1, "Recent projects did not keep the quoted cache path.");
             Assert(entries[0].Path == existingProject, "Recent projects did not normalize the quoted cache path.");
             Assert(entries[0].DisplayName == "quoted", "Recent projects did not repair a blank display name.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsRememberQuotedPaths()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var projectPath = Path.Combine(directory, "quoted-input.novel.json");
+        File.WriteAllText(projectPath, "{}");
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            RecentProjectsStore.Remember($"  \"{projectPath}\"  ");
+
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 1, "Recent projects did not remember the quoted input path.");
+            Assert(entries[0].Path == projectPath, "Recent projects did not normalize the remembered path.");
+            Assert(entries[0].DisplayName == "quoted-input", "Recent projects used the wrong display name.");
         });
     }
     finally
