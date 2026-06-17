@@ -110,6 +110,10 @@ public partial class MainWindow : Window
             {
                 RefreshAssets();
             }
+            else
+            {
+                SyncFilesFromDisk(refreshCode: false);
+            }
         };
         _diagnosticsTimer = new DispatcherTimer
         {
@@ -2873,6 +2877,10 @@ public partial class MainWindow : Window
         if (!EnsureCodeApplied())
         {
             return false;
+        }
+        if (_projectPath is not null)
+        {
+            SyncFilesFromDisk(refreshCode: false);
         }
         if (_projectPath is null)
         {
