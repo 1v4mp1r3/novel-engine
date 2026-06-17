@@ -79,7 +79,9 @@ public sealed class CharacterEditorWindow : Window
     public CharacterEditorWindow(
         CharacterPlacement? character,
         IEnumerable<NovelAsset> spriteAssets,
-        IEnumerable<NovelAsset> voiceAssets)
+        IEnumerable<NovelAsset> voiceAssets,
+        string? suggestedName = null,
+        string? suggestedSprite = null)
     {
         Title = character is null ? "Добавить персонажа" : "Изменить персонажа";
         Width = 560;
@@ -87,10 +89,11 @@ public sealed class CharacterEditorWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
-        _nameBox = DialogUi.TextBox(character?.Name ?? string.Empty);
+        _nameBox = DialogUi.TextBox(
+            character?.Name ?? suggestedName ?? string.Empty);
         _spriteBox = CreateAssetBox(
             spriteAssets,
-            character?.Sprite ?? string.Empty,
+            character?.Sprite ?? suggestedSprite ?? string.Empty,
             "Без спрайта");
         _voiceList = CreateAssetList(
             voiceAssets,

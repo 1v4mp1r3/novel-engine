@@ -1769,6 +1769,13 @@ public partial class MainWindow : Window
                 selectedNode is not null));
             if (IsInAssetFolder(view.Asset, "characters"))
             {
+                menu.Items.Add(CreateAssetMenuItem(
+                    "Создать персонажа в библиотеке из спрайта",
+                    () => CreateLibraryCharacterFromSprite(view.Asset)));
+                menu.Items.Add(CreateAssetMenuItem(
+                    "Добавить персонажа в выбранную ноду",
+                    () => AddCharacterFromSpriteToSelectedNode(view.Asset),
+                    selectedNode is not null));
                 menu.Items.Add(CreateCharacterAssetVoiceMenu(view.Asset, selectedNode));
             }
         }
@@ -2002,6 +2009,64 @@ public partial class MainWindow : Window
         MarkDirty();
         RefreshAfterAssetBinding();
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
+    }
+
+    private void CreateLibraryCharacterFromSprite(NovelAsset asset)
+    {
+        if (asset.Kind != AssetKind.Image)
+        {
+            return;
+        }
+
+        var dialog = new CharacterEditorWindow(
+            null,
+            GetCharacterSpriteAssets(),
+            GetVoiceBlipAssets(),
+            SuggestedCharacterName(asset),
+            AssetReference.Create(asset.Id))
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var character = CreateCharacterPlacementFromDialog(
+            dialog,
+            CreateUniqueLibraryCharacterId(dialog.CharacterName));
+        _project.Characters.Add(character);
+        MarkDirty();
+        StatusText.Text =
+            $"Персонаж «{CharacterLabel(character)}» создан в библиотеке";
+    }
+
+    private void AddCharacterFromSpriteToSelectedNode(NovelAsset asset)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null || asset.Kind != AssetKind.Image)
+        {
+            return;
+        }
+
+        var dialog = new CharacterEditorWindow(
+            null,
+            GetCharacterSpriteAssets(),
+            GetVoiceBlipAssets(),
+            SuggestedCharacterName(asset),
+            AssetReference.Create(asset.Id))
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var character = AddCharacterToNodeFromDialog(node, dialog);
+        MarkDirty();
+        StatusText.Text =
+            $"Персонаж «{CharacterLabel(character)}» добавлен в ноду «{node.Title}»";
     }
 
     private void BindVoiceAssetToCharacter(NovelAsset asset, string characterId)
@@ -3391,26 +3456,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var voiceSounds = NormalizeVoiceReferences(dialog.VoiceSounds);
-        node.InheritCharacters = false;
-        if (node.UsesTypeDefaults)
-        {
-            node.PropertyOverrides.Add("inheritCharacters");
-            node.PropertyOverrides.Add("characters");
-        }
-        InheritCharactersCheck.IsChecked = false;
-        node.Characters.Add(
-            new CharacterPlacement
-            {
-                Id = $"character-{Guid.NewGuid():N}",
-                Name = dialog.CharacterName,
-                Sprite = NormalizeAssetPath(dialog.Sprite, "characters"),
-                Position = dialog.Position,
-                VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
-                VoiceSounds = voiceSounds,
-                VoicePitch = dialog.VoicePitch,
-                VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter,
-            });
+        AddCharacterToNodeFromDialog(node, dialog);
         MarkDirty();
     }
 
@@ -3522,6 +3568,75 @@ public partial class MainWindow : Window
             .Where(reference => reference.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private CharacterPlacement AddCharacterToNodeFromDialog(
+        NovelNode node,
+        CharacterEditorWindow dialog)
+    {
+        node.InheritCharacters = false;
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("inheritCharacters");
+            node.PropertyOverrides.Add("characters");
+        }
+        InheritCharactersCheck.IsChecked = false;
+
+        var character = CreateCharacterPlacementFromDialog(
+            dialog,
+            $"character-{Guid.NewGuid():N}");
+        node.Characters.Add(character);
+        return character;
+    }
+
+    private CharacterPlacement CreateCharacterPlacementFromDialog(
+        CharacterEditorWindow dialog,
+        string characterId)
+    {
+        var voiceSounds = NormalizeVoiceReferences(dialog.VoiceSounds);
+        return new CharacterPlacement
+        {
+            Id = characterId,
+            Name = dialog.CharacterName,
+            Sprite = NormalizeAssetPath(dialog.Sprite, "characters"),
+            Position = dialog.Position,
+            VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
+            VoiceSounds = voiceSounds,
+            VoicePitch = dialog.VoicePitch,
+            VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter,
+        };
+    }
+
+    private string CreateUniqueLibraryCharacterId(string name)
+    {
+        var baseId = ProjectAssets.MakeId(name);
+        if (baseId.Equals("asset", StringComparison.OrdinalIgnoreCase))
+        {
+            baseId = "character";
+        }
+
+        var candidate = baseId;
+        var suffix = 2;
+        while (_project.FindCharacter(candidate) is not null)
+        {
+            candidate = $"{baseId}-{suffix}";
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private static string SuggestedCharacterName(NovelAsset asset)
+    {
+        var name = Path.GetFileNameWithoutExtension(asset.Path);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = asset.Id;
+        }
+
+        return name
+            .Replace('_', ' ')
+            .Replace('-', ' ')
+            .Trim();
+    }
 
     private static void CopyCharacterValues(
         CharacterPlacement source,
