@@ -43,6 +43,7 @@ public static partial class VisualConditionCompiler
         {
             return new VisualConditionExpression();
         }
+        condition = TrimOuterParentheses(condition);
 
         var anyParts = SplitLogical(condition, "||");
         if (anyParts.Count > 1)
@@ -199,8 +200,12 @@ public static partial class VisualConditionCompiler
         if (parentKind is VisualConditionKind.All
             && child.Kind is VisualConditionKind.Any)
         {
-            throw new InvalidDataException(
-                "OR-группа внутри AND пока не поддерживается без скобок.");
+            var nested = Compile(child);
+            if (nested.Length == 0)
+            {
+                throw new InvalidDataException("Группа условий не может содержать пустое условие.");
+            }
+            return $"({nested})";
         }
         var condition = Compile(child);
         if (condition.Length == 0)
@@ -208,6 +213,59 @@ public static partial class VisualConditionCompiler
             throw new InvalidDataException("Группа условий не может содержать пустое условие.");
         }
         return condition;
+    }
+
+    private static string TrimOuterParentheses(string condition)
+    {
+        while (IsWrappedByOuterParentheses(condition))
+        {
+            condition = condition[1..^1].Trim();
+        }
+        return condition;
+    }
+
+    private static bool IsWrappedByOuterParentheses(string condition)
+    {
+        if (condition.Length < 2 || condition[0] != '(' || condition[^1] != ')')
+        {
+            return false;
+        }
+
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+        for (var index = 0; index < condition.Length; index++)
+        {
+            var current = condition[index];
+            if (inString && current == '\\' && !escaped)
+            {
+                escaped = true;
+                continue;
+            }
+            if (current == '"' && !escaped)
+            {
+                inString = !inString;
+            }
+            escaped = false;
+            if (inString)
+            {
+                continue;
+            }
+
+            if (current == '(')
+            {
+                depth++;
+            }
+            else if (current == ')')
+            {
+                depth--;
+                if (depth == 0 && index < condition.Length - 1)
+                {
+                    return false;
+                }
+            }
+        }
+        return depth == 0;
     }
 
     private static VisualConditionExpression CreateGroup(
@@ -226,6 +284,7 @@ public static partial class VisualConditionCompiler
     {
         var parts = new List<string>();
         var start = 0;
+        var depth = 0;
         var inString = false;
         var escaped = false;
         for (var index = 0; index <= condition.Length - operation.Length; index++)
@@ -242,7 +301,26 @@ public static partial class VisualConditionCompiler
             }
             escaped = false;
 
+            if (!inString)
+            {
+                if (current == '(')
+                {
+                    depth++;
+                    continue;
+                }
+                if (current == ')')
+                {
+                    depth--;
+                    if (depth < 0)
+                    {
+                        throw new InvalidDataException($"Некорректное условие: {condition}");
+                    }
+                    continue;
+                }
+            }
+
             if (inString
+                || depth != 0
                 || !condition.AsSpan(index, operation.Length)
                     .SequenceEqual(operation))
             {
@@ -252,6 +330,11 @@ public static partial class VisualConditionCompiler
             parts.Add(condition[start..index].Trim());
             index += operation.Length - 1;
             start = index + 1;
+        }
+
+        if (depth != 0)
+        {
+            throw new InvalidDataException($"Некорректное условие: {condition}");
         }
 
         if (parts.Count == 0)

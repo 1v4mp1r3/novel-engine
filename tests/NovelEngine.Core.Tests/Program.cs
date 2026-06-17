@@ -783,6 +783,11 @@ static void VisualConditionsParseAndCompile()
             VisualConditionCompiler.Parse("met_hero && score >= 3 || route == \"good\""))
             == "met_hero && score >= 3 || route == \"good\"",
         "Mixed AND/OR condition did not round trip.");
+    Assert(
+        VisualConditionCompiler.Compile(
+            VisualConditionCompiler.Parse("(met_hero || route == \"good\") && score >= 3"))
+            == "(met_hero || route == \"good\") && score >= 3",
+        "Parenthesized condition did not round trip.");
 
     var expression = new VisualConditionExpression
     {
@@ -812,6 +817,12 @@ static void VisualConditionsParseAndCompile()
     Assert(
         VisualConditionCompiler.Evaluate("met_hero && score >= 3 || route == \"good\"", state),
         "OR condition did not evaluate.");
+    state.Variables["score"] = 3;
+    Assert(
+        VisualConditionCompiler.Evaluate(
+            "(missing_flag || route == \"good\") && score >= 3",
+            state),
+        "Parenthesized condition did not evaluate.");
     AssertThrows<InvalidDataException>(
         () => VisualConditionCompiler.Validate(
             new VisualConditionExpression

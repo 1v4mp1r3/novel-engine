@@ -259,7 +259,7 @@ internal static class ScreenshotRenderer
 
     public static void SmokeConditionBuilder()
     {
-        const string condition = "met_hero && score >= 3 || route == \"good\"";
+        const string condition = "(met_hero || route == \"good\") && score >= 3";
         var window = new ConditionBuilderWindow(
             string.Empty,
             ["met_hero", "score", "route"],

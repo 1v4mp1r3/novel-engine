@@ -32,10 +32,11 @@ player_name == "Макс"
 route != "bad"
 met_alice && score >= 3
 route == "good" || route == "true"
+(met_alice || route == "good") && score >= 3
 ```
 
 An empty condition means that the choice is always available.
-Use `&&` for AND and `||` for OR. AND is evaluated before OR; parentheses are
-not part of the MVP condition syntax yet.
+Use `&&` for AND and `||` for OR. AND is evaluated before OR; use parentheses
+when a branch needs an OR group inside an AND group.
 The condition builder can assemble AND/OR groups visually and stores them in the
 same core condition model used by hand-written DSL.
