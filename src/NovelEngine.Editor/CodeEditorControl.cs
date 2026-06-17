@@ -47,6 +47,7 @@ public sealed class CodeEditorControl : RichTextBox
     private readonly List<EditorSnapshot> _undoHistory = [];
     private readonly List<EditorSnapshot> _redoHistory = [];
     private EditorSnapshot _currentSnapshot = new(string.Empty, 0);
+    private string? _sourceTextCache;
     private string? _renderedSource;
     private IReadOnlyList<ProjectLanguageSyntaxSpan> _renderedSpans = [];
     private int? _renderedErrorStart;
@@ -138,12 +139,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     public string SourceText
     {
-        get
-        {
-            var text = NormalizeText(
-                new TextRange(Document.ContentStart, Document.ContentEnd).Text);
-            return text.EndsWith('\n') ? text[..^1] : text;
-        }
+        get => _sourceTextCache ??= ReadSourceText();
         set
         {
             CloseCompletions();
@@ -194,6 +190,8 @@ public sealed class CodeEditorControl : RichTextBox
         {
             return;
         }
+        _sourceTextCache = null;
+        InvalidateRenderedSyntax();
         RecordUserChange();
         _completionTimer.Stop();
         _completionTimer.Start();
@@ -548,6 +546,7 @@ public sealed class CodeEditorControl : RichTextBox
                     isError);
             }
             Document.PageWidth = 100_000;
+            _sourceTextCache = source;
             _renderedSource = source;
             _renderedSpans = spans.ToArray();
             _renderedErrorStart = errorStart;
@@ -557,6 +556,14 @@ public sealed class CodeEditorControl : RichTextBox
         {
             _updatingDocument = false;
         }
+    }
+
+    private void InvalidateRenderedSyntax()
+    {
+        _renderedSource = null;
+        _renderedSpans = [];
+        _renderedErrorStart = null;
+        _renderedErrorLength = 0;
     }
 
     private bool IsRendered(
@@ -663,6 +670,13 @@ public sealed class CodeEditorControl : RichTextBox
             navigator = navigator.GetNextContextPosition(LogicalDirection.Forward);
         }
         return Document.ContentEnd;
+    }
+
+    private string ReadSourceText()
+    {
+        var text = NormalizeText(
+            new TextRange(Document.ContentStart, Document.ContentEnd).Text);
+        return text.EndsWith('\n') ? text[..^1] : text;
     }
 
     private static string NormalizeText(string text) =>
