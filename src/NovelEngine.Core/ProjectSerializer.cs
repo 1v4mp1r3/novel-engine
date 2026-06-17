@@ -30,12 +30,24 @@ public static class ProjectSerializer
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         var temporaryPath = fullPath + ".tmp";
 
-        using (var stream = File.Create(temporaryPath))
+        var completed = false;
+        try
         {
-            JsonSerializer.Serialize(stream, project, Options);
-        }
+            using (var stream = File.Create(temporaryPath))
+            {
+                JsonSerializer.Serialize(stream, project, Options);
+            }
 
-        File.Move(temporaryPath, fullPath, true);
+            File.Move(temporaryPath, fullPath, true);
+            completed = true;
+        }
+        finally
+        {
+            if (!completed && File.Exists(temporaryPath))
+            {
+                TryDeleteTemporaryFile(temporaryPath);
+            }
+        }
     }
 
     public static string ToJson(NovelProject project)
@@ -52,5 +64,19 @@ public static class ProjectSerializer
         project.Validate();
         project.FormatVersion = 5;
         return project;
+    }
+
+    private static void TryDeleteTemporaryFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException)
+        {
+            // Best-effort cleanup after a failed save.
+        }
     }
 }

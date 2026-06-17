@@ -14,6 +14,7 @@ var tests = new (string Name, Action Run)[]
     ("moving dialogue choices preserves data and boundaries", MoveDialogueChoicesPreservesDataAndBoundaries),
     ("node templates create authoring scaffolds", NodeTemplatesCreateAuthoringScaffolds),
     ("project JSON round trip", ProjectJsonRoundTrip),
+    ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
@@ -460,6 +461,40 @@ static void ProjectJsonRoundTrip()
     Assert(
         restored.FindNode(dialogue.Id)?.Outputs[0].Condition == "met_hero",
         "Choice condition changed.");
+}
+
+static void ProjectSaveCleansTemporaryFileOnFailure()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-save-failure-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var project = NovelProject.CreateDefault();
+        var blockedPath = Path.Combine(directory, "blocked.novel.json");
+        Directory.CreateDirectory(blockedPath);
+
+        try
+        {
+            ProjectSerializer.Save(project, blockedPath);
+            throw new InvalidOperationException("Saving over a directory should fail.");
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException)
+        {
+            // Expected: the target path is a directory, not a file.
+        }
+
+        Assert(
+            !File.Exists(blockedPath + ".tmp"),
+            "Failed project save left a temporary file behind.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
 }
 
 static void RuntimeStateFlows()
