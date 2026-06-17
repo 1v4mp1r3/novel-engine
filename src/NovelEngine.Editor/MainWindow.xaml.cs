@@ -42,6 +42,8 @@ public partial class MainWindow : Window
     private bool _codeCursorCacheDirty = true;
     private string? _codeSyntaxSource;
     private IReadOnlyList<ProjectLanguageSyntaxSpan> _codeSyntaxSpans = [];
+    private string? _parsedCodeSource;
+    private NovelProject? _parsedCodeProject;
     private bool _codeRefreshPending = true;
     private bool _codeRefreshUseStoredSource = true;
     private bool _syncingFilesFromDisk;
@@ -710,7 +712,9 @@ public partial class MainWindow : Window
         {
             var selectedNodeId = Graph.SelectedNodeId;
             var source = CodeEditor.SourceText;
-            var compiled = ProjectLanguage.Parse(source);
+            var compiled = GetParsedCodeProject(source);
+            _parsedCodeSource = null;
+            _parsedCodeProject = null;
 
             _project = compiled;
             _project.SourceCode = source;
@@ -865,7 +869,7 @@ public partial class MainWindow : Window
         SetCodeCursorCache(source);
         try
         {
-            _ = ProjectLanguage.Parse(source);
+            _ = GetParsedCodeProject(source);
             ApplyCodeHighlighting(source, null);
             CodeStatusText.Foreground = _codeHasPendingChanges
                 ? (Brush)FindResource("AccentBrush")
@@ -924,6 +928,21 @@ public partial class MainWindow : Window
         _codeSyntaxSource = source;
         _codeSyntaxSpans = ProjectLanguage.GetSyntaxSpans(source);
         return _codeSyntaxSpans;
+    }
+
+    private NovelProject GetParsedCodeProject(string source)
+    {
+        if (_parsedCodeSource == source && _parsedCodeProject is not null)
+        {
+            return _parsedCodeProject;
+        }
+
+        _parsedCodeSource = null;
+        _parsedCodeProject = null;
+        var parsed = ProjectLanguage.Parse(source);
+        _parsedCodeSource = source;
+        _parsedCodeProject = parsed;
+        return _parsedCodeProject;
     }
 
     private static int ErrorTokenLength(string source, int start)
