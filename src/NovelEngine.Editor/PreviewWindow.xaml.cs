@@ -100,6 +100,7 @@ public partial class PreviewWindow : Window
         _mainMenuActive = false;
         MainMenuHost.Visibility = Visibility.Collapsed;
         _dialogueCts?.Cancel();
+        StopAllVoicePlayers(close: false);
         SetBackground(_player.State.CurrentBackground);
         SetCharacters(_player.State.CurrentCharacters);
         SyncMusic(_player.State.CurrentMusic);
