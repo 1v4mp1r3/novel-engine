@@ -1705,6 +1705,17 @@ static void BuildCompilerEmitsPackage()
                         Path.DirectorySeparatorChar))),
             "Compiled library character sprite was not copied.");
         Assert(
+            !Path.IsPathRooted(builtLibraryCharacter.VoiceSound)
+                && builtLibraryCharacter.VoiceSound.StartsWith(
+                    "assets/external/",
+                    StringComparison.Ordinal),
+            "Compiled library character voice sound did not become a build-relative path.");
+        Assert(
+            builtLibraryCharacter.GetVoiceSounds().All(voice =>
+                !Path.IsPathRooted(voice)
+                && voice.StartsWith("assets/external/", StringComparison.Ordinal)),
+            "Compiled library character voice list did not become build-relative paths.");
+        Assert(
             builtLibraryCharacter.GetVoiceSounds().All(voice =>
                 File.Exists(
                     Path.Combine(
