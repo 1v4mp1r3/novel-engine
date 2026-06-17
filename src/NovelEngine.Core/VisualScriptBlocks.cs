@@ -181,6 +181,35 @@ public static class VisualScriptCompiler
         return builder.ToString().TrimEnd();
     }
 
+    public static string Describe(VisualScriptBlock block) =>
+        block.Kind switch
+        {
+            VisualScriptBlockKind.SetVariable =>
+                $"{RequiredVariableName(block)} = {RequiredValue(block)}",
+            VisualScriptBlockKind.SetFlagTrue =>
+                $"Флаг {RequiredVariableName(block)}: включить",
+            VisualScriptBlockKind.SetFlagFalse =>
+                $"Флаг {RequiredVariableName(block)}: выключить",
+            VisualScriptBlockKind.AddVariable =>
+                $"{RequiredVariableName(block)} += {RequiredValue(block)}",
+            VisualScriptBlockKind.SubtractVariable =>
+                $"{RequiredVariableName(block)} -= {RequiredPositiveNumber(block)}",
+            VisualScriptBlockKind.MultiplyVariable =>
+                $"{RequiredVariableName(block)} *= {RequiredValue(block)}",
+            VisualScriptBlockKind.DivideVariable =>
+                $"{RequiredVariableName(block)} /= {RequiredNonZeroNumber(block)}",
+            VisualScriptBlockKind.UnsetVariable =>
+                $"Удалить переменную {RequiredVariableName(block)}",
+            VisualScriptBlockKind.ToggleVariable =>
+                $"Переключить флаг {RequiredVariableName(block)}",
+            VisualScriptBlockKind.Comment =>
+                block.Text.Trim().Length == 0
+                    ? "Пустой комментарий"
+                    : $"Комментарий: {block.Text.Trim()}",
+            _ => throw new InvalidDataException(
+                $"Неизвестный тип visual script block: {block.Kind}"),
+        };
+
     public static void Execute(
         string script,
         IEnumerable<VisualScriptBlock> blocks,

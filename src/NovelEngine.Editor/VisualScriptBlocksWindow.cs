@@ -346,8 +346,7 @@ public sealed class VisualScriptBlocksWindow : Window
     {
         try
         {
-            var script = VisualScriptCompiler.Compile([block]);
-            return script.Length == 0 ? $"{block.Id}: пустой комментарий" : script;
+            return VisualScriptCompiler.Describe(block);
         }
         catch (InvalidDataException error)
         {

@@ -117,6 +117,9 @@ currently installed on this workstation.
 - Visual blocks include dedicated flag on/off/toggle actions for common route
   flags, plus score add/subtract/multiply/divide actions, while still compiling
   to the same text script commands.
+- The visual-block list shows semantic labels such as `score += 2` or
+  `Флаг met_hero: включить`; the raw generated NovelScript remains visible in
+  the preview box for debugging.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
 - Conditions created through the visual builder are saved as structured data

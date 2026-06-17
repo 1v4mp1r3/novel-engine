@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("novel script rejects invalid add operands", NovelScriptRejectsInvalidAddOperands),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks import simple scripts", VisualScriptBlocksImportSimpleScripts),
+    ("visual script blocks describe semantic labels", VisualScriptBlocksDescribeSemanticLabels),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
@@ -783,6 +784,45 @@ static void VisualScriptBlocksImportSimpleScripts()
     AssertThrows<InvalidDataException>(
         () => VisualScriptCompiler.ParseScript("dance now"),
         "Unsupported script command was imported into visual blocks.");
+}
+
+static void VisualScriptBlocksDescribeSemanticLabels()
+{
+    var descriptions = new[]
+    {
+        new VisualScriptBlock
+        {
+            Kind = VisualScriptBlockKind.SetFlagTrue,
+            VariableName = "met_hero",
+        },
+        new VisualScriptBlock
+        {
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "score",
+            Value = "2",
+        },
+        new VisualScriptBlock
+        {
+            Kind = VisualScriptBlockKind.DivideVariable,
+            VariableName = "score",
+            Value = "2",
+        },
+        new VisualScriptBlock
+        {
+            Kind = VisualScriptBlockKind.Comment,
+            Text = "setup route",
+        },
+    }.Select(VisualScriptCompiler.Describe).ToList();
+
+    Assert(
+        descriptions.SequenceEqual(
+            [
+                "Флаг met_hero: включить",
+                "score += 2",
+                "score /= 2",
+                "Комментарий: setup route",
+            ]),
+        "Visual script block descriptions changed.");
 }
 
 static void VisualScriptBlocksValidateGeneratedScripts()
