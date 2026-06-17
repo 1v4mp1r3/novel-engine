@@ -1474,7 +1474,16 @@ public partial class MainWindow : Window
 
     private string AssetSize(NovelAsset asset)
     {
-        var path = ResolveAssetPath(asset);
+        string path;
+        try
+        {
+            path = ResolveAssetPath(asset);
+        }
+        catch (Exception error) when (IsAssetPathError(error))
+        {
+            return "некорректный путь";
+        }
+
         if (_assetSizeCache.TryGetValue(path, out var cached))
         {
             return cached;
@@ -1548,7 +1557,11 @@ public partial class MainWindow : Window
         if (view?.Asset.Kind == AssetKind.Audio)
         {
             AssetPreviewAudioPanel.Visibility = Visibility.Visible;
-            var audioPath = ResolveAssetPath(view.Asset);
+            if (!TryResolveAssetPath(view.Asset, out var audioPath))
+            {
+                AssetPreviewPlaceholder.Text = "Путь аудио недоступен";
+                return;
+            }
             if (File.Exists(audioPath))
             {
                 _assetPreviewAudioPath = audioPath;
@@ -1566,7 +1579,11 @@ public partial class MainWindow : Window
         {
             return;
         }
-        var path = ResolveAssetPath(view.Asset);
+        if (!TryResolveAssetPath(view.Asset, out var path))
+        {
+            AssetPreviewPlaceholder.Text = "Путь изображения недоступен";
+            return;
+        }
         if (!File.Exists(path))
         {
             return;
@@ -2740,6 +2757,27 @@ public partial class MainWindow : Window
             ? Path.GetFullPath(asset.Path)
             : ProjectAssets.ResolvePath(_projectPath, asset);
     }
+
+    private bool TryResolveAssetPath(NovelAsset asset, out string path)
+    {
+        try
+        {
+            path = ResolveAssetPath(asset);
+            return true;
+        }
+        catch (Exception error) when (IsAssetPathError(error))
+        {
+            path = string.Empty;
+            return false;
+        }
+    }
+
+    private static bool IsAssetPathError(Exception error) =>
+        error is IOException
+        or UnauthorizedAccessException
+        or ArgumentException
+        or InvalidOperationException
+        or NotSupportedException;
 
     private void RefreshWindowTitle()
     {
