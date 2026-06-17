@@ -635,9 +635,7 @@ public partial class PreviewWindow : Window
     {
         try
         {
-            var soundPath = voice.SoundPaths.Count == 1
-                ? voice.SoundPaths[0]
-                : voice.SoundPaths[Random.Shared.Next(voice.SoundPaths.Count)];
+            var soundPath = VoiceSoundPicker.Pick(voice.SoundPaths);
             var player = GetNextVoicePlayer(soundPath, voice.Pitch);
             _activeVoicePlayers.Add(player);
             player.Stop();

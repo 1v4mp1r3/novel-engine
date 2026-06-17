@@ -28,6 +28,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
+    ("voice sound picker supports multiple blips", VoiceSoundPickerSupportsMultipleBlips),
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
@@ -1023,6 +1024,31 @@ static void VoiceBlipGeneratorEmitsWav()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void VoiceSoundPickerSupportsMultipleBlips()
+{
+    var single = VoiceSoundPicker.Pick(["voices/hero.wav"], new Random(7));
+    Assert(single == "voices/hero.wav", "Single voice sound was not preserved.");
+
+    var sounds = new[]
+    {
+        "voices/hero-a.wav",
+        "voices/hero-b.wav",
+        "voices/hero-c.wav",
+    };
+    var random = new Random(7);
+    var picked = Enumerable
+        .Range(0, 24)
+        .Select(_ => VoiceSoundPicker.Pick(sounds, random))
+        .ToList();
+
+    Assert(
+        picked.All(sound => sounds.Contains(sound)),
+        "Voice sound picker returned an unknown sound.");
+    Assert(
+        picked.Distinct(StringComparer.Ordinal).Count() > 1,
+        "Voice sound picker did not vary multiple blips.");
 }
 
 static void ProjectLanguageRejectsCycles()
