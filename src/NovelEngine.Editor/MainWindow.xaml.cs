@@ -1670,6 +1670,7 @@ public partial class MainWindow : Window
             if (IsInAssetFolder(view.Asset, "voices"))
             {
                 menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
+                menu.Items.Add(CreateLibraryVoiceBindingMenu(view.Asset));
             }
         }
     }
@@ -1746,6 +1747,35 @@ public partial class MainWindow : Window
             menu.Items.Add(CreateAssetMenuItem(
                 $"Персонаж «{CharacterLabel(character)}»",
                 () => BindVoiceAssetToCharacter(asset, character.Id)));
+        }
+
+        return menu;
+    }
+
+    private MenuItem CreateLibraryVoiceBindingMenu(NovelAsset asset)
+    {
+        if (_project.Characters.Count == 0)
+        {
+            return CreateDisabledAssetMenuItem(
+                "Добавить voice-блип в библиотеку: персонажей нет");
+        }
+
+        if (_project.Characters.Count == 1)
+        {
+            var character = _project.Characters[0];
+            return CreateAssetMenuItem(
+                $"Добавить voice-блип в библиотеку: «{CharacterLabel(character)}»",
+                () => BindVoiceAssetToLibraryCharacter(asset, character.Id));
+        }
+
+        var menu = CreateHoverSubmenu("Добавить voice-блип в библиотеку");
+        foreach (var character in _project.Characters.OrderBy(
+            character => CharacterLabel(character),
+            StringComparer.CurrentCultureIgnoreCase))
+        {
+            menu.Items.Add(CreateAssetMenuItem(
+                $"Персонаж «{CharacterLabel(character)}»",
+                () => BindVoiceAssetToLibraryCharacter(asset, character.Id)));
         }
 
         return menu;
@@ -1881,6 +1911,36 @@ public partial class MainWindow : Window
         RefreshAfterAssetBinding();
         StatusText.Text =
             $"Voice-блипы персонажа «{character.Name}»: {character.VoiceSounds.Count}";
+    }
+
+    private void BindVoiceAssetToLibraryCharacter(
+        NovelAsset asset,
+        string characterId)
+    {
+        if (asset.Kind != AssetKind.Audio)
+        {
+            return;
+        }
+
+        var character = _project.FindCharacter(characterId);
+        if (character is null)
+        {
+            StatusText.Text = "Персонаж библиотеки для voice-блипа не найден";
+            return;
+        }
+
+        var reference = AssetReference.Create(asset.Id);
+        var voices = CharacterVoiceReferences(character);
+        if (!voices.Contains(reference, StringComparer.OrdinalIgnoreCase))
+        {
+            voices.Add(reference);
+        }
+        character.SetVoiceSounds(voices);
+
+        MarkDirty();
+        RefreshAfterAssetBinding();
+        StatusText.Text =
+            $"Voice-блипы библиотечного персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";
     }
 
     private void RefreshAfterAssetBinding()
