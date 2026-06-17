@@ -701,24 +701,88 @@ public sealed class GraphSurface : FrameworkElement
             .Where(candidate => candidate.Outputs.Any(output => output.TargetNodeId == node.Id))
             .OrderBy(candidate => candidate.Title, StringComparer.CurrentCulture);
 
-    private static string DescribeInheritanceSource(
+    private string DescribeInheritanceSource(
+        NovelNode source,
+        InheritanceResource resource)
+    {
+        var resolved = ResolveInheritanceSource(
+            source,
+            resource,
+            new HashSet<string>(StringComparer.Ordinal));
+        if (resolved is null)
+        {
+            return "источник не найден";
+        }
+        if (resolved.Node.Id == source.Id)
+        {
+            return resolved.Description;
+        }
+        return $"источник «{resolved.Node.Title}»: {resolved.Description}";
+    }
+
+    private InheritanceSourceDescription? ResolveInheritanceSource(
+        NovelNode node,
+        InheritanceResource resource,
+        HashSet<string> visited)
+    {
+        if (!visited.Add(node.Id))
+        {
+            return new InheritanceSourceDescription(
+                node,
+                "цепочка наследования зациклена");
+        }
+        if (!NodeInheritsResource(node, resource))
+        {
+            return new InheritanceSourceDescription(
+                node,
+                DescribeExplicitInheritanceValue(node, resource));
+        }
+
+        var sources = GetIncomingNodes(node).ToList();
+        if (sources.Count == 0)
+        {
+            return new InheritanceSourceDescription(
+                node,
+                "нет входящей ноды-источника");
+        }
+        if (sources.Count > 1)
+        {
+            return new InheritanceSourceDescription(
+                node,
+                $"источник зависит от ветки: {string.Join(", ", sources.Select(source => $"«{source.Title}»"))}");
+        }
+
+        return ResolveInheritanceSource(sources[0], resource, visited);
+    }
+
+    private static bool NodeInheritsResource(
+        NovelNode node,
+        InheritanceResource resource) =>
+        resource switch
+        {
+            InheritanceResource.Music => node.InheritMusic,
+            InheritanceResource.Background => node.InheritBackground,
+            InheritanceResource.Characters => node.InheritCharacters,
+            _ => false,
+        };
+
+    private static string DescribeExplicitInheritanceValue(
         NovelNode source,
         InheritanceResource resource) =>
         resource switch
         {
-            InheritanceResource.Music => source.InheritMusic
-                ? "сама наследует музыку"
-                : EmptyFallback(source.Music, "музыка не задана"),
-            InheritanceResource.Background => source.InheritBackground
-                ? "сама наследует фон"
-                : EmptyFallback(source.Background, "фон не задан"),
-            InheritanceResource.Characters => source.InheritCharacters
-                ? "сама наследует персонажей"
-                : source.Characters.Count == 0
-                    ? "персонажи не заданы"
-                    : string.Join(", ", source.Characters.Select(character => character.Name)),
+            InheritanceResource.Music => EmptyFallback(source.Music, "музыка не задана"),
+            InheritanceResource.Background => EmptyFallback(source.Background, "фон не задан"),
+            InheritanceResource.Characters => source.Characters.Count == 0
+                ? "персонажи не заданы"
+                : string.Join(", ", source.Characters.Select(CharacterDisplayName)),
             _ => string.Empty,
         };
+
+    private static string CharacterDisplayName(CharacterPlacement character) =>
+        string.IsNullOrWhiteSpace(character.Name)
+            ? character.Id
+            : character.Name;
 
     private static string EmptyFallback(string value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value;
@@ -1152,6 +1216,10 @@ public sealed class GraphSurface : FrameworkElement
         string OutputId,
         Point Center,
         Rect HitArea);
+
+    private sealed record InheritanceSourceDescription(
+        NovelNode Node,
+        string Description);
 
     private enum InheritanceResource
     {
