@@ -24,8 +24,17 @@ function Quote-Argument {
     '"' + $Value.Replace('"', '""') + '"'
 }
 
+function Resolve-ExecutablePath {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    if (-not (Test-Path -LiteralPath $Value -PathType Leaf)) {
+        throw "ExecutablePath must point to an existing file: $Value"
+    }
+    (Resolve-Path -LiteralPath $Value).Path
+}
+
 if ($ExecutablePath) {
-    $resolvedExecutable = (Resolve-Path $ExecutablePath).Path
+    $resolvedExecutable = Resolve-ExecutablePath $ExecutablePath
     $baseCommand = "$(Quote-Argument $resolvedExecutable) --open-project"
     $iconPath = $resolvedExecutable
 } else {
