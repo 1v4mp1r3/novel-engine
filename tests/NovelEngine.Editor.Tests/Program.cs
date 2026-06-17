@@ -6,6 +6,9 @@ var tests = new (string Name, Action Run)[]
 {
     ("workspace project creates default folders", WorkspaceProjectCreatesDefaultFolders),
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
+    ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
+    ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
+    ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
 };
 
 var failed = 0;
@@ -70,6 +73,69 @@ static void WorkspaceProjectPathAvoidsExistingFile()
         Assert(
             Path.GetFileName(secondPath) == $"{Path.GetFileName(directory)}-2.novel.json",
             "Available project path did not use the expected numeric suffix.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverOpensOnlyProject()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var projectPath = Path.Combine(directory, "custom-name.novel.json");
+        File.WriteAllText(projectPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath == projectPath, "Resolver did not open the only project file.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed workspace directory.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a folder with one project as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverPrefersFolderNamedProject()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var preferredPath = Path.Combine(
+            directory,
+            $"{Path.GetFileName(directory)}.novel.json");
+        var otherPath = Path.Combine(directory, "other.novel.json");
+        File.WriteAllText(preferredPath, "{}");
+        File.WriteAllText(otherPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath == preferredPath, "Resolver did not prefer the folder-named project.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a preferred project folder as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        File.WriteAllText(Path.Combine(directory, "first.novel.json"), "{}");
+        File.WriteAllText(Path.Combine(directory, "second.novel.json"), "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath is null, "Resolver picked a project from an ambiguous folder.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed ambiguous workspace directory.");
+        Assert(result.CreatedEmptyWorkspace, "Resolver did not mark an ambiguous folder as workspace.");
     }
     finally
     {
