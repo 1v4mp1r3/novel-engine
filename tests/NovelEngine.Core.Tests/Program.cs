@@ -609,7 +609,12 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
             Value = "1",
         });
 
-    var parsed = ProjectLanguage.Parse(ProjectLanguage.Format(project));
+    var source = ProjectLanguage.Format(project);
+    Assert(
+        source.Contains("# visual blocks: 1", StringComparison.Ordinal),
+        "Project language format does not expose visual script blocks.");
+
+    var parsed = ProjectLanguage.Parse(source);
     VisualScriptBlockPreserver.PreserveFrom(project, parsed);
 
     Assert(

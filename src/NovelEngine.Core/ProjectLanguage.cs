@@ -616,6 +616,11 @@ public static class ProjectLanguage
             {
                 builder.Append("    script ").AppendLine(Quote(node.Script));
             }
+            if (node.ScriptBlocks.Count > 0)
+            {
+                builder.Append("    # visual blocks: ")
+                    .AppendLine(node.ScriptBlocks.Count.ToString(CultureInfo.InvariantCulture));
+            }
 
             foreach (var output in node.Outputs)
             {
@@ -630,7 +635,8 @@ public static class ProjectLanguage
                 var hasBody = output.Condition.Length > 0
                     || output.Script.Length > 0
                     || output.TransitionSound.Length > 0
-                    || output.FadeDurationMs != 350;
+                    || output.FadeDurationMs != 350
+                    || output.ScriptBlocks.Count > 0;
                 if (!hasBody)
                 {
                     builder.AppendLine();
@@ -645,6 +651,11 @@ public static class ProjectLanguage
                 if (output.Script.Length > 0)
                 {
                     builder.Append("        script ").AppendLine(Quote(output.Script));
+                }
+                if (output.ScriptBlocks.Count > 0)
+                {
+                    builder.Append("        # visual blocks: ")
+                        .AppendLine(output.ScriptBlocks.Count.ToString(CultureInfo.InvariantCulture));
                 }
                 if (output.TransitionSound.Length > 0)
                 {

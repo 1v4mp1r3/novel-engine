@@ -88,7 +88,9 @@ overlays.
 Visual script blocks created from the node or choice property dialogs are stored
 beside the DSL source. They compile to the same runtime script commands as
 hand-written `script` text and are preserved when the `Код` tab is applied back
-to the graph by matching node ids and choice outputs.
+to the graph by matching node ids and choice outputs. Generated project source
+marks these locations with `# visual blocks: N` comments so block-authored logic
+is visible while reading code.
 
 ## Minimal project
 
