@@ -35,6 +35,7 @@ public partial class PreviewWindow : Window
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _voicePlayerIndexes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, BitmapImage?> _bitmapCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<string> _voicePoolLru = [];
     private readonly HashSet<MediaPlayer> _activeVoicePlayers = new();
     private readonly GameRuntimeSettings _settings = new();
@@ -207,7 +208,7 @@ public partial class PreviewWindow : Window
 
         var background = ResolveAsset(_project.MainMenu.Background);
         MainMenuStage.Background = background.Length > 0 && File.Exists(background)
-            ? new ImageBrush(LoadBitmap(background)) { Stretch = Stretch.UniformToFill }
+            ? new ImageBrush(LoadBitmapCached(background)) { Stretch = Stretch.UniformToFill }
             : new LinearGradientBrush(
                 Color.FromRgb(24, 38, 55),
                 Color.FromRgb(7, 11, 17),
@@ -287,7 +288,7 @@ public partial class PreviewWindow : Window
             grid.Children.Add(
                 new Image
                 {
-                    Source = LoadBitmap(imagePath),
+                    Source = LoadBitmapCached(imagePath),
                     Stretch = Stretch.UniformToFill,
                 });
         }
@@ -394,7 +395,7 @@ public partial class PreviewWindow : Window
 
     private void SetBackground(string path)
     {
-        BackgroundImage.Source = LoadBitmap(ResolveAsset(path));
+        BackgroundImage.Source = LoadBitmapCached(ResolveAsset(path));
         RootGrid.Background = BackgroundImage.Source is null
             ? new LinearGradientBrush(
                 Color.FromRgb(30, 47, 68),
@@ -421,7 +422,7 @@ public partial class PreviewWindow : Window
             Height = CharacterLayout.BaseHeight,
             RenderTransformOrigin = new Point(0.5, 0.5),
         };
-        var image = LoadBitmap(ResolveAsset(character.Sprite));
+        var image = LoadBitmapCached(ResolveAsset(character.Sprite));
         if (image is not null)
         {
             root.Children.Add(
@@ -532,6 +533,22 @@ public partial class PreviewWindow : Window
             return path;
         }
         return Path.GetFullPath(Path.Combine(_assetDirectory, path));
+    }
+
+    private BitmapImage? LoadBitmapCached(string path)
+    {
+        if (path.Length == 0)
+        {
+            return null;
+        }
+        if (_bitmapCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var image = LoadBitmap(path);
+        _bitmapCache[path] = image;
+        return image;
     }
 
     private static BitmapImage? LoadBitmap(string path)
