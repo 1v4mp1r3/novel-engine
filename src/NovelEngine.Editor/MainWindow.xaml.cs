@@ -2437,7 +2437,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private string ImportAssetFile(string sourcePath)
+    private string ImportAssetFile(string sourcePath, string? folder = null)
     {
         if (_projectPath is null)
         {
@@ -2448,7 +2448,7 @@ public partial class MainWindow : Window
             _project,
             _projectPath,
             sourcePath,
-            _selectedAssetFolder);
+            folder ?? _selectedAssetFolder);
         return AssetReference.Create(asset.Id);
     }
 
@@ -3139,7 +3139,10 @@ public partial class MainWindow : Window
 
     private void BrowseBackground_Click(object sender, RoutedEventArgs e)
     {
-        var path = BrowseAsset("Выберите фон", "Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp");
+        var path = BrowseAsset(
+            "Выберите фон",
+            "Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif",
+            "backgrounds");
         if (path is not null)
         {
             InheritBackgroundCheck.IsChecked = false;
@@ -3149,7 +3152,10 @@ public partial class MainWindow : Window
 
     private void BrowseMusic_Click(object sender, RoutedEventArgs e)
     {
-        var path = BrowseAsset("Выберите музыку", "Аудио|*.mp3;*.wav;*.wma;*.aac;*.m4a");
+        var path = BrowseAsset(
+            "Выберите музыку",
+            "Аудио|*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac",
+            "audio");
         if (path is not null)
         {
             InheritMusicCheck.IsChecked = false;
@@ -3157,7 +3163,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private string? BrowseAsset(string title, string filter)
+    private string? BrowseAsset(string title, string filter, string folder)
     {
         if (!EnsureProjectSavedForAssets())
         {
@@ -3178,7 +3184,7 @@ public partial class MainWindow : Window
         try
         {
             var count = _project.Assets.Count;
-            var reference = ImportAssetFile(dialog.FileName);
+            var reference = ImportAssetFile(dialog.FileName, folder);
             if (_project.Assets.Count != count)
             {
                 MarkDirty();
@@ -3231,7 +3237,7 @@ public partial class MainWindow : Window
             {
                 Id = $"character-{Guid.NewGuid():N}",
                 Name = dialog.CharacterName,
-                Sprite = NormalizeAssetPath(dialog.Sprite),
+                Sprite = NormalizeAssetPath(dialog.Sprite, "characters"),
                 Position = dialog.Position,
                 VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
                 VoiceSounds = voiceSounds,
@@ -3324,7 +3330,7 @@ public partial class MainWindow : Window
 
         var voiceSounds = NormalizeVoiceReferences(dialog.VoiceSounds);
         character.Name = dialog.CharacterName;
-        character.Sprite = NormalizeAssetPath(dialog.Sprite);
+        character.Sprite = NormalizeAssetPath(dialog.Sprite, "characters");
         character.SetVoiceSounds(voiceSounds);
         character.VoicePitch = dialog.VoicePitch;
         character.VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter;
@@ -3345,7 +3351,7 @@ public partial class MainWindow : Window
 
     private List<string> NormalizeVoiceReferences(IEnumerable<string> references) =>
         references
-            .Select(NormalizeAssetPath)
+            .Select(reference => NormalizeAssetPath(reference, "voices"))
             .Where(reference => reference.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -4196,7 +4202,7 @@ public partial class MainWindow : Window
         return changes;
     }
 
-    private string NormalizeAssetPath(string path)
+    private string NormalizeAssetPath(string path, string? folder = null)
     {
         if (path.Length == 0 || !Path.IsPathRooted(path))
         {
@@ -4208,7 +4214,7 @@ public partial class MainWindow : Window
         }
         try
         {
-            return ImportAssetFile(path);
+            return ImportAssetFile(path, folder);
         }
         catch (IOException error)
         {
