@@ -22,7 +22,7 @@ public sealed class OutputEditorWindow : Window
     {
         Title = "Вариант ответа";
         Width = 560;
-        Height = 500;
+        Height = 535;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
@@ -45,6 +45,15 @@ public sealed class OutputEditorWindow : Window
         panel.Children.Add(_labelBox);
         panel.Children.Add(DialogUi.Label("Условие показа, например: score >= 3"));
         panel.Children.Add(_conditionBox);
+        var conditionButton = new Button
+        {
+            Content = "Собрать условие...",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 12),
+            MinWidth = 150,
+        };
+        conditionButton.Click += (_, _) => BuildCondition();
+        panel.Children.Add(conditionButton);
         panel.Children.Add(DialogUi.Label("Скрипт при выборе"));
         _scriptBox.Height = 150;
         panel.Children.Add(_scriptBox);
@@ -85,6 +94,18 @@ public sealed class OutputEditorWindow : Window
         _scriptBlocks.Clear();
         _scriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
         RefreshScriptBlocksButton();
+    }
+
+    private void BuildCondition()
+    {
+        var dialog = new ConditionBuilderWindow(_conditionBox.Text)
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            _conditionBox.Text = dialog.Condition;
+        }
     }
 
     private void RefreshScriptBlocksButton() =>
