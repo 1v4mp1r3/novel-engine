@@ -56,6 +56,8 @@ public partial class MainWindow : Window
     private string? _assetPreviewAudioPath;
     private readonly Dictionary<string, string> _assetSizeCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, BitmapImage?> _assetPreviewImageCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public MainWindow()
         : this(null)
@@ -106,7 +108,7 @@ public partial class MainWindow : Window
         _filesRefreshTimer.Tick += (_, _) =>
         {
             _filesRefreshTimer.Stop();
-            _assetSizeCache.Clear();
+            ClearAssetFileCaches();
             if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
             {
                 RefreshAssets();
@@ -1057,11 +1059,17 @@ public partial class MainWindow : Window
     {
         if (syncFromDisk)
         {
-            _assetSizeCache.Clear();
+            ClearAssetFileCaches();
             SyncFilesFromDisk();
         }
         RefreshAssetFolders();
         RefreshAssetList();
+    }
+
+    private void ClearAssetFileCaches()
+    {
+        _assetSizeCache.Clear();
+        _assetPreviewImageCache.Clear();
     }
 
     private void RefreshNodeAssetPickers(NovelNode? node)
@@ -1594,22 +1602,42 @@ public partial class MainWindow : Window
         {
             return;
         }
+        var image = LoadAssetPreviewImage(path);
+        if (image is null)
+        {
+            AssetPreviewPlaceholder.Text = "Не удалось открыть изображение";
+            return;
+        }
+
+        AssetPreviewImage.Source = image;
+        AssetPreviewPlaceholder.Visibility = Visibility.Collapsed;
+    }
+
+    private BitmapImage? LoadAssetPreviewImage(string path)
+    {
+        if (_assetPreviewImageCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        BitmapImage? image;
         try
         {
-            var image = new BitmapImage();
+            image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.DecodePixelWidth = 900;
             image.UriSource = new Uri(path, UriKind.Absolute);
             image.EndInit();
             image.Freeze();
-            AssetPreviewImage.Source = image;
-            AssetPreviewPlaceholder.Visibility = Visibility.Collapsed;
         }
         catch (Exception)
         {
-            AssetPreviewPlaceholder.Text = "Не удалось открыть изображение";
+            image = null;
         }
+
+        _assetPreviewImageCache[path] = image;
+        return image;
     }
 
     private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
