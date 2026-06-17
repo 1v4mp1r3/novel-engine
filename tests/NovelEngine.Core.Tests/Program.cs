@@ -1055,6 +1055,18 @@ static void VoiceSoundPickerSupportsMultipleBlips()
 static void VoicePlaybackCadenceSkipsExpectedCharacters()
 {
     Assert(
+        VoicePlaybackCadence.CountsAsVoicedCharacter('Г'),
+        "Voice cadence should count letters as voiced characters.");
+    Assert(
+        VoicePlaybackCadence.CountsAsVoicedCharacter('!'),
+        "Voice cadence should count punctuation as voiced characters.");
+    Assert(
+        !VoicePlaybackCadence.CountsAsVoicedCharacter(' '),
+        "Voice cadence should skip spaces.");
+    Assert(
+        !VoicePlaybackCadence.CountsAsVoicedCharacter('\n'),
+        "Voice cadence should skip line breaks.");
+    Assert(
         VoicePlaybackCadence.ShouldPlay(1, 1),
         "Voice cadence should play the first voiced character when frequency is one.");
     Assert(

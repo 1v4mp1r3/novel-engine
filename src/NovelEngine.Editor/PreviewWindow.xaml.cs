@@ -582,7 +582,8 @@ public partial class PreviewWindow : Window
 
                 visible.Append(character);
                 DialogueText.Text = visible.ToString();
-                if (!char.IsWhiteSpace(character) && voice is not null)
+                if (VoicePlaybackCadence.CountsAsVoicedCharacter(character)
+                    && voice is not null)
                 {
                     voicedCharacters++;
                     if (VoicePlaybackCadence.ShouldPlay(
