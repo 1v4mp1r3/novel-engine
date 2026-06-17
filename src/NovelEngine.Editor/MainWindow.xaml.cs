@@ -2945,7 +2945,10 @@ public partial class MainWindow : Window
             RecentProjectsStore.Remember(fullPath);
             return true;
         }
-        catch (Exception error) when (error is IOException or InvalidDataException)
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             _projectPath = previousProjectPath;
             _workspaceDirectory = previousWorkspaceDirectory;
@@ -4131,6 +4134,10 @@ public partial class MainWindow : Window
             {
                 return;
             }
+        }
+        else
+        {
+            SyncFilesFromDisk(refreshCode: false);
         }
         var projectPath = _projectPath;
         if (projectPath is null)
