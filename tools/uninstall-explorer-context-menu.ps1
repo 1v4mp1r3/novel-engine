@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$Describe
+)
 
 $ErrorActionPreference = 'Stop'
 $menuText = -join @(
@@ -19,6 +21,14 @@ $keys = @(
     'HKCU:\Software\Classes\*\shell\NovelEngine.Open',
     'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
 )
+
+if ($Describe) {
+    [pscustomobject]@{
+        MenuText = $menuText
+        Keys = @($keys)
+    } | ConvertTo-Json -Depth 3
+    return
+}
 
 foreach ($key in $keys) {
     Remove-Item -Path $key -Recurse -Force -ErrorAction SilentlyContinue

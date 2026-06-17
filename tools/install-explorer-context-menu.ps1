@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$ExecutablePath
+    [string]$ExecutablePath,
+    [switch]$Describe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,15 +65,36 @@ $items = @(
         Argument = '%V'
     },
     @{
-        Key = 'HKCU:\Software\Classes\*\shell\NovelEngine.Open'
+        Key = 'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
         Argument = '%1'
-        AppliesTo = 'System.ItemName:".novel.json"'
     }
 )
+
+$entries = foreach ($item in $items) {
+    [pscustomobject]@{
+        Key = $item.Key
+        CommandKey = Join-Path $item.Key 'command'
+        MenuText = $menuText
+        Icon = $iconPath
+        AppliesTo = if ($item.AppliesTo) { $item.AppliesTo } else { $null }
+        Command = ('{0} "{1}"' -f $baseCommand, $item.Argument)
+    }
+}
+
+if ($Describe) {
+    [pscustomobject]@{
+        MenuText = $menuText
+        BaseCommand = $baseCommand
+        Icon = $iconPath
+        Entries = @($entries)
+    } | ConvertTo-Json -Depth 4
+    return
+}
 
 foreach ($item in $items) {
     $key = $item.Key
     $commandKey = Join-Path $key 'command'
+    $entry = $entries | Where-Object { $_.Key -eq $key } | Select-Object -First 1
     New-Item -Path $key -Force | Out-Null
     New-Item -Path $commandKey -Force | Out-Null
     Set-Item -Path $key -Value $menuText
@@ -83,7 +105,7 @@ foreach ($item in $items) {
     } else {
         Remove-ItemProperty -Path $key -Name 'AppliesTo' -ErrorAction SilentlyContinue
     }
-    Set-Item -Path $commandKey -Value ('{0} "{1}"' -f $baseCommand, $item.Argument)
+    Set-Item -Path $commandKey -Value $entry.Command
 }
 
 Write-Host ('Explorer context menu item "{0}" installed for project folders and *.novel.json files.' -f $menuText)
