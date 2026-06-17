@@ -1488,6 +1488,26 @@ static void AssetFoldersMoveFiles()
             project.ResolveAssetReference(scene.Background) == asset.Path,
             "Moved asset reference did not resolve to the new asset path.");
 
+        var missingAsset = new NovelAsset
+        {
+            Id = "missing_move",
+            Kind = AssetKind.Image,
+            Path = "files/backgrounds/missing.png",
+            Folder = "backgrounds",
+        };
+        project.Assets.Add(missingAsset);
+        AssertThrows<FileNotFoundException>(
+            () => ProjectAssets.MoveAsset(
+                project,
+                projectPath,
+                missingAsset,
+                "characters/heroes"),
+            "Moving a missing physical asset should fail.");
+        Assert(
+            missingAsset.Folder == "backgrounds"
+                && missingAsset.Path == "files/backgrounds/missing.png",
+            "Failed asset move changed the project model.");
+
         ProjectAssets.RenameFolder(
             project,
             projectPath,

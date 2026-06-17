@@ -311,15 +311,19 @@ public static class ProjectAssets
         }
 
         var source = ResolvePath(projectPath, asset);
+        if (!File.Exists(source))
+        {
+            throw new FileNotFoundException(
+                "Файл ассета для перемещения не найден.",
+                source);
+        }
+
         var targetDirectory = Path.Combine(
             GetAssetsDirectory(projectPath),
             folder.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(targetDirectory);
         var target = UniquePath(targetDirectory, Path.GetFileName(source));
-        if (File.Exists(source))
-        {
-            File.Move(source, target);
-        }
+        File.Move(source, target);
         asset.Folder = folder;
         asset.Path = Path.GetRelativePath(GetProjectDirectory(projectPath), target)
             .Replace('\\', '/');
