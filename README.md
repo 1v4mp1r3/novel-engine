@@ -96,6 +96,9 @@ currently installed on this workstation.
 - Press `F5` to compile and launch the game, `F6` for a debug build,
   `Shift+F5` to stop it, or `Ctrl+F5` to preview the selected node.
 - Right-click any node to start its preview.
+- In preview/runtime, press `Space`, `Enter`, or left-click to reveal the
+  current line immediately; choices still appear only after the line is fully
+  shown.
 - Open the `Код` tab to author node types, nodes, connections, inheritance,
   assets, and transitions as source code. Press `Ctrl+Enter` to compile it.
 - Open the `Файлы` tab to import assets into the project and address them from
