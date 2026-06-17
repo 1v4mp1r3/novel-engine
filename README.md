@@ -116,12 +116,15 @@ currently installed on this workstation.
   in a choice editor, use the same button to attach blocks to that transition.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
+- Conditions created through the visual builder are saved as structured data
+  beside their generated text form, so future condition blocks can survive DSL
+  edits, builds, and JSON round trips.
 - Visual-block dialogs can import simple text scripts (`set`, `add`, `unset`,
   comments) into editable blocks and optionally clear the original text to avoid
   double execution.
 - Applying source from the `Код` tab preserves existing visual script blocks by
-  matching node ids and choice outputs, so block-authored logic is not lost
-  during DSL edits.
+  matching node ids and choice outputs, and keeps structured choice conditions
+  when their generated `when` text still matches.
 - Open the `Файлы` tab to import assets into the project and address them from
   code through stable references such as `@city_night` or `@main_theme`.
 - Entry scripts and choice conditions use the language documented in
