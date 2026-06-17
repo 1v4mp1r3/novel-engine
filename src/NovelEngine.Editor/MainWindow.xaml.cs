@@ -4062,6 +4062,61 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateCharacterMenuItem("Удалить", () => DeleteCharacter_Click(this, new RoutedEventArgs())));
     }
 
+    private void CharactersGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            EditCharacter_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            DuplicateCharacter_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            DeleteCharacter_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.Alt)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Up)
+        {
+            MoveSelectedCharacter(-1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            MoveSelectedCharacter(1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Left)
+        {
+            SetSelectedCharacterPosition(CharacterPosition.Left);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Home)
+        {
+            SetSelectedCharacterPosition(CharacterPosition.Center);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Right)
+        {
+            SetSelectedCharacterPosition(CharacterPosition.Right);
+            e.Handled = true;
+        }
+    }
+
     private static MenuItem CreateCharacterMenuItem(
         string header,
         Action action,

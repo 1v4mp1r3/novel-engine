@@ -102,6 +102,9 @@ currently installed on this workstation.
   properties panel without opening the full character editor.
 - Right-click a scene character to edit, duplicate, save it to the library,
   reorder, set left/center/right position, or remove it.
+- In the scene character table, `Enter`, `Ctrl+D`, `Delete`, `Alt+Up/Down`,
+  and `Alt+Left/Home/Right` provide the same edit, duplicate, delete, reorder,
+  and left/center/right placement actions from the keyboard.
 - New scene characters are picked from images in `files/characters`; import a
   sprite there first, then add it from the properties panel or from the asset
   context menu.

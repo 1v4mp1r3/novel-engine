@@ -248,7 +248,7 @@
 
                             <CheckBox x:Name="InheritCharactersCheck" Content="Наследовать персонажей" Checked="Inheritance_Changed" Unchecked="Inheritance_Changed" />
                             <TextBlock Text="Персонажи на сцене" Style="{StaticResource SectionHeader}" />
-                            <DataGrid x:Name="CharactersGrid" Height="135" AutoGenerateColumns="False" SelectionChanged="CharactersGrid_SelectionChanged" MouseDoubleClick="EditCharacter_Click" PreviewMouseRightButtonDown="CharactersGrid_PreviewMouseRightButtonDown" ContextMenuOpening="CharactersGrid_ContextMenuOpening">
+                            <DataGrid x:Name="CharactersGrid" Height="135" AutoGenerateColumns="False" SelectionChanged="CharactersGrid_SelectionChanged" MouseDoubleClick="EditCharacter_Click" PreviewKeyDown="CharactersGrid_PreviewKeyDown" PreviewMouseRightButtonDown="CharactersGrid_PreviewMouseRightButtonDown" ContextMenuOpening="CharactersGrid_ContextMenuOpening">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="*" />
                                     <DataGridTextColumn Header="Позиция" Binding="{Binding Position}" Width="90" />
