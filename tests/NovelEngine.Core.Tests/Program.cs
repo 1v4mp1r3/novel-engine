@@ -1216,6 +1216,14 @@ static void AssetFoldersMoveFiles()
         var asset = ProjectAssets.Import(project, projectPath, source);
 
         ProjectAssets.CreateFolder(project, "characters/heroes");
+        var conflictingTarget = Path.Combine(
+            directory,
+            "files",
+            "characters",
+            "heroes",
+            "hero.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(conflictingTarget)!);
+        File.WriteAllBytes(conflictingTarget, [137, 80, 78, 71, 2]);
         ProjectAssets.MoveAsset(
             project,
             projectPath,
@@ -1227,6 +1235,11 @@ static void AssetFoldersMoveFiles()
         Assert(
             File.Exists(ProjectAssets.ResolvePath(projectPath, asset)),
             "Physical asset disappeared after moving.");
+        Assert(File.Exists(conflictingTarget), "Existing target file was overwritten.");
+        Assert(
+            Path.GetFileName(ProjectAssets.ResolvePath(projectPath, asset))
+                == "hero-2.png",
+            "Moved asset did not receive a unique file name.");
 
         ProjectAssets.RenameFolder(
             project,
