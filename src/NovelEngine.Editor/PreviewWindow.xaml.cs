@@ -18,6 +18,7 @@ namespace NovelEngine.Editor;
 public partial class PreviewWindow : Window
 {
     private const int VoicePlayerPoolSize = 6;
+    private const int MaxVoiceSoundPools = 32;
     private static readonly JsonSerializerOptions SaveOptions = new()
     {
         WriteIndented = true,
@@ -34,6 +35,7 @@ public partial class PreviewWindow : Window
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _voicePlayerIndexes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly LinkedList<string> _voicePoolLru = [];
     private readonly HashSet<MediaPlayer> _activeVoicePlayers = new();
     private readonly GameRuntimeSettings _settings = new();
     private string _currentMusicPath = string.Empty;
@@ -717,6 +719,8 @@ public partial class PreviewWindow : Window
             pool = CreateVoicePlayerPool(soundPath, pitch);
             _voicePlayerPools[soundPath] = pool;
         }
+        TouchVoicePool(soundPath);
+        TrimVoicePools();
 
         var index = _voicePlayerIndexes.TryGetValue(soundPath, out var currentIndex)
             ? currentIndex
@@ -748,6 +752,45 @@ public partial class PreviewWindow : Window
         return pool;
     }
 
+    private void TouchVoicePool(string soundPath)
+    {
+        var node = _voicePoolLru.Find(soundPath);
+        if (node is not null)
+        {
+            _voicePoolLru.Remove(node);
+        }
+        _voicePoolLru.AddLast(soundPath);
+    }
+
+    private void TrimVoicePools()
+    {
+        var attempts = 0;
+        while (_voicePlayerPools.Count > MaxVoiceSoundPools
+            && _voicePoolLru.First is not null
+            && attempts++ < _voicePlayerPools.Count)
+        {
+            var soundPath = _voicePoolLru.First.Value;
+            _voicePoolLru.RemoveFirst();
+            if (!_voicePlayerPools.TryGetValue(soundPath, out var pool))
+            {
+                continue;
+            }
+            if (pool.Any(_activeVoicePlayers.Contains))
+            {
+                _voicePoolLru.AddLast(soundPath);
+                continue;
+            }
+
+            foreach (var player in pool)
+            {
+                player.Stop();
+                player.Close();
+            }
+            _voicePlayerPools.Remove(soundPath);
+            _voicePlayerIndexes.Remove(soundPath);
+        }
+    }
+
     private void StopAllVoicePlayers(bool close)
     {
         foreach (var player in _voicePlayerPools.Values.SelectMany(pool => pool))
@@ -764,6 +807,7 @@ public partial class PreviewWindow : Window
         {
             _voicePlayerPools.Clear();
             _voicePlayerIndexes.Clear();
+            _voicePoolLru.Clear();
         }
     }
 
