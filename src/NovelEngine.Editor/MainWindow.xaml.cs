@@ -2023,7 +2023,8 @@ public partial class MainWindow : Window
             GetCharacterSpriteAssets(),
             GetVoiceBlipAssets(),
             SuggestedCharacterName(asset),
-            AssetReference.Create(asset.Id))
+            AssetReference.Create(asset.Id),
+            requireSprite: true)
         {
             Owner = this,
         };
@@ -2054,7 +2055,8 @@ public partial class MainWindow : Window
             GetCharacterSpriteAssets(),
             GetVoiceBlipAssets(),
             SuggestedCharacterName(asset),
-            AssetReference.Create(asset.Id))
+            AssetReference.Create(asset.Id),
+            requireSprite: true)
         {
             Owner = this,
         };
@@ -3447,7 +3449,8 @@ public partial class MainWindow : Window
         var dialog = new CharacterEditorWindow(
             null,
             GetCharacterSpriteAssets(),
-            GetVoiceBlipAssets())
+            GetVoiceBlipAssets(),
+            requireSprite: true)
         {
             Owner = this,
         };

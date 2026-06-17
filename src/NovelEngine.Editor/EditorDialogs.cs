@@ -69,6 +69,7 @@ public sealed class OutputEditorWindow : Window
 
 public sealed class CharacterEditorWindow : Window
 {
+    private readonly bool _requiresSprite;
     private readonly TextBox _nameBox;
     private readonly ComboBox _spriteBox;
     private readonly ListBox _voiceList;
@@ -81,8 +82,10 @@ public sealed class CharacterEditorWindow : Window
         IEnumerable<NovelAsset> spriteAssets,
         IEnumerable<NovelAsset> voiceAssets,
         string? suggestedName = null,
-        string? suggestedSprite = null)
+        string? suggestedSprite = null,
+        bool requireSprite = false)
     {
+        _requiresSprite = requireSprite;
         Title = character is null ? "Добавить персонажа" : "Изменить персонажа";
         Width = 560;
         Height = 560;
@@ -94,7 +97,7 @@ public sealed class CharacterEditorWindow : Window
         _spriteBox = CreateAssetBox(
             spriteAssets,
             character?.Sprite ?? suggestedSprite ?? string.Empty,
-            "Без спрайта");
+            requireSprite ? "Выберите спрайт" : "Без спрайта");
         _voiceList = CreateAssetList(
             voiceAssets,
             CharacterVoiceReferences(character));
@@ -117,7 +120,10 @@ public sealed class CharacterEditorWindow : Window
         var panel = DialogUi.Panel();
         panel.Children.Add(DialogUi.Label("Имя персонажа"));
         panel.Children.Add(_nameBox);
-        panel.Children.Add(DialogUi.Label("Спрайт из files/characters"));
+        panel.Children.Add(DialogUi.Label(
+            requireSprite
+                ? "Спрайт из files/characters (обязательно)"
+                : "Спрайт из files/characters"));
         panel.Children.Add(_spriteBox);
         panel.Children.Add(DialogUi.Label("Позиция"));
         panel.Children.Add(_positionBox);
@@ -272,6 +278,16 @@ public sealed class CharacterEditorWindow : Window
             MessageBox.Show(
                 this,
                 "Укажите имя персонажа.",
+                "Персонаж",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        if (_requiresSprite && Sprite.Length == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Выберите спрайт из files/characters. Если список пустой, импортируйте изображение в папку characters через менеджер файлов.",
                 "Персонаж",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);

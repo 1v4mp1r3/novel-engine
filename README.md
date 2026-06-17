@@ -93,6 +93,9 @@ currently installed on this workstation.
   transform settings intact.
 - Selected scene characters can be moved left, center, or right from the
   properties panel without opening the full character editor.
+- New scene characters are picked from images in `files/characters`; import a
+  sprite there first, then add it from the properties panel or from the asset
+  context menu.
 - A node may inherit music without restarting playback.
 - Right-click a connection to configure its transition sound and fade duration.
 - Press `F5` to compile and launch the game, `F6` for a debug build,
@@ -133,3 +136,6 @@ currently installed on this workstation.
   menu.
 - Asset usage results can be opened directly to jump back to the node or main
   menu area that references the asset.
+- Right-click an image in `files/characters` to create a library character from
+  that sprite, add it to the selected node, or attach voice blips from
+  `files/voices` to the matching character.
