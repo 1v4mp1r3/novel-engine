@@ -141,6 +141,13 @@ static void CharacterLibraryRoundTrip()
             Kind = AssetKind.Audio,
             Path = "files/voices/alice.wav",
         });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "alice_voice_alt",
+            Kind = AssetKind.Audio,
+            Path = "files/voices/alice-alt.wav",
+        });
     project.Characters.Add(
         new CharacterPlacement
         {
@@ -149,7 +156,7 @@ static void CharacterLibraryRoundTrip()
             Sprite = "@alice_sprite",
             Position = CharacterPosition.Left,
             VoiceSound = "@alice_voice",
-            VoiceSounds = ["@alice_voice"],
+            VoiceSounds = ["@alice_voice", "@alice_voice_alt"],
             VoicePitch = 1.2,
             VoiceEveryNthCharacter = 2,
         });
@@ -170,10 +177,22 @@ static void CharacterLibraryRoundTrip()
         fromCode.CountAssetReferences("alice_voice") == 1,
         "Character library voice reference was not counted.");
     Assert(
+        fromCode.Characters[0].VoiceSounds.Count == 2
+            && fromCode.Characters[0].VoiceSounds.Contains("@alice_voice_alt"),
+        "Character library lost multiple voice blips.");
+    Assert(
+        fromCode.CountAssetReferences("alice_voice_alt") == 1,
+        "Character library alternate voice reference was not counted.");
+    Assert(
         fromCode.FindAssetUsages("alice_voice").Single().Location.Contains(
             "библиотека персонажей",
             StringComparison.Ordinal),
         "Character library voice usage location was not reported.");
+    Assert(
+        fromCode.FindAssetUsages("alice_voice_alt").Single().Location.Contains(
+            "библиотека персонажей",
+            StringComparison.Ordinal),
+        "Character library alternate voice usage location was not reported.");
 }
 
 static void DialogueChoicesConnectIndependently()
