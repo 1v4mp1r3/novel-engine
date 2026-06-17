@@ -471,6 +471,7 @@
                                       Grid.Row="1"
                                       AutoGenerateColumns="False"
                                       SelectionChanged="AssetsGrid_SelectionChanged"
+                                      PreviewKeyDown="AssetsGrid_PreviewKeyDown"
                                       PreviewMouseRightButtonDown="AssetsGrid_PreviewMouseRightButtonDown"
                                       ContextMenuOpening="AssetsGrid_ContextMenuOpening"
                                       MouseDoubleClick="CopyAssetReference_Click">

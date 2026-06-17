@@ -187,6 +187,9 @@ currently installed on this workstation.
 - Audio assets can be previewed directly from the file manager.
 - Selected assets can be opened in Windows Explorer from the toolbar or context
   menu.
+- In the file manager table, `Ctrl+C`, `Enter`, `F2`, `Delete`, `Space`,
+  `Escape`, and `Ctrl+F` copy a reference, open, rename, delete, preview or
+  stop audio, and jump to search.
 - Asset usage results can be opened directly to jump back to the node or main
   menu area that references the asset.
 - Right-click an image in `files/characters` to create a library character from

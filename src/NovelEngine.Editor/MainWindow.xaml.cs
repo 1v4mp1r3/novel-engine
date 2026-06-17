@@ -1867,6 +1867,71 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void AssetsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            AssetSearchBox.Focus();
+            AssetSearchBox.SelectAll();
+            e.Handled = true;
+            return;
+        }
+
+        var view = AssetsGrid.SelectedItem as AssetView;
+        if (view is null)
+        {
+            return;
+        }
+
+        if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            CopyAssetReference_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            OpenSelectedAsset_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.F2)
+        {
+            RenameAsset_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete)
+        {
+            DeleteAsset_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Space
+            && view.Asset.Kind == AssetKind.Audio
+            && AssetPreviewPlayButton.IsEnabled)
+        {
+            PlayAssetPreview_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && AssetPreviewStopButton.IsEnabled)
+        {
+            StopAssetPreview_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+        }
+    }
+
     private void PlayAssetPreview_Click(object sender, RoutedEventArgs e)
     {
         if (_assetPreviewAudioPath is null || !File.Exists(_assetPreviewAudioPath))
