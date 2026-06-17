@@ -2622,34 +2622,7 @@ public partial class MainWindow : Window
         var directory = _projectPath is null
             ? Path.Combine(GetAssetDirectory(), ProjectAssets.ManagedFilesDirectoryName)
             : ProjectAssets.GetAssetsDirectory(_projectPath);
-        Directory.CreateDirectory(directory);
-        Process.Start(
-            new ProcessStartInfo
-            {
-                FileName = directory,
-                UseShellExecute = true,
-            });
-    }
-
-    private void OpenSelectedAssetInExplorer(NovelAsset asset)
-    {
-        var path = ResolveAssetPath(asset);
-        var fullPath = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(fullPath);
-        if (File.Exists(fullPath))
-        {
-            Process.Start(
-                new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"/select,\"{fullPath}\"",
-                    UseShellExecute = true,
-                });
-            StatusText.Text = $"Открыт файл {Path.GetFileName(fullPath)}";
-            return;
-        }
-
-        if (directory is not null)
+        try
         {
             Directory.CreateDirectory(directory);
             Process.Start(
@@ -2659,7 +2632,65 @@ public partial class MainWindow : Window
                     UseShellExecute = true,
                 });
         }
-        StatusText.Text = $"Файл ассета не найден: {fullPath}";
+        catch (Exception error) when (IsShellOpenError(error))
+        {
+            ShowShellOpenError("Открыть папку files", error);
+        }
+    }
+
+    private void OpenSelectedAssetInExplorer(NovelAsset asset)
+    {
+        try
+        {
+            var path = ResolveAssetPath(asset);
+            var fullPath = Path.GetFullPath(path);
+            var directory = Path.GetDirectoryName(fullPath);
+            if (File.Exists(fullPath))
+            {
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{fullPath}\"",
+                        UseShellExecute = true,
+                    });
+                StatusText.Text = $"Открыт файл {Path.GetFileName(fullPath)}";
+                return;
+            }
+
+            if (directory is not null)
+            {
+                Directory.CreateDirectory(directory);
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName = directory,
+                        UseShellExecute = true,
+                    });
+            }
+            StatusText.Text = $"Файл ассета не найден: {fullPath}";
+        }
+        catch (Exception error) when (IsShellOpenError(error))
+        {
+            ShowShellOpenError("Открыть ассет", error);
+        }
+    }
+
+    private bool IsShellOpenError(Exception error) =>
+        error is IOException
+        or UnauthorizedAccessException
+        or InvalidOperationException
+        or Win32Exception;
+
+    private void ShowShellOpenError(string title, Exception error)
+    {
+        StatusText.Text = $"{title}: {error.Message}";
+        MessageBox.Show(
+            this,
+            error.Message,
+            title,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     private bool EnsureProjectSavedForAssets()
