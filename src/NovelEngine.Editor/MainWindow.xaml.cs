@@ -1353,6 +1353,14 @@ public partial class MainWindow : Window
         _refreshingAssetFolders = true;
         try
         {
+            var folderCounts = _project.Assets
+                .GroupBy(
+                    asset => ProjectAssets.NormalizeFolder(asset.Folder),
+                    StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Count(),
+                    StringComparer.OrdinalIgnoreCase);
             AssetFoldersTree.Items.Clear();
             var all = new TreeViewItem
             {
@@ -1377,13 +1385,11 @@ public partial class MainWindow : Window
                         : $"{parentPath}/{segment}";
                     if (!items.TryGetValue(path, out var item))
                     {
-                        var count = _project.Assets.Count(
-                            asset => asset.Folder.Equals(
-                                path,
-                                StringComparison.OrdinalIgnoreCase));
                         item = new TreeViewItem
                         {
-                            Header = CreateFolderHeader(segment, count),
+                            Header = CreateFolderHeader(
+                                segment,
+                                folderCounts.GetValueOrDefault(path)),
                             Tag = path,
                             IsExpanded = true,
                             IsSelected = path.Equals(
