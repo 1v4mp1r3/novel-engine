@@ -3223,7 +3223,10 @@ public partial class MainWindow : Window
             }
             return reference;
         }
-        catch (IOException error)
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             MessageBox.Show(
                 this,
@@ -4252,7 +4255,10 @@ public partial class MainWindow : Window
         {
             return ImportAssetFile(path, folder);
         }
-        catch (IOException error)
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             MessageBox.Show(
                 this,
