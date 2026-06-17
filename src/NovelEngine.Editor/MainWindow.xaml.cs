@@ -158,6 +158,10 @@ public partial class MainWindow : Window
     internal void SelectFilesWorkspace() =>
         WorkspaceTabs.SelectedItem = FilesTab;
 
+    internal NovelProject ProjectForSmoke => _project;
+
+    internal bool SaveProjectForSmoke() => SaveProject();
+
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
@@ -2009,6 +2013,26 @@ public partial class MainWindow : Window
 
     internal bool RebuildAssetsContextMenuForSmoke() =>
         RebuildAssetsContextMenu();
+
+    internal bool BindVoiceAssetToCharacterForSmoke(
+        string assetId,
+        string characterId)
+    {
+        var asset = _project.FindAsset(assetId);
+        if (asset is null)
+        {
+            return false;
+        }
+
+        BindVoiceAssetToCharacter(asset, characterId);
+        var reference = AssetReference.Create(asset.Id);
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        return node?.Characters
+            .FirstOrDefault(character => character.Id == characterId)
+            ?.GetVoiceSounds()
+            .Contains(reference, StringComparer.OrdinalIgnoreCase)
+            == true;
+    }
 
     private bool RebuildAssetsContextMenu()
     {

@@ -405,8 +405,10 @@ internal static class ScreenshotRenderer
             Directory.CreateDirectory(sourceDirectory);
             var projectPath = ProjectWorkspace.CreateProjectInDirectory(projectDirectory);
             var sourceBackground = Path.Combine(sourceDirectory, "smoke-background.png");
+            var sourceCharacter = Path.Combine(sourceDirectory, "smoke-character.png");
             var sourceVoice = Path.Combine(sourceDirectory, "smoke-voice.wav");
             CreateImage(sourceBackground, 640, 360, backgroundImage: true);
+            CreateImage(sourceCharacter, 260, 520, backgroundImage: false);
             VoiceBlipGenerator.WriteWaveFile(sourceVoice, new VoiceBlipOptions());
 
             var project = ProjectSerializer.Load(projectPath);
@@ -415,11 +417,26 @@ internal static class ScreenshotRenderer
                 projectPath,
                 sourceBackground,
                 "backgrounds");
+            var characterAsset = ProjectAssets.Import(
+                project,
+                projectPath,
+                sourceCharacter,
+                "characters");
             var voiceAsset = ProjectAssets.Import(
                 project,
                 projectPath,
                 sourceVoice,
                 "voices");
+            var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+            scene.InheritCharacters = false;
+            scene.Characters.Add(
+                new CharacterPlacement
+                {
+                    Id = "smoke-hero",
+                    Name = "Smoke Hero",
+                    Sprite = AssetReference.Create(characterAsset.Id),
+                    Position = CharacterPosition.Left,
+                });
             ProjectSerializer.Save(project, projectPath);
 
             var window = new MainWindow(projectPath)
@@ -432,6 +449,7 @@ internal static class ScreenshotRenderer
                 WindowStartupLocation = WindowStartupLocation.Manual,
             };
             window.Show();
+            window.SelectPreviewNode(NodeKind.Scene);
             window.SelectFilesWorkspace();
             window.Dispatcher.Invoke(
                 () => { },
@@ -476,6 +494,41 @@ internal static class ScreenshotRenderer
                 DispatcherPriority.ApplicationIdle);
             AssertDarkMenuRender(menu, "asset manager context menu");
             menu.IsOpen = false;
+
+            var bindVoiceItem = FindMenuItem(
+                menu.Items,
+                "Добавить voice-блип к «Smoke Hero»");
+            if (bindVoiceItem is null || !bindVoiceItem.IsEnabled)
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke did not expose the selected-node voice binding action.");
+            }
+
+            if (!window.BindVoiceAssetToCharacterForSmoke(
+                voiceAsset.Id,
+                "smoke-hero"))
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke could not invoke the selected-node voice binding action.");
+            }
+
+            var updatedScene = window.ProjectForSmoke.Nodes.Single(
+                node => node.Id == scene.Id);
+            var updatedCharacter = updatedScene.Characters.Single(
+                character => character.Id == "smoke-hero");
+            var voiceReference = AssetReference.Create(voiceAsset.Id);
+            if (!updatedCharacter.GetVoiceSounds().Contains(
+                voiceReference,
+                StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke did not bind the selected voice asset to the character.");
+            }
+            if (!window.SaveProjectForSmoke())
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke could not save the voice binding project.");
+            }
             window.Close();
         }
         finally
@@ -489,6 +542,30 @@ internal static class ScreenshotRenderer
 
     private static string? GetAssetViewId(object item) =>
         item.GetType().GetProperty("Id")?.GetValue(item) as string;
+
+    private static MenuItem? FindMenuItem(ItemCollection items, string header)
+    {
+        foreach (var item in items)
+        {
+            if (item is not MenuItem menuItem)
+            {
+                continue;
+            }
+
+            if (menuItem.Header is string text
+                && text.Equals(header, StringComparison.Ordinal))
+            {
+                return menuItem;
+            }
+
+            if (FindMenuItem(menuItem.Items, header) is { } child)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
 
     private static void AssertDarkMenuRender(FrameworkElement element, string name)
     {
