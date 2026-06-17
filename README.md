@@ -120,6 +120,9 @@ currently installed on this workstation.
 - The visual-block list shows semantic labels such as `score += 2` or
   `Флаг met_hero: включить`; the raw generated NovelScript remains visible in
   the preview box for debugging.
+- Visual-block dialogs include a search field that filters by action label,
+  block kind, variable, value, and comment text while keeping edits mapped to
+  the original block order.
 - Visual-block dialogs support duplicate, copy, cut, paste, `Ctrl+C`/`Ctrl+X`/
   `Ctrl+V`, `Ctrl+D`, `Delete`, and `Alt+Up/Down` so repeated route logic can
   be reused and reordered without retyping every block.

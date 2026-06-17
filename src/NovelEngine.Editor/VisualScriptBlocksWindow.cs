@@ -13,6 +13,7 @@ public sealed class VisualScriptBlocksWindow : Window
     private readonly IReadOnlyList<string> _knownVariables;
     private readonly string _importScript;
     private readonly List<VisualScriptBlock> _clipboardBlocks = [];
+    private readonly TextBox _filterBox;
     private readonly ListBox _blockList;
     private readonly TextBox _previewBox;
     private readonly TextBlock _summaryText;
@@ -47,6 +48,9 @@ public sealed class VisualScriptBlocksWindow : Window
             Foreground = (System.Windows.Media.Brush)Application.Current.Resources["MutedBrush"],
             Margin = new Thickness(0, 0, 0, 8),
         };
+        _filterBox = DialogUi.TextBox(string.Empty);
+        _filterBox.Margin = new Thickness(0, 4, 0, 10);
+        _filterBox.TextChanged += (_, _) => RefreshList(GetSelectedBlockIndex());
         _blockList = new ListBox
         {
             Height = 220,
@@ -86,6 +90,8 @@ public sealed class VisualScriptBlocksWindow : Window
     {
         var panel = DialogUi.Panel();
         panel.Children.Add(_summaryText);
+        panel.Children.Add(DialogUi.Label("Поиск блоков"));
+        panel.Children.Add(_filterBox);
         panel.Children.Add(_blockList);
         panel.Children.Add(CreateAddButtons());
         panel.Children.Add(CreateEditButtons());
@@ -164,13 +170,12 @@ public sealed class VisualScriptBlocksWindow : Window
         }
 
         _blocks.Add(dialog.Block);
-        _blockList.SelectedIndex = _blocks.Count - 1;
-        RefreshList();
+        RefreshList(_blocks.Count - 1);
     }
 
     private void EditSelectedBlock()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         if (index < 0 || index >= _blocks.Count)
         {
             return;
@@ -193,7 +198,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void DuplicateSelectedBlock()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         if (index < 0 || index >= _blocks.Count)
         {
             return;
@@ -206,7 +211,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void CopySelectedBlock()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         if (index < 0 || index >= _blocks.Count)
         {
             return;
@@ -219,7 +224,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void CutSelectedBlock()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         if (index < 0 || index >= _blocks.Count)
         {
             return;
@@ -238,7 +243,7 @@ public sealed class VisualScriptBlocksWindow : Window
             return;
         }
 
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         var insertIndex = index >= 0 && index < _blocks.Count
             ? index + 1
             : _blocks.Count;
@@ -251,7 +256,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void DeleteSelectedBlock()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         if (index < 0 || index >= _blocks.Count)
         {
             return;
@@ -263,7 +268,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void MoveSelectedBlock(int direction)
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         var target = index + direction;
         if (index < 0 || target < 0 || target >= _blocks.Count)
         {
@@ -292,7 +297,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void RebuildBlockContextMenu()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         var selected = index >= 0 && index < _blocks.Count;
         var menu = _blockList.ContextMenu ?? new ContextMenu();
         menu.Items.Clear();
@@ -395,21 +400,39 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void RefreshList(int selectedIndex = -1)
     {
-        _blockList.ItemsSource = _blocks
+        var query = _filterBox.Text.Trim();
+        var views = _blocks
             .Select((block, index) => new BlockView(
+                index,
                 index + 1,
                 DisplayBlock(block)))
+            .Where(view => BlockMatchesFilter(_blocks[view.SourceIndex], view.Text, query))
             .ToList();
+        _blockList.ItemsSource = views;
         if (selectedIndex >= 0 && selectedIndex < _blocks.Count)
         {
-            _blockList.SelectedIndex = selectedIndex;
+            var visibleIndex = views.FindIndex(view => view.SourceIndex == selectedIndex);
+            if (visibleIndex >= 0)
+            {
+                _blockList.SelectedIndex = visibleIndex;
+            }
         }
         UpdatePreview();
         UpdateButtons();
     }
 
+    private int GetSelectedBlockIndex() =>
+        _blockList.SelectedItem is BlockView view
+            ? view.SourceIndex
+            : -1;
+
     private void HandleKeyboard(KeyEventArgs e)
     {
+        if (e.OriginalSource is TextBox)
+        {
+            return;
+        }
+
         var modifiers = Keyboard.Modifiers;
         var hasControl = (modifiers & ModifierKeys.Control) == ModifierKeys.Control;
         var hasAlt = (modifiers & ModifierKeys.Alt) == ModifierKeys.Alt;
@@ -465,7 +488,10 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void UpdatePreview()
     {
-        _summaryText.Text = $"Блоков: {_blocks.Count}";
+        var visibleCount = _blockList.Items.Count;
+        _summaryText.Text = string.IsNullOrWhiteSpace(_filterBox.Text)
+            ? $"Блоков: {_blocks.Count}"
+            : $"Блоков: {_blocks.Count}, показано: {visibleCount}";
         try
         {
             _previewBox.Text = VisualScriptCompiler.Compile(_blocks);
@@ -478,7 +504,7 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void UpdateButtons()
     {
-        var index = _blockList.SelectedIndex;
+        var index = GetSelectedBlockIndex();
         var selected = index >= 0 && index < _blocks.Count;
         _editButton.IsEnabled = selected;
         _duplicateButton.IsEnabled = selected;
@@ -520,7 +546,24 @@ public sealed class VisualScriptBlocksWindow : Window
         }
     }
 
-    private sealed record BlockView(int Index, string Text)
+    private static bool BlockMatchesFilter(
+        VisualScriptBlock block,
+        string label,
+        string query)
+    {
+        if (query.Length == 0)
+        {
+            return true;
+        }
+
+        return label.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || block.Kind.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+            || block.VariableName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || block.Value.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || block.Text.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record BlockView(int SourceIndex, int Index, string Text)
     {
         public override string ToString() => $"{Index}. {Text}";
     }
