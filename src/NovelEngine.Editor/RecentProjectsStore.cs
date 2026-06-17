@@ -30,7 +30,8 @@ internal static class RecentProjectsStore
                 File.ReadAllText(path),
                 JsonOptions) ?? [];
             return entries
-                .Where(entry => IsUsableEntry(entry))
+                .Select(NormalizeEntry)
+                .OfType<RecentProjectEntry>()
                 .OrderByDescending(entry => entry.LastOpenedUtc)
                 .Take(MaxEntries)
                 .ToList();
@@ -53,7 +54,11 @@ internal static class RecentProjectsStore
 
         try
         {
-            var normalizedPath = Path.GetFullPath(path);
+            var normalizedPath = NormalizePath(path);
+            if (normalizedPath is null)
+            {
+                return;
+            }
             var entries = Load()
                 .Where(entry => !entry.Path.Equals(
                     normalizedPath,
@@ -75,6 +80,7 @@ internal static class RecentProjectsStore
         catch (Exception error) when (
             error is IOException
             or UnauthorizedAccessException
+            or ArgumentException
             or NotSupportedException)
         {
             // Recent projects are a convenience cache; project opening should not fail
@@ -82,8 +88,32 @@ internal static class RecentProjectsStore
         }
     }
 
-    private static bool IsUsableEntry(RecentProjectEntry entry) =>
-        !string.IsNullOrWhiteSpace(entry.Path) && Exists(entry.Path);
+    private static RecentProjectEntry? NormalizeEntry(RecentProjectEntry entry)
+    {
+        var path = NormalizePath(entry.Path);
+        if (path is null || !Exists(path))
+        {
+            return null;
+        }
+
+        return entry with
+        {
+            Path = path,
+            DisplayName = string.IsNullOrWhiteSpace(entry.DisplayName)
+                ? CreateDisplayName(path)
+                : entry.DisplayName,
+        };
+    }
+
+    private static string? NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+        return Path.GetFullPath(Environment.ExpandEnvironmentVariables(
+            path.Trim().Trim('"')));
+    }
 
     private static bool Exists(string path) =>
         File.Exists(path) || Directory.Exists(path);

@@ -16,6 +16,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore corrupt cache", RecentProjectsIgnoreCorruptCache),
     ("recent projects ignore blank cache entries", RecentProjectsIgnoreBlankCacheEntries),
+    ("recent projects normalize quoted cache paths", RecentProjectsNormalizeQuotedCachePaths),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
@@ -346,6 +347,42 @@ static void RecentProjectsIgnoreBlankCacheEntries()
 
             Assert(entries.Count == 1, "Recent projects kept a blank cache entry.");
             Assert(entries[0].Path == existingProject, "Recent projects lost the usable cache entry.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsNormalizeQuotedCachePaths()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var existingProject = Path.Combine(directory, "quoted.novel.json");
+        File.WriteAllText(existingProject, "{}");
+        var quotedProject = $"  \"{existingProject.Replace("\\", "\\\\")}\"  ";
+        File.WriteAllText(
+            storePath,
+            $$"""
+            [
+              {
+                "Path": "{{quotedProject.Replace("\"", "\\\"")}}",
+                "DisplayName": "",
+                "LastOpenedUtc": "2026-06-17T11:00:00Z"
+              }
+            ]
+            """);
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 1, "Recent projects did not keep the quoted cache path.");
+            Assert(entries[0].Path == existingProject, "Recent projects did not normalize the quoted cache path.");
+            Assert(entries[0].DisplayName == "quoted", "Recent projects did not repair a blank display name.");
         });
     }
     finally
