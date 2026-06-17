@@ -260,6 +260,7 @@
                                 <Button x:Name="AddLibraryCharacterButton" Content="Из библиотеки" Click="AddLibraryCharacter_Click" />
                                 <Button x:Name="SaveCharacterToLibraryButton" Content="В библиотеку" Click="SaveCharacterToLibrary_Click" />
                                 <Button x:Name="EditCharacterButton" Content="Изменить" Click="EditCharacter_Click" />
+                                <Button x:Name="DuplicateCharacterButton" Content="Дублировать" Click="DuplicateCharacter_Click" />
                                 <Button x:Name="MoveCharacterUpButton" Content="Выше" Click="MoveCharacterUp_Click" />
                                 <Button x:Name="MoveCharacterDownButton" Content="Ниже" Click="MoveCharacterDown_Click" />
                                 <Button x:Name="MoveCharacterLeftButton" Content="Слева" Click="MoveCharacterLeft_Click" />

@@ -3232,6 +3232,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string CreateDuplicateCharacterName(
+        string name,
+        IEnumerable<CharacterPlacement> characters)
+    {
+        var baseName = string.IsNullOrWhiteSpace(name)
+            ? "Персонаж копия"
+            : $"{name} копия";
+        var existing = characters
+            .Select(character => character.Name)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!existing.Contains(baseName))
+        {
+            return baseName;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseName} {index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
     private static string SanitizeCharacterId(string value)
     {
         var cleaned = new string(
@@ -3264,6 +3289,29 @@ public partial class MainWindow : Window
             node.PropertyOverrides.Add("characters");
         }
         MarkDirty();
+    }
+
+    private void DuplicateCharacter_Click(object sender, RoutedEventArgs e)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var character = SelectedCharacter();
+        if (node is null || character is null)
+        {
+            return;
+        }
+
+        var duplicateId = CreateUniqueCharacterId($"{character.Id}-copy", node.Characters);
+        var duplicate = character.CloneWithId(duplicateId);
+        duplicate.Name = CreateDuplicateCharacterName(character.Name, node.Characters);
+        var sourceIndex = node.Characters.FindIndex(candidate => candidate.Id == character.Id);
+        node.Characters.Insert(sourceIndex < 0 ? node.Characters.Count : sourceIndex + 1, duplicate);
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
+        MarkDirty();
+        SelectCharacterView(duplicate.Id);
+        StatusText.Text = $"Персонаж «{CharacterLabel(character)}» продублирован";
     }
 
     private void MoveCharacterLeft_Click(object sender, RoutedEventArgs e) =>
@@ -3389,6 +3437,7 @@ public partial class MainWindow : Window
         SaveCharacterToLibraryButton.IsEnabled =
             canEdit && hasSelectedCharacter;
         EditCharacterButton.IsEnabled = canEdit && hasSelectedCharacter;
+        DuplicateCharacterButton.IsEnabled = canEdit && hasSelectedCharacter;
         MoveCharacterUpButton.IsEnabled = canEdit && hasSelectedCharacter && selectedIndex > 0;
         MoveCharacterDownButton.IsEnabled =
             canEdit && hasSelectedCharacter && selectedIndex >= 0 && selectedIndex < characterCount - 1;
