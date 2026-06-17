@@ -16,7 +16,8 @@ public sealed class ConditionBuilderWindow : Window
 
     public ConditionBuilderWindow(
         string condition,
-        IEnumerable<string>? knownVariables = null)
+        IEnumerable<string>? knownVariables = null,
+        VisualConditionExpression? expression = null)
     {
         Title = "Собрать условие";
         Width = 480;
@@ -57,11 +58,19 @@ public sealed class ConditionBuilderWindow : Window
         _valueEditor.LiteralChanged += (_, _) => UpdatePreview();
 
         Content = CreateContent();
-        LoadCondition(condition);
+        if (expression is null)
+        {
+            LoadCondition(condition);
+        }
+        else
+        {
+            LoadExpression(expression);
+        }
         UpdateFields();
     }
 
     public string Condition => BuildCondition();
+    public VisualConditionExpression Expression => BuildExpression().Clone();
 
     private UIElement CreateContent()
     {
@@ -84,10 +93,7 @@ public sealed class ConditionBuilderWindow : Window
         try
         {
             var expression = VisualConditionCompiler.Parse(condition);
-            SelectMode(expression.Kind);
-            _variableBox.Text = expression.VariableName;
-            _operatorBox.SelectedItem = expression.Operator;
-            _valueEditor.LoadLiteral(expression.Value);
+            LoadExpression(expression);
         }
         catch (InvalidDataException)
         {
@@ -96,6 +102,14 @@ public sealed class ConditionBuilderWindow : Window
             _operatorBox.SelectedItem = "==";
             _valueEditor.LoadLiteral(_rawFallbackCondition);
         }
+    }
+
+    private void LoadExpression(VisualConditionExpression expression)
+    {
+        SelectMode(expression.Kind);
+        _variableBox.Text = expression.VariableName;
+        _operatorBox.SelectedItem = expression.Operator;
+        _valueEditor.LoadLiteral(expression.Value);
     }
 
     private void SelectMode(VisualConditionKind mode) =>

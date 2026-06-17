@@ -92,6 +92,12 @@ to the graph by matching node ids and choice outputs. Generated project source
 marks these locations with `# visual blocks: N` comments so block-authored logic
 is visible while reading code.
 
+Choice conditions created through the condition builder are also kept as
+structured `VisualConditionExpression` data beside the emitted `when` text.
+Runtime filtering, diagnostics, builds, and code-apply preservation use that
+expression while the generated text still matches it; hand-edited conditions
+remain valid as plain DSL strings.
+
 ## Minimal project
 
 ```text

@@ -97,8 +97,26 @@ public static partial class VisualConditionCompiler
     public static bool Evaluate(string condition, ScriptState state) =>
         Evaluate(Parse(condition), state);
 
+    public static bool Evaluate(NodeOutput output, ScriptState state) =>
+        output.ConditionExpression is null
+            ? Evaluate(output.Condition, state)
+            : Evaluate(output.ConditionExpression, state);
+
     public static bool Evaluate(VisualConditionExpression expression, ScriptState state) =>
         NovelScript.Evaluate(Compile(expression), state);
+
+    public static string Compile(NodeOutput output) =>
+        output.ConditionExpression is null
+            ? output.Condition.Trim()
+            : Compile(output.ConditionExpression);
+
+    public static void SyncTextFromExpression(NodeOutput output)
+    {
+        if (output.ConditionExpression is not null)
+        {
+            output.Condition = Compile(output.ConditionExpression);
+        }
+    }
 
     private static string RequiredVariableName(VisualConditionExpression expression)
     {

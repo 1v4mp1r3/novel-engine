@@ -3985,7 +3985,16 @@ public partial class MainWindow : Window
     {
         try
         {
-            _ = NovelScript.Evaluate(dialog.Condition, new ScriptState());
+            if (dialog.ConditionExpression is null)
+            {
+                _ = VisualConditionCompiler.Evaluate(
+                    dialog.Condition,
+                    new ScriptState());
+            }
+            else
+            {
+                VisualConditionCompiler.Validate(dialog.ConditionExpression);
+            }
             VisualScriptCompiler.Execute(
                 dialog.Script,
                 dialog.ScriptBlocks,

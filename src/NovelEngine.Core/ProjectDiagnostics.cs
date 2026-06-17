@@ -90,14 +90,13 @@ public static class ProjectDiagnostics
 
             foreach (var output in node.Outputs)
             {
-                if (!string.IsNullOrWhiteSpace(output.Condition))
+                if (!string.IsNullOrWhiteSpace(output.Condition)
+                    || output.ConditionExpression is not null)
                 {
                     TryAddScriptError(
                         diagnostics,
                         $"Нода «{DisplayNode(node)}», условие «{output.Label}»",
-                        () => VisualConditionCompiler.Evaluate(
-                            output.Condition,
-                            new ScriptState()));
+                        () => VisualConditionCompiler.Evaluate(output, new ScriptState()));
                 }
                 if (!string.IsNullOrWhiteSpace(output.Script))
                 {

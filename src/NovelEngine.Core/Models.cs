@@ -242,6 +242,7 @@ public sealed class NodeOutput
     public string Label { get; set; } = "Дальше";
     public string? TargetNodeId { get; set; }
     public string Condition { get; set; } = string.Empty;
+    public VisualConditionExpression? ConditionExpression { get; set; }
     public string Script { get; set; } = string.Empty;
     public List<VisualScriptBlock> ScriptBlocks { get; init; } = [];
     public string TransitionSound { get; set; } = string.Empty;
@@ -547,6 +548,7 @@ public sealed class NovelProject
                 Id = CreateId("out"),
                 Label = output.Label,
                 Condition = output.Condition,
+                ConditionExpression = output.ConditionExpression?.Clone(),
                 Script = output.Script,
                 TransitionSound = output.TransitionSound,
                 FadeDurationMs = output.FadeDurationMs,
@@ -592,6 +594,7 @@ public sealed class NovelProject
             Id = CreateId("out"),
             Label = CreateDuplicateOutputLabel(node, source.Label),
             Condition = source.Condition,
+            ConditionExpression = source.ConditionExpression?.Clone(),
             Script = source.Script,
             TransitionSound = source.TransitionSound,
             FadeDurationMs = source.FadeDurationMs,
@@ -941,6 +944,10 @@ public sealed class NovelProject
                 {
                     throw new InvalidDataException(
                         $"Длительность перехода «{output.Label}» должна быть от 0 до 10000 мс.");
+                }
+                if (output.ConditionExpression is not null)
+                {
+                    VisualConditionCompiler.Validate(output.ConditionExpression);
                 }
                 VisualScriptCompiler.Validate(output.ScriptBlocks);
             }

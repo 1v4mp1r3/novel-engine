@@ -146,6 +146,14 @@ public static class NovelBuildCompiler
             {
                 var sourceOutput = sourceNode.Outputs[index];
                 var destinationOutput = destinationNode.Outputs[index];
+                if (sourceOutput.ConditionExpression is not null
+                    && sourceOutput.Condition.Equals(
+                        destinationOutput.Condition,
+                        StringComparison.Ordinal))
+                {
+                    destinationOutput.ConditionExpression =
+                        sourceOutput.ConditionExpression.Clone();
+                }
                 destinationOutput.ScriptBlocks.Clear();
                 destinationOutput.ScriptBlocks.AddRange(
                     sourceOutput.ScriptBlocks.Select(block => block.Clone()));

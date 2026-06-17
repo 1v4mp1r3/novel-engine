@@ -18,6 +18,7 @@ public sealed class OutputEditorWindow : Window
     private readonly IReadOnlyList<string> _knownVariables;
     private readonly List<VisualScriptBlock> _scriptBlocks;
     private readonly Button _scriptBlocksButton;
+    private VisualConditionExpression? _conditionExpression;
 
     public OutputEditorWindow(
         NodeOutput output,
@@ -30,7 +31,21 @@ public sealed class OutputEditorWindow : Window
         ResizeMode = ResizeMode.NoResize;
 
         _labelBox = DialogUi.TextBox(output.Label);
-        _conditionBox = DialogUi.TextBox(output.Condition);
+        _conditionExpression = output.ConditionExpression?.Clone();
+        _conditionBox = DialogUi.TextBox(
+            _conditionExpression is null
+                ? output.Condition
+                : VisualConditionCompiler.Compile(_conditionExpression));
+        _conditionBox.TextChanged += (_, _) =>
+        {
+            if (_conditionExpression is not null
+                && !_conditionBox.Text.Trim().Equals(
+                    VisualConditionCompiler.Compile(_conditionExpression),
+                    StringComparison.Ordinal))
+            {
+                _conditionExpression = null;
+            }
+        };
         _scriptBox = DialogUi.TextBox(output.Script, multiline: true);
         _knownVariables = knownVariables?
             .Where(variable => !string.IsNullOrWhiteSpace(variable))
@@ -74,6 +89,8 @@ public sealed class OutputEditorWindow : Window
 
     public string OutputLabel => _labelBox.Text.Trim();
     public string Condition => _conditionBox.Text.Trim();
+    public VisualConditionExpression? ConditionExpression =>
+        _conditionExpression?.Clone();
     public string Script => _scriptBox.Text.Trim();
     public IReadOnlyList<VisualScriptBlock> ScriptBlocks =>
         _scriptBlocks.Select(block => block.Clone()).ToList();
@@ -82,6 +99,12 @@ public sealed class OutputEditorWindow : Window
     {
         output.Label = OutputLabel;
         output.Condition = Condition;
+        output.ConditionExpression =
+            _conditionExpression is not null
+            && VisualConditionCompiler.Compile(_conditionExpression)
+                .Equals(Condition, StringComparison.Ordinal)
+                ? _conditionExpression.Clone()
+                : null;
         output.Script = Script;
         output.ScriptBlocks.Clear();
         output.ScriptBlocks.AddRange(ScriptBlocks);
@@ -113,12 +136,16 @@ public sealed class OutputEditorWindow : Window
 
     private void BuildCondition()
     {
-        var dialog = new ConditionBuilderWindow(_conditionBox.Text, _knownVariables)
+        var dialog = new ConditionBuilderWindow(
+            _conditionBox.Text,
+            _knownVariables,
+            _conditionExpression)
         {
             Owner = this,
         };
         if (dialog.ShowDialog() == true)
         {
+            _conditionExpression = dialog.Expression;
             _conditionBox.Text = dialog.Condition;
         }
     }

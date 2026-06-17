@@ -65,7 +65,7 @@ public sealed class NovelPlayer
 
     public IReadOnlyList<NodeOutput> GetAvailableOutputs() =>
         CurrentNode?.Outputs
-            .Where(output => VisualConditionCompiler.Evaluate(output.Condition, State))
+            .Where(output => VisualConditionCompiler.Evaluate(output, State))
             .ToList()
         ?? [];
 
@@ -112,7 +112,7 @@ public sealed class NovelPlayer
             ?? throw new InvalidOperationException("Проигрывание ещё не начато.");
         var output = node.Outputs.FirstOrDefault(candidate => candidate.Id == outputId)
             ?? throw new InvalidOperationException("Выход ноды не найден.");
-        if (!VisualConditionCompiler.Evaluate(output.Condition, State))
+        if (!VisualConditionCompiler.Evaluate(output, State))
         {
             throw new InvalidOperationException("Условие выбранного выхода не выполнено.");
         }

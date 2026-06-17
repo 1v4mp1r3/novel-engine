@@ -240,10 +240,27 @@ public static class VisualScriptBlockPreserver
             }
 
             usedSourceOutputs.Add(sourceOutput);
+            PreserveConditionExpression(sourceOutput, targetOutput);
             CopyBlocksIfEmpty(
                 sourceOutput.ScriptBlocks,
                 targetOutput.ScriptBlocks);
         }
+    }
+
+    private static void PreserveConditionExpression(
+        NodeOutput sourceOutput,
+        NodeOutput targetOutput)
+    {
+        if (sourceOutput.ConditionExpression is null
+            || targetOutput.ConditionExpression is not null
+            || !sourceOutput.Condition.Equals(
+                targetOutput.Condition,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        targetOutput.ConditionExpression = sourceOutput.ConditionExpression.Clone();
     }
 
     private static NodeOutput? FindMatchingOutput(

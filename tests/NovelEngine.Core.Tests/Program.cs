@@ -22,6 +22,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
     ("visual conditions parse and compile", VisualConditionsParseAndCompile),
+    ("visual condition expressions survive JSON and runtime", VisualConditionExpressionsSurviveJsonAndRuntime),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
@@ -329,7 +330,14 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     scene.Background = "@city";
     scene.Music = "@theme";
     scene.Script = "set visited = 1";
-    scene.Outputs[0].Condition = "visited >= 1";
+    scene.Outputs[0].ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "visited",
+        Operator = ">=",
+        Value = "1",
+    };
+    VisualConditionCompiler.SyncTextFromExpression(scene.Outputs[0]);
     scene.Outputs[0].Script = "add score 1";
     scene.Outputs[0].TransitionSound = "@click";
     scene.Characters.Add(
@@ -353,6 +361,10 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     Assert(duplicate.Outputs.Count == scene.Outputs.Count, "Duplicate outputs count changed.");
     Assert(duplicate.Outputs[0].Id != scene.Outputs[0].Id, "Duplicate output reused the source id.");
     Assert(duplicate.Outputs[0].TargetNodeId is null, "Duplicate output kept the source connection.");
+    Assert(duplicate.Outputs[0].ConditionExpression is not null, "Duplicate node lost output condition expression.");
+    Assert(
+        duplicate.Outputs[0].ConditionExpression != scene.Outputs[0].ConditionExpression,
+        "Duplicate node reused the output condition expression instance.");
     Assert(duplicate.Outputs[0].TransitionSound == "@click", "Duplicate transition sound was not copied.");
     Assert(duplicate.Characters[0].Id != scene.Characters[0].Id, "Duplicate character reused the source id.");
     Assert(duplicate.Characters[0].Sprite == "@hero", "Duplicate character data was not copied.");
@@ -368,7 +380,14 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
     var target = project.AddNode(NodeKind.Scene, 1100, 220);
     var source = dialogue.Outputs[0];
     source.Label = "Спросить";
-    source.Condition = "trust >= 2";
+    source.ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "trust",
+        Operator = ">=",
+        Value = "2",
+    };
+    VisualConditionCompiler.SyncTextFromExpression(source);
     source.Script = "add trust 1";
     source.TransitionSound = "@click";
     source.FadeDurationMs = 900;
@@ -379,6 +398,13 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
     Assert(duplicate.Id != source.Id, "Duplicate choice reused the source id.");
     Assert(duplicate.Label == "Спросить копия", "Duplicate choice label was not marked as a copy.");
     Assert(duplicate.Condition == source.Condition, "Duplicate choice condition was not copied.");
+    Assert(duplicate.ConditionExpression is not null, "Duplicate choice structured condition was not copied.");
+    Assert(
+        duplicate.ConditionExpression != source.ConditionExpression,
+        "Duplicate choice reused the structured condition instance.");
+    Assert(
+        duplicate.ConditionExpression?.VariableName == "trust",
+        "Duplicate choice structured condition data changed.");
     Assert(duplicate.Script == source.Script, "Duplicate choice script was not copied.");
     Assert(duplicate.TransitionSound == "@click", "Duplicate choice transition sound was not copied.");
     Assert(duplicate.FadeDurationMs == source.FadeDurationMs, "Duplicate choice fade duration was not copied.");
@@ -651,6 +677,14 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
             VariableName = "score",
             Value = "1",
         });
+    dialogue.Outputs[0].ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "score",
+        Operator = ">=",
+        Value = "1",
+    };
+    VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
 
     var source = ProjectLanguage.Format(project);
     Assert(
@@ -666,6 +700,9 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
     Assert(
         parsed.FindNode(dialogue.Id)?.Outputs[0].ScriptBlocks.Single().Id == "choice-score",
         "Project language apply dropped output visual script blocks.");
+    Assert(
+        parsed.FindNode(dialogue.Id)?.Outputs[0].ConditionExpression?.VariableName == "score",
+        "Project language apply dropped output visual condition expression.");
 }
 
 static void ProjectScriptVariablesCollectAuthoredNames()
@@ -750,6 +787,53 @@ static void VisualConditionsParseAndCompile()
     AssertThrows<InvalidDataException>(
         () => VisualConditionCompiler.Parse("route && score"),
         "Unsupported condition syntax was accepted.");
+}
+
+static void VisualConditionExpressionsSurviveJsonAndRuntime()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    var end = project.AddNode(NodeKind.Scene, 980, 120);
+    scene.Script = "set score = 2";
+    dialogue.Outputs[0].TargetNodeId = end.Id;
+    dialogue.Outputs[0].ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "score",
+        Operator = ">=",
+        Value = "2",
+    };
+    VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
+    dialogue.Outputs[1].ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "score",
+        Operator = "<",
+        Value = "2",
+    };
+    VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[1]);
+
+    var restored = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
+    var restoredDialogue = restored.FindNode(dialogue.Id)
+        ?? throw new InvalidOperationException("Restored dialogue node was not found.");
+    var player = new NovelPlayer(restored);
+    var start = player.Start();
+    player.Choose(start.Outputs[0].Id);
+    player.Choose(scene.Outputs[0].Id);
+    var available = player.GetAvailableOutputs();
+
+    Assert(
+        restoredDialogue.Outputs[0].ConditionExpression?.VariableName == "score",
+        "JSON round trip dropped the structured choice condition.");
+    Assert(
+        available.Any(output => output.Id == restoredDialogue.Outputs[0].Id),
+        "Runtime did not show the choice backed by a structured condition.");
+    Assert(
+        available.All(output => output.Id != restoredDialogue.Outputs[1].Id),
+        "Runtime showed a choice with a failing structured condition.");
+    player.Choose(restoredDialogue.Outputs[0].Id);
+    Assert(player.CurrentNode?.Id == end.Id, "Structured condition choice did not advance.");
 }
 
 static void RemovingNodeDisconnectsOutputs()
@@ -1987,6 +2071,14 @@ static void BuildCompilerPreservesVisualScriptBlocks()
                 VariableName = "score",
                 Value = "1",
             });
+        dialogue.Outputs[0].ConditionExpression = new VisualConditionExpression
+        {
+            Kind = VisualConditionKind.Comparison,
+            VariableName = "score",
+            Operator = ">=",
+            Value = "1",
+        };
+        VisualConditionCompiler.SyncTextFromExpression(dialogue.Outputs[0]);
         project.SourceCode = ProjectLanguage.Format(project);
         ProjectSerializer.Save(project, projectPath);
 
@@ -2003,6 +2095,9 @@ static void BuildCompilerPreservesVisualScriptBlocks()
         Assert(
             built.FindNode(dialogue.Id)?.Outputs[0].ScriptBlocks.Single().Id == "choice-score",
             "Build compiler dropped output visual script blocks.");
+        Assert(
+            built.FindNode(dialogue.Id)?.Outputs[0].ConditionExpression?.VariableName == "score",
+            "Build compiler dropped output visual condition expressions.");
     }
     finally
     {

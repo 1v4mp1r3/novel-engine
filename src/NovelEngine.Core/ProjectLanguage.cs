@@ -632,7 +632,8 @@ public static class ProjectLanguage
                     .Append(" -> ")
                     .Append(output.TargetNodeId ?? "none");
 
-                var hasBody = output.Condition.Length > 0
+                var condition = VisualConditionCompiler.Compile(output);
+                var hasBody = condition.Length > 0
                     || output.Script.Length > 0
                     || output.TransitionSound.Length > 0
                     || output.FadeDurationMs != 350
@@ -644,9 +645,9 @@ public static class ProjectLanguage
                 }
 
                 builder.AppendLine(" {");
-                if (output.Condition.Length > 0)
+                if (condition.Length > 0)
                 {
-                    builder.Append("        when ").AppendLine(Quote(output.Condition));
+                    builder.Append("        when ").AppendLine(Quote(condition));
                 }
                 if (output.Script.Length > 0)
                 {
@@ -879,9 +880,7 @@ public static class ProjectLanguage
                 new ScriptState());
             foreach (var output in node.Outputs)
             {
-                _ = VisualConditionCompiler.Evaluate(
-                    output.Condition,
-                    new ScriptState());
+                _ = VisualConditionCompiler.Evaluate(output, new ScriptState());
                 VisualScriptCompiler.Execute(
                     output.Script,
                     output.ScriptBlocks,
