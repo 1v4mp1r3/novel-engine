@@ -37,14 +37,17 @@ After installation, right-click a project folder or empty space inside it and
 choose `Открыть с помощью Novel Engine`. The editor will find the
 `*.novel.json` file in that folder and load the project with its adjacent
 managed files. Empty folders are opened as a workspace too, so you can create a new
-project there with `Ctrl+N`; the editor immediately writes the project file,
-creates `files/` for managed game files, and keeps timestamped backups in
-`autosaves/`.
+project there with `Ctrl+S`; the editor writes the project file into the opened
+folder, creates `files/` for managed game files, and keeps timestamped backups
+in `autosaves/`.
 The startup screen lists recently opened or created projects for quick switching
 between workspaces.
 Use `File -> Restore autosave...` (`Файл -> Восстановить автосейв...`) to load
 a timestamped snapshot from `autosaves/` as unsaved editor state before deciding
 whether to overwrite the main project file.
+New projects create the default managed asset folders:
+`files/characters`, `files/voices`, `files/audio_fx`, `files/audio`, and
+`files/backgrounds`.
 
 ## Build and test
 
