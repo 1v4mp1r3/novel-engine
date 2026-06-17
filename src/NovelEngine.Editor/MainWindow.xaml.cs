@@ -1487,7 +1487,21 @@ public partial class MainWindow : Window
             _assetSizeCache[path] = size;
             return size;
         }
-        var bytes = new FileInfo(path).Length;
+        long bytes;
+        try
+        {
+            bytes = new FileInfo(path).Length;
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+        {
+            size = "недоступен";
+            _assetSizeCache[path] = size;
+            return size;
+        }
+
         size = bytes switch
         {
             >= 1024L * 1024L =>
