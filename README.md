@@ -100,6 +100,8 @@ currently installed on this workstation.
   transform settings intact.
 - Selected scene characters can be moved left, center, or right from the
   properties panel without opening the full character editor.
+- Right-click a scene character to edit, duplicate, save it to the library,
+  reorder, set left/center/right position, or remove it.
 - New scene characters are picked from images in `files/characters`; import a
   sprite there first, then add it from the properties panel or from the asset
   context menu.

@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         CodeEditor.CompletionProvider = ProjectLanguage.GetCompletions;
         AssetsGrid.ContextMenu = new ContextMenu();
+        CharactersGrid.ContextMenu = new ContextMenu();
         OutputsGrid.ContextMenu = new ContextMenu();
 
         Graph.SelectionChanged += (_, _) => HandleGraphSelection();
@@ -3973,6 +3974,99 @@ public partial class MainWindow : Window
         SelectCharacterView(characterId);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён: {CharacterPositionLabel(position)}";
     }
+
+    private void CharactersGrid_PreviewMouseRightButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            CharactersGrid.SelectedItem = null;
+            return;
+        }
+
+        row.IsSelected = true;
+        CharactersGrid.SelectedItem = row.Item;
+        row.Focus();
+    }
+
+    private void CharactersGrid_ContextMenuOpening(
+        object sender,
+        ContextMenuEventArgs e)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var canEdit = node is not null
+            && (node.Kind == NodeKind.Start || InheritCharactersCheck.IsChecked != true);
+        var character = SelectedCharacter();
+        var selectedIndex = CharactersGrid.SelectedIndex;
+        var characterCount = CharactersGrid.Items.Count;
+        var menu = CharactersGrid.ContextMenu ?? new ContextMenu();
+        CharactersGrid.ContextMenu = menu;
+        menu.Items.Clear();
+
+        if (node is null)
+        {
+            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите ноду"));
+            return;
+        }
+
+        if (!canEdit)
+        {
+            menu.Items.Add(CreateDisabledAssetMenuItem("Персонажи наследуются"));
+            return;
+        }
+
+        menu.Items.Add(CreateCharacterMenuItem("Добавить персонажа", () => AddCharacter_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(CreateCharacterMenuItem(
+            "Добавить из библиотеки",
+            () => AddLibraryCharacter_Click(this, new RoutedEventArgs()),
+            _project.Characters.Count > 0));
+        if (character is null)
+        {
+            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите персонажа"));
+            return;
+        }
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateCharacterMenuItem("Изменить", () => EditCharacter_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(CreateCharacterMenuItem(
+            "Дублировать",
+            () => DuplicateCharacter_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(CreateCharacterMenuItem(
+            "Сохранить в библиотеку",
+            () => SaveCharacterToLibrary_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateCharacterMenuItem(
+            "Выше",
+            () => MoveSelectedCharacter(-1),
+            selectedIndex > 0));
+        menu.Items.Add(CreateCharacterMenuItem(
+            "Ниже",
+            () => MoveSelectedCharacter(1),
+            selectedIndex >= 0 && selectedIndex < characterCount - 1));
+
+        var positionMenu = CreateHoverSubmenu("Позиция");
+        positionMenu.Items.Add(CreateCharacterMenuItem(
+            "Слева",
+            () => SetSelectedCharacterPosition(CharacterPosition.Left)));
+        positionMenu.Items.Add(CreateCharacterMenuItem(
+            "Центр",
+            () => SetSelectedCharacterPosition(CharacterPosition.Center)));
+        positionMenu.Items.Add(CreateCharacterMenuItem(
+            "Справа",
+            () => SetSelectedCharacterPosition(CharacterPosition.Right)));
+        menu.Items.Add(positionMenu);
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateCharacterMenuItem("Удалить", () => DeleteCharacter_Click(this, new RoutedEventArgs())));
+    }
+
+    private static MenuItem CreateCharacterMenuItem(
+        string header,
+        Action action,
+        bool isEnabled = true) =>
+        CreateAssetMenuItem(header, action, isEnabled);
 
     private CharacterPlacement? SelectedCharacter()
     {
