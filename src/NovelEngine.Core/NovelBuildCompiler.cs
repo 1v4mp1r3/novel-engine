@@ -109,7 +109,7 @@ public static class NovelBuildCompiler
         {
             if (Directory.Exists(temporaryDirectory))
             {
-                Directory.Delete(temporaryDirectory, recursive: true);
+                TryDeleteDirectory(temporaryDirectory);
             }
             throw;
         }
@@ -442,7 +442,7 @@ public static class NovelBuildCompiler
         try
         {
             Directory.Move(temporaryDirectory, outputDirectory);
-            Directory.Delete(backupDirectory, recursive: true);
+            TryDeleteDirectory(backupDirectory);
         }
         catch
         {
@@ -452,6 +452,23 @@ public static class NovelBuildCompiler
                 Directory.Move(backupDirectory, outputDirectory);
             }
             throw;
+        }
+    }
+
+    private static void TryDeleteDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException)
+        {
+            // Build cleanup is best-effort; preserve the original compile result.
         }
     }
 
