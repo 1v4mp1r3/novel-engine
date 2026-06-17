@@ -2001,14 +2001,24 @@ public partial class MainWindow : Window
         object sender,
         ContextMenuEventArgs e)
     {
+        if (!RebuildAssetsContextMenu())
+        {
+            e.Handled = true;
+        }
+    }
+
+    internal bool RebuildAssetsContextMenuForSmoke() =>
+        RebuildAssetsContextMenu();
+
+    private bool RebuildAssetsContextMenu()
+    {
         var view = AssetsGrid.SelectedItem as AssetView;
         var menu = AssetsGrid.ContextMenu ?? new ContextMenu();
         AssetsGrid.ContextMenu = menu;
         menu.Items.Clear();
         if (view is null)
         {
-            e.Handled = true;
-            return;
+            return false;
         }
 
         var selectedNode = _project.FindNode(Graph.SelectedNodeId);
@@ -2055,6 +2065,8 @@ public partial class MainWindow : Window
                 menu.Items.Add(CreateLibraryVoiceBindingMenu(view.Asset));
             }
         }
+
+        return true;
     }
 
     private MenuItem CreateCharacterAssetVoiceMenu(NovelAsset asset, NovelNode? node)

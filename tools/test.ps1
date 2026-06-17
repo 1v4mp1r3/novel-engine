@@ -33,3 +33,15 @@ Invoke-Step "Run core tests" {
 Invoke-Step "Run editor tests" {
     dotnet run --no-build --project tests\NovelEngine.Editor.Tests\NovelEngine.Editor.Tests.csproj
 }
+Invoke-Step "Smoke context menus" {
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --context-menu-smoke
+}
+Invoke-Step "Smoke condition builder" {
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --condition-builder-smoke
+}
+Invoke-Step "Smoke visual script blocks" {
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --visual-script-blocks-smoke
+}
+Invoke-Step "Smoke asset manager" {
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --asset-manager-smoke
+}

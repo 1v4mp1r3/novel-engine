@@ -388,6 +388,108 @@ internal static class ScreenshotRenderer
         window.Close();
     }
 
+    public static void SmokeAssetManager()
+    {
+        var rootDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "novel-engine-asset-manager-smoke");
+        if (Directory.Exists(rootDirectory))
+        {
+            Directory.Delete(rootDirectory, recursive: true);
+        }
+
+        try
+        {
+            var projectDirectory = Path.Combine(rootDirectory, "project");
+            var sourceDirectory = Path.Combine(rootDirectory, "sources");
+            Directory.CreateDirectory(sourceDirectory);
+            var projectPath = ProjectWorkspace.CreateProjectInDirectory(projectDirectory);
+            var sourceBackground = Path.Combine(sourceDirectory, "smoke-background.png");
+            var sourceVoice = Path.Combine(sourceDirectory, "smoke-voice.wav");
+            CreateImage(sourceBackground, 640, 360, backgroundImage: true);
+            VoiceBlipGenerator.WriteWaveFile(sourceVoice, new VoiceBlipOptions());
+
+            var project = ProjectSerializer.Load(projectPath);
+            var backgroundAsset = ProjectAssets.Import(
+                project,
+                projectPath,
+                sourceBackground,
+                "backgrounds");
+            var voiceAsset = ProjectAssets.Import(
+                project,
+                projectPath,
+                sourceVoice,
+                "voices");
+            ProjectSerializer.Save(project, projectPath);
+
+            var window = new MainWindow(projectPath)
+            {
+                Width = 1280,
+                Height = 760,
+                Left = -20_000,
+                Top = -20_000,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+            };
+            window.Show();
+            window.SelectFilesWorkspace();
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+            window.UpdateLayout();
+
+            var assetItems = window.AssetsGrid.Items
+                .Cast<object>()
+                .Where(item => item.GetType().Name.Contains("AssetView", StringComparison.Ordinal))
+                .ToList();
+            var assetIds = assetItems
+                .Select(GetAssetViewId)
+                .Where(id => id is not null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!assetIds.Contains(backgroundAsset.Id) || !assetIds.Contains(voiceAsset.Id))
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke did not load imported background and voice assets.");
+            }
+
+            var voiceItem = assetItems.First(item =>
+                string.Equals(GetAssetViewId(item), voiceAsset.Id, StringComparison.OrdinalIgnoreCase));
+            window.AssetsGrid.SelectedItem = voiceItem;
+            window.AssetsGrid.UpdateLayout();
+            if (!window.RebuildAssetsContextMenuForSmoke())
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke could not rebuild the selected asset context menu.");
+            }
+
+            var menu = window.AssetsGrid.ContextMenu;
+            if (menu is null || menu.Items.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Asset manager smoke did not build an asset context menu.");
+            }
+
+            menu.PlacementTarget = window.AssetsGrid;
+            menu.IsOpen = true;
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+            AssertDarkMenuRender(menu, "asset manager context menu");
+            menu.IsOpen = false;
+            window.Close();
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static string? GetAssetViewId(object item) =>
+        item.GetType().GetProperty("Id")?.GetValue(item) as string;
+
     private static void AssertDarkMenuRender(FrameworkElement element, string name)
     {
         element.UpdateLayout();
