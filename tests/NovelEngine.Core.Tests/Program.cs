@@ -28,6 +28,7 @@ var tests = new (string Name, Action Run)[]
     ("character transforms and voice survive code and JSON", CharacterTransformsRoundTrip),
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
+    ("removed voice assets are cleared from characters", RemovedVoiceAssetsAreClearedFromCharacters),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
     ("voice sound picker supports multiple blips", VoiceSoundPickerSupportsMultipleBlips),
     ("voice playback cadence skips expected characters", VoicePlaybackCadenceSkipsExpectedCharacters),
@@ -1013,6 +1014,71 @@ static void MainMenuAndVoiceAssetReferences()
     Assert(
         scene.Characters.Single().VoiceSounds.Contains("@voice_main"),
         "Voice asset list reference was not replaced.");
+}
+
+static void RemovedVoiceAssetsAreClearedFromCharacters()
+{
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "voice_hero",
+            Kind = AssetKind.Audio,
+            Path = "assets/audio/hero.wav",
+        });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "voice_hero_alt",
+            Kind = AssetKind.Audio,
+            Path = "assets/audio/hero-alt.wav",
+        });
+
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.InheritCharacters = false;
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой",
+            VoiceSound = "@voice_hero",
+            VoiceSounds =
+            [
+                "@voice_hero",
+                "@voice_hero_alt",
+            ],
+        });
+    project.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "library_hero",
+            Name = "Герой из библиотеки",
+            VoiceSound = "@voice_hero",
+            VoiceSounds =
+            [
+                "@voice_hero",
+                "@voice_hero_alt",
+            ],
+        });
+
+    project.ReplaceAssetReference("voice_hero", string.Empty);
+
+    var nodeCharacter = scene.Characters.Single();
+    var libraryCharacter = project.Characters.Single();
+    Assert(nodeCharacter.VoiceSound.Length == 0, "Removed node voice stayed as primary voice.");
+    Assert(
+        !nodeCharacter.VoiceSounds.Contains("@voice_hero", StringComparer.OrdinalIgnoreCase),
+        "Removed node voice stayed in the voice list.");
+    Assert(
+        nodeCharacter.VoiceSounds.Contains("@voice_hero_alt", StringComparer.OrdinalIgnoreCase),
+        "Other node voice was removed with the deleted voice.");
+    Assert(libraryCharacter.VoiceSound.Length == 0, "Removed library voice stayed as primary voice.");
+    Assert(
+        !libraryCharacter.VoiceSounds.Contains("@voice_hero", StringComparer.OrdinalIgnoreCase),
+        "Removed library voice stayed in the voice list.");
+    Assert(
+        libraryCharacter.VoiceSounds.Contains("@voice_hero_alt", StringComparer.OrdinalIgnoreCase),
+        "Other library voice was removed with the deleted voice.");
 }
 
 static void VoiceBlipGeneratorEmitsWav()
