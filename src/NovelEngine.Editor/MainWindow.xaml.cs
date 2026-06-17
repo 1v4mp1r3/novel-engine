@@ -4130,6 +4130,7 @@ public partial class MainWindow : Window
             PreservePendingSourceCode();
             ProjectSerializer.Save(_project, projectPath);
             WriteAutoSaveSnapshot();
+            _savedProjectSnapshot = CaptureProjectSnapshot();
             _dirty = false;
             _workspaceNeedsProjectFile = false;
             RefreshWindowTitle();
