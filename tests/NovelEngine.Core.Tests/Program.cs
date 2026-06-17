@@ -1213,26 +1213,36 @@ static void ProjectAssetSyncDiscoversFilesFromDisk()
         Directory.CreateDirectory(emptyNestedFolder);
         var imagePath = Path.Combine(physicalFolder, "MountFuji.jpg");
         File.WriteAllBytes(imagePath, [255, 216, 255, 217]);
+        var voiceFolder = Path.Combine(directory, "files", "voices");
+        Directory.CreateDirectory(voiceFolder);
+        var voicePath = Path.Combine(voiceFolder, "hero-blip.wav");
+        File.WriteAllBytes(voicePath, [82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
         var project = NovelProject.CreateDefault();
 
         var changes = ProjectAssets.SyncFromDisk(project, projectPath);
-        var asset = project.Assets.SingleOrDefault();
 
-        Assert(changes >= 2, "Sync did not report the discovered folder and file.");
+        Assert(changes >= 4, "Sync did not report the discovered folders and files.");
         Assert(project.AssetFolders.Contains("backgrounds"), "Physical folder was not registered.");
         Assert(project.AssetFolders.Contains("characters"), "Physical parent folder was not registered.");
         Assert(project.AssetFolders.Contains("characters/heroes"), "Physical empty nested folder was not registered.");
-        Assert(asset is not null, "Physical file was not registered.");
-        asset = project.Assets.Single();
-        Assert(asset.Kind == AssetKind.Image, "Discovered image kind was not detected.");
-        Assert(asset.Folder == "backgrounds", "Discovered image folder was wrong.");
+        Assert(project.AssetFolders.Contains("voices"), "Physical voices folder was not registered.");
+        Assert(project.Assets.Count == 2, "Physical files were not registered.");
+        var image = project.Assets.Single(asset => asset.Path.EndsWith("MountFuji.jpg", StringComparison.Ordinal));
+        var voice = project.Assets.Single(asset => asset.Path.EndsWith("hero-blip.wav", StringComparison.Ordinal));
+        Assert(image.Kind == AssetKind.Image, "Discovered image kind was not detected.");
+        Assert(image.Folder == "backgrounds", "Discovered image folder was wrong.");
         Assert(
-            asset.Path == "files/backgrounds/MountFuji.jpg",
+            image.Path == "files/backgrounds/MountFuji.jpg",
             "Discovered image path should point into files.");
+        Assert(voice.Kind == AssetKind.Audio, "Discovered voice kind was not detected.");
+        Assert(voice.Folder == "voices", "Discovered voice folder was wrong.");
+        Assert(
+            voice.Path == "files/voices/hero-blip.wav",
+            "Discovered voice path should point into files.");
         Assert(
             ProjectAssets.SyncFromDisk(project, projectPath) == 0,
             "Second sync created duplicate records.");
-        Assert(project.Assets.Count == 1, "Second sync duplicated the asset.");
+        Assert(project.Assets.Count == 2, "Second sync duplicated an asset.");
     }
     finally
     {
