@@ -90,6 +90,7 @@ public sealed class VisualScriptBlocksWindow : Window
         panel.Children.Add(CreateButton("+ flag on", () => AddBlock(VisualScriptBlockKind.SetFlagTrue)));
         panel.Children.Add(CreateButton("+ flag off", () => AddBlock(VisualScriptBlockKind.SetFlagFalse)));
         panel.Children.Add(CreateButton("+ add", () => AddBlock(VisualScriptBlockKind.AddVariable)));
+        panel.Children.Add(CreateButton("+ subtract", () => AddBlock(VisualScriptBlockKind.SubtractVariable)));
         panel.Children.Add(CreateButton("+ unset", () => AddBlock(VisualScriptBlockKind.UnsetVariable)));
         panel.Children.Add(CreateButton("+ toggle", () => AddBlock(VisualScriptBlockKind.ToggleVariable)));
         panel.Children.Add(CreateButton("+ comment", () => AddBlock(VisualScriptBlockKind.Comment)));
@@ -133,13 +134,7 @@ public sealed class VisualScriptBlocksWindow : Window
             Id = $"block-{Guid.NewGuid():N}",
             Kind = kind,
             VariableName = kind == VisualScriptBlockKind.Comment ? string.Empty : "flag",
-            Value = kind == VisualScriptBlockKind.UnsetVariable
-                || kind == VisualScriptBlockKind.ToggleVariable
-                || kind == VisualScriptBlockKind.SetFlagTrue
-                || kind == VisualScriptBlockKind.SetFlagFalse
-                || kind == VisualScriptBlockKind.Comment
-                    ? string.Empty
-                    : "true",
+            Value = DefaultValueFor(kind),
             Text = kind == VisualScriptBlockKind.Comment ? "Комментарий" : string.Empty,
         };
         var dialog = new VisualScriptBlockEditorWindow(block, _knownVariables)
@@ -363,6 +358,15 @@ public sealed class VisualScriptBlocksWindow : Window
         public override string ToString() => $"{Index}. {Text}";
     }
 
+    private static string DefaultValueFor(VisualScriptBlockKind kind) =>
+        kind switch
+        {
+            VisualScriptBlockKind.SetVariable => "true",
+            VisualScriptBlockKind.AddVariable
+                or VisualScriptBlockKind.SubtractVariable => "1",
+            _ => string.Empty,
+        };
+
     private static IReadOnlyList<string> NormalizeVariables(
         IEnumerable<string>? variables) =>
         variables?
@@ -451,7 +455,8 @@ public sealed class VisualScriptBlockEditorWindow : Window
         var kind = SelectedKind;
         var isComment = kind == VisualScriptBlockKind.Comment;
         var needsValue = kind is VisualScriptBlockKind.SetVariable
-            or VisualScriptBlockKind.AddVariable;
+            or VisualScriptBlockKind.AddVariable
+            or VisualScriptBlockKind.SubtractVariable;
         _variableBox.IsEnabled = !isComment;
         _valueEditor.IsEnabled = needsValue;
         _commentBox.IsEnabled = isComment;
@@ -462,7 +467,8 @@ public sealed class VisualScriptBlockEditorWindow : Window
         try
         {
             if ((SelectedKind is VisualScriptBlockKind.SetVariable
-                    or VisualScriptBlockKind.AddVariable)
+                    or VisualScriptBlockKind.AddVariable
+                    or VisualScriptBlockKind.SubtractVariable)
                 && !_valueEditor.TryValidate(this, "Блок скрипта"))
             {
                 return;
@@ -487,6 +493,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         new(VisualScriptBlockKind.SetFlagTrue, "Включить флаг"),
         new(VisualScriptBlockKind.SetFlagFalse, "Выключить флаг"),
         new(VisualScriptBlockKind.AddVariable, "Прибавить к переменной"),
+        new(VisualScriptBlockKind.SubtractVariable, "Уменьшить переменную"),
         new(VisualScriptBlockKind.UnsetVariable, "Удалить переменную"),
         new(VisualScriptBlockKind.ToggleVariable, "Переключить флаг"),
         new(VisualScriptBlockKind.Comment, "Комментарий"),

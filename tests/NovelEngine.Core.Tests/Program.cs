@@ -641,6 +641,14 @@ static void VisualScriptBlocksRoundTripAndRun()
             Kind = VisualScriptBlockKind.SetFlagTrue,
             VariableName = "visited_intro",
         });
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-subtract-score",
+            Kind = VisualScriptBlockKind.SubtractVariable,
+            VariableName = "score",
+            Value = "1",
+        });
     dialogue.Outputs[0].ScriptBlocks.Add(
         new VisualScriptBlock
         {
@@ -658,7 +666,7 @@ static void VisualScriptBlocksRoundTripAndRun()
     player.Choose(dialogue.Outputs[0].Id);
 
     Assert(
-        Convert.ToDouble(player.State.Variables["score"]) == 3,
+        Convert.ToDouble(player.State.Variables["score"]) == 2,
         "Visual script blocks did not run after text script.");
     Assert(
         (string?)player.State.Variables["route"] == "good",
@@ -668,7 +676,7 @@ static void VisualScriptBlocksRoundTripAndRun()
             && visitedIntro is true,
         "Flag visual script block did not run.");
     Assert(
-        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 2,
+        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 3,
         "Visual script blocks were lost during JSON round trip.");
 }
 
@@ -682,13 +690,14 @@ static void VisualScriptBlocksImportSimpleScripts()
         set visited_intro = true
         set route_locked = false
         add score 2
+        add score -2
         toggle met_hero
         unset temporary_flag
         """);
 
     var script = VisualScriptCompiler.Compile(blocks);
 
-    Assert(blocks.Count == 8, "Script import produced the wrong block count.");
+    Assert(blocks.Count == 9, "Script import produced the wrong block count.");
     Assert(
         script.Contains("set route = \"good\"", StringComparison.Ordinal),
         "Imported set command was not compiled back.");
@@ -703,6 +712,11 @@ static void VisualScriptBlocksImportSimpleScripts()
     Assert(
         script.Contains("add score 2", StringComparison.Ordinal),
         "Imported add command was not compiled back.");
+    Assert(
+        blocks.Any(block => block.Kind == VisualScriptBlockKind.SubtractVariable
+            && block.VariableName == "score"
+            && block.Value == "2"),
+        "Imported negative add command did not become a subtract block.");
     Assert(
         script.Contains("toggle met_hero", StringComparison.Ordinal),
         "Imported toggle command was not compiled back.");

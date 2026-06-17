@@ -115,7 +115,8 @@ currently installed on this workstation.
 - In the node properties panel, use `Блоки скрипта` to edit entry-script blocks;
   in a choice editor, use the same button to attach blocks to that transition.
 - Visual blocks include dedicated flag on/off/toggle actions for common route
-  flags, while still compiling to the same text script commands.
+  flags, plus score add/subtract actions, while still compiling to the same
+  text script commands.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
 - Conditions created through the visual builder are saved as structured data
