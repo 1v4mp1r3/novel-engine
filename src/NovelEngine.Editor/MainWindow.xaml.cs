@@ -3275,6 +3275,44 @@ public partial class MainWindow : Window
     private void MoveCharacterRight_Click(object sender, RoutedEventArgs e) =>
         SetSelectedCharacterPosition(CharacterPosition.Right);
 
+    private void MoveCharacterUp_Click(object sender, RoutedEventArgs e) =>
+        MoveSelectedCharacter(-1);
+
+    private void MoveCharacterDown_Click(object sender, RoutedEventArgs e) =>
+        MoveSelectedCharacter(1);
+
+    private void MoveSelectedCharacter(int direction)
+    {
+        if (direction == 0)
+        {
+            return;
+        }
+
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var character = SelectedCharacter();
+        if (node is null || character is null)
+        {
+            return;
+        }
+
+        var currentIndex = node.Characters.FindIndex(candidate => candidate.Id == character.Id);
+        var targetIndex = currentIndex + Math.Sign(direction);
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= node.Characters.Count)
+        {
+            return;
+        }
+
+        (node.Characters[currentIndex], node.Characters[targetIndex]) =
+            (node.Characters[targetIndex], node.Characters[currentIndex]);
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
+        }
+        MarkDirty();
+        SelectCharacterView(character.Id);
+        StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён в списке";
+    }
+
     private void SetSelectedCharacterPosition(CharacterPosition position)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
@@ -3342,12 +3380,18 @@ public partial class MainWindow : Window
     private void SetCharacterButtons(bool canEdit)
     {
         var hasSelectedCharacter = CharactersGrid.SelectedItem is CharacterView;
+        var selectedIndex = CharactersGrid.SelectedIndex;
+        var characterCount = CharactersGrid.Items.Count;
+
         CharactersGrid.IsEnabled = canEdit;
         AddCharacterButton.IsEnabled = canEdit;
         AddLibraryCharacterButton.IsEnabled = canEdit && _project.Characters.Count > 0;
         SaveCharacterToLibraryButton.IsEnabled =
             canEdit && hasSelectedCharacter;
         EditCharacterButton.IsEnabled = canEdit && hasSelectedCharacter;
+        MoveCharacterUpButton.IsEnabled = canEdit && hasSelectedCharacter && selectedIndex > 0;
+        MoveCharacterDownButton.IsEnabled =
+            canEdit && hasSelectedCharacter && selectedIndex >= 0 && selectedIndex < characterCount - 1;
         MoveCharacterLeftButton.IsEnabled = canEdit && hasSelectedCharacter;
         MoveCharacterCenterButton.IsEnabled = canEdit && hasSelectedCharacter;
         MoveCharacterRightButton.IsEnabled = canEdit && hasSelectedCharacter;

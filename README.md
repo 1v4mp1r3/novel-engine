@@ -74,6 +74,8 @@ currently installed on this workstation.
   settings without copying its graph connection.
 - Move dialogue choices up or down to control their in-game order.
 - A node may inherit or replace the current background and character set.
+- Selected scene characters can be moved up or down in the character list to
+  control their scene order.
 - Selected scene characters can be moved left, center, or right from the
   properties panel without opening the full character editor.
 - A node may inherit music without restarting playback.
