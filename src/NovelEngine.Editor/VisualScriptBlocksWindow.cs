@@ -19,6 +19,7 @@ public sealed class VisualScriptBlocksWindow : Window
     private readonly Button _editButton;
     private readonly Button _duplicateButton;
     private readonly Button _copyButton;
+    private readonly Button _cutButton;
     private readonly Button _pasteButton;
     private readonly Button _deleteButton;
     private readonly Button _moveUpButton;
@@ -65,6 +66,7 @@ public sealed class VisualScriptBlocksWindow : Window
         _editButton = CreateButton("Изменить", EditSelectedBlock);
         _duplicateButton = CreateButton("Дублировать", DuplicateSelectedBlock);
         _copyButton = CreateButton("Копировать", CopySelectedBlock);
+        _cutButton = CreateButton("Вырезать", CutSelectedBlock);
         _pasteButton = CreateButton("Вставить", PasteBlocks);
         _deleteButton = CreateButton("Удалить", DeleteSelectedBlock);
         _moveUpButton = CreateButton("Выше", () => MoveSelectedBlock(-1));
@@ -116,6 +118,7 @@ public sealed class VisualScriptBlocksWindow : Window
         panel.Children.Add(_editButton);
         panel.Children.Add(_duplicateButton);
         panel.Children.Add(_copyButton);
+        panel.Children.Add(_cutButton);
         panel.Children.Add(_pasteButton);
         panel.Children.Add(_moveUpButton);
         panel.Children.Add(_moveDownButton);
@@ -214,6 +217,20 @@ public sealed class VisualScriptBlocksWindow : Window
         UpdateButtons();
     }
 
+    private void CutSelectedBlock()
+    {
+        var index = _blockList.SelectedIndex;
+        if (index < 0 || index >= _blocks.Count)
+        {
+            return;
+        }
+
+        _clipboardBlocks.Clear();
+        _clipboardBlocks.Add(_blocks[index].Clone());
+        _blocks.RemoveAt(index);
+        RefreshList(Math.Min(index, _blocks.Count - 1));
+    }
+
     private void PasteBlocks()
     {
         if (_clipboardBlocks.Count == 0)
@@ -282,6 +299,7 @@ public sealed class VisualScriptBlocksWindow : Window
         menu.Items.Add(CreateMenuItem("Изменить", EditSelectedBlock, selected));
         menu.Items.Add(CreateMenuItem("Дублировать", DuplicateSelectedBlock, selected));
         menu.Items.Add(CreateMenuItem("Копировать", CopySelectedBlock, selected));
+        menu.Items.Add(CreateMenuItem("Вырезать", CutSelectedBlock, selected));
         menu.Items.Add(CreateMenuItem("Вставить", PasteBlocks, _clipboardBlocks.Count > 0));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateMenuItem("Выше", () => MoveSelectedBlock(-1), selected && index > 0));
@@ -410,6 +428,13 @@ public sealed class VisualScriptBlocksWindow : Window
             return;
         }
 
+        if (hasControl && e.Key == Key.X)
+        {
+            CutSelectedBlock();
+            e.Handled = true;
+            return;
+        }
+
         if (hasControl && e.Key == Key.D)
         {
             DuplicateSelectedBlock();
@@ -458,6 +483,7 @@ public sealed class VisualScriptBlocksWindow : Window
         _editButton.IsEnabled = selected;
         _duplicateButton.IsEnabled = selected;
         _copyButton.IsEnabled = selected;
+        _cutButton.IsEnabled = selected;
         _pasteButton.IsEnabled = _clipboardBlocks.Count > 0;
         _deleteButton.IsEnabled = selected;
         _moveUpButton.IsEnabled = selected && index > 0;

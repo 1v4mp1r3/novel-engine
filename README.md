@@ -120,11 +120,11 @@ currently installed on this workstation.
 - The visual-block list shows semantic labels such as `score += 2` or
   `Флаг met_hero: включить`; the raw generated NovelScript remains visible in
   the preview box for debugging.
-- Visual-block dialogs support duplicate, copy, paste, `Ctrl+C`/`Ctrl+V`,
-  `Ctrl+D`, `Delete`, and `Alt+Up/Down` so repeated route logic can be reused
-  and reordered without retyping every block.
+- Visual-block dialogs support duplicate, copy, cut, paste, `Ctrl+C`/`Ctrl+X`/
+  `Ctrl+V`, `Ctrl+D`, `Delete`, and `Alt+Up/Down` so repeated route logic can
+  be reused and reordered without retyping every block.
 - Right-click a visual script block to open the same edit, duplicate, copy,
-  paste, move, and delete actions from a context menu.
+  cut, paste, move, and delete actions from a context menu.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
 - Conditions created through the visual builder are saved as structured data
