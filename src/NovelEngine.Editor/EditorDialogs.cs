@@ -953,7 +953,9 @@ public sealed class VoiceBlipEditorWindow : Window
                 File.Delete(_previewPath);
             }
         }
-        catch (IOException)
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException)
         {
         }
         _previewPath = null;
