@@ -1837,6 +1837,9 @@ static void BuildCompilerEmitsPackage()
             loaded.Manifest.DebugSymbols,
             "Debug build did not retain debug symbols.");
         Assert(
+            !string.IsNullOrWhiteSpace(loaded.Project.SourceCode),
+            "Debug build did not keep project source code.");
+        Assert(
             loaded.Project.Nodes.Count == project.Nodes.Count,
             "Runtime project changed node count.");
         Assert(
@@ -1860,6 +1863,19 @@ static void BuildCompilerEmitsPackage()
                     result.OutputDirectory,
                     builtMenuElement.Image.Replace('/', Path.DirectorySeparatorChar))),
             "Compiled main menu image was not copied.");
+
+        var releaseResult = NovelBuildCompiler.Compile(
+            project,
+            projectPath,
+            Path.Combine(directory, "build", "story-release"),
+            debugSymbols: false);
+        var release = NovelBuildCompiler.LoadBuild(releaseResult.ManifestPath);
+        Assert(
+            !release.Manifest.DebugSymbols,
+            "Release build kept debug symbol metadata enabled.");
+        Assert(
+            string.IsNullOrEmpty(release.Project.SourceCode),
+            "Release build did not strip project source code.");
 
         var foreignDirectory = Path.Combine(directory, "foreign-output");
         Directory.CreateDirectory(foreignDirectory);
