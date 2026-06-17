@@ -52,6 +52,8 @@ public partial class MainWindow : Window
     private bool _restoringProjectHistory;
     private string _savedProjectSnapshot = string.Empty;
     private string? _assetPreviewAudioPath;
+    private readonly Dictionary<string, string> _assetSizeCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public MainWindow()
         : this(null)
@@ -1022,6 +1024,7 @@ public partial class MainWindow : Window
     {
         if (syncFromDisk)
         {
+            _assetSizeCache.Clear();
             SyncFilesFromDisk();
         }
         RefreshAssetFolders();
@@ -1436,18 +1439,28 @@ public partial class MainWindow : Window
     private string AssetSize(NovelAsset asset)
     {
         var path = ResolveAssetPath(asset);
+        if (_assetSizeCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        string size;
         if (!File.Exists(path))
         {
-            return "нет файла";
+            size = "нет файла";
+            _assetSizeCache[path] = size;
+            return size;
         }
         var bytes = new FileInfo(path).Length;
-        return bytes switch
+        size = bytes switch
         {
             >= 1024L * 1024L =>
                 $"{bytes / (1024d * 1024d):0.##} МБ",
             >= 1024L => $"{bytes / 1024d:0.##} КБ",
             _ => $"{bytes} Б",
         };
+        _assetSizeCache[path] = size;
+        return size;
     }
 
     private void RefreshAssetPreview()
