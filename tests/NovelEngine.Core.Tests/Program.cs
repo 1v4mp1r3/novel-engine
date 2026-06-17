@@ -894,6 +894,11 @@ static void MainMenuAndVoiceAssetReferences()
     Assert(project.CountAssetReferences("voice_hero") == 1, "Voice refs were not counted.");
     Assert(project.CountAssetReferences("voice_hero_alt") == 1, "Second voice refs were not counted.");
     Assert(project.CountAssetReferences("transition_click") == 1, "Transition sound refs were not counted.");
+    var referenceCounts = project.CountAssetReferencesById();
+    Assert(referenceCounts["menu_bg"] == 2, "Batch main menu image refs were not counted.");
+    Assert(referenceCounts["voice_hero"] == 1, "Batch voice refs were not counted.");
+    Assert(referenceCounts["voice_hero_alt"] == 1, "Batch second voice refs were not counted.");
+    Assert(referenceCounts["transition_click"] == 1, "Batch transition refs were not counted.");
     var menuUsages = project.FindAssetUsages("menu_bg");
     Assert(menuUsages.Count == 2, "Main menu image usages were not listed.");
     Assert(

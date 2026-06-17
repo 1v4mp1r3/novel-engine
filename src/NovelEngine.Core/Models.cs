@@ -333,6 +333,21 @@ public sealed class NovelProject
             value => value.Equals(reference, StringComparison.OrdinalIgnoreCase));
     }
 
+    public IReadOnlyDictionary<string, int> CountAssetReferencesById()
+    {
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in EnumerateAssetValues())
+        {
+            if (!AssetReference.TryGetId(value, out var id))
+            {
+                continue;
+            }
+
+            counts[id] = counts.GetValueOrDefault(id) + 1;
+        }
+        return counts;
+    }
+
     public IReadOnlyList<AssetUsage> FindAssetUsages(string assetId)
     {
         var reference = AssetReference.Create(assetId);

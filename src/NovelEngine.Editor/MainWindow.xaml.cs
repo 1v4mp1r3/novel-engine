@@ -1263,13 +1263,14 @@ public partial class MainWindow : Window
             assets = assets.Where(asset => AssetMatchesSearch(asset, query));
         }
 
+        var usageCounts = _project.CountAssetReferencesById();
         var assetViews = assets
             .OrderBy(asset => asset.Kind)
             .ThenBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
             .Select(
                 asset => new AssetView(
                     asset,
-                    _project.CountAssetReferences(asset.Id),
+                    usageCounts.GetValueOrDefault(asset.Id),
                     AssetSize(asset)))
             .ToList();
         AssetsGrid.ItemsSource = assetViews;
