@@ -112,6 +112,13 @@ static void ProjectDiagnosticsCheckPhysicalAssets()
                 Folder = "backgrounds",
             });
         project.AssetFolders.Add("backgrounds");
+        project.MainMenu.Elements.Add(
+            new MainMenuElement
+            {
+                Id = "missing_logo",
+                Kind = MainMenuElementKind.ImageLabel,
+                Image = "files/ui/missing-logo.png",
+            });
         var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
         scene.Background = "@missing_bg";
 
@@ -122,6 +129,11 @@ static void ProjectDiagnosticsCheckPhysicalAssets()
             report.Diagnostics.Any(
                 diagnostic => diagnostic.Message.Contains("Файл не найден", StringComparison.Ordinal)),
             "Missing physical asset diagnostic was not specific.");
+        Assert(
+            report.Diagnostics.Any(
+                diagnostic => diagnostic.Location.Contains("Главное меню", StringComparison.Ordinal)
+                    && diagnostic.Message.Contains("missing-logo.png", StringComparison.Ordinal)),
+            "Missing direct main menu image was not reported.");
     }
     finally
     {

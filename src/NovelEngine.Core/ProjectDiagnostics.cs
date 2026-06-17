@@ -294,6 +294,169 @@ public static class ProjectDiagnostics
                         error.Message));
             }
         }
+
+        AddDirectAssetFileDiagnostics(project, diagnostics, projectPath);
+    }
+
+    private static void AddDirectAssetFileDiagnostics(
+        NovelProject project,
+        List<ProjectDiagnostic> diagnostics,
+        string? projectPath)
+    {
+        if (projectPath is null)
+        {
+            return;
+        }
+
+        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+        if (projectDirectory is null)
+        {
+            return;
+        }
+
+        foreach (var asset in EnumerateDirectAssetValues(project))
+        {
+            if (string.IsNullOrWhiteSpace(asset.Value)
+                || AssetReference.TryGetId(asset.Value, out _))
+            {
+                continue;
+            }
+
+            try
+            {
+                var path = Path.IsPathRooted(asset.Value)
+                    ? Path.GetFullPath(asset.Value)
+                    : Path.GetFullPath(Path.Combine(projectDirectory, asset.Value));
+                if (!File.Exists(path))
+                {
+                    diagnostics.Add(
+                        new ProjectDiagnostic(
+                            ProjectDiagnosticSeverity.Error,
+                            asset.Location,
+                            $"Файл не найден: {path}"));
+                    continue;
+                }
+
+                var actualKind = AssetReference.GuessKind(path);
+                if (actualKind != AssetKind.Other && actualKind != asset.ExpectedKind)
+                {
+                    diagnostics.Add(
+                        new ProjectDiagnostic(
+                            ProjectDiagnosticSeverity.Error,
+                            asset.Location,
+                            $"Файл имеет тип {actualKind.ToString().ToLowerInvariant()}, "
+                            + $"но требуется {asset.ExpectedKind.ToString().ToLowerInvariant()}: {path}"));
+                }
+            }
+            catch (Exception error) when (
+                error is IOException
+                or ArgumentException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+            {
+                diagnostics.Add(
+                    new ProjectDiagnostic(
+                        ProjectDiagnosticSeverity.Error,
+                        asset.Location,
+                        error.Message));
+            }
+        }
+    }
+
+    private static IEnumerable<DirectAssetValue> EnumerateDirectAssetValues(
+        NovelProject project)
+    {
+        foreach (var character in project.Characters)
+        {
+            yield return new DirectAssetValue(
+                character.Sprite,
+                AssetKind.Image,
+                $"Библиотека персонажей, персонаж «{DisplayCharacter(character)}», спрайт");
+            foreach (var voice in character.GetVoiceSounds())
+            {
+                yield return new DirectAssetValue(
+                    voice,
+                    AssetKind.Audio,
+                    $"Библиотека персонажей, персонаж «{DisplayCharacter(character)}», voice-блип");
+            }
+        }
+
+        yield return new DirectAssetValue(
+            project.MainMenu.Background,
+            AssetKind.Image,
+            "Главное меню, фон");
+        foreach (var element in project.MainMenu.Elements)
+        {
+            yield return new DirectAssetValue(
+                element.Image,
+                AssetKind.Image,
+                $"Главное меню, элемент «{element.Id}»");
+        }
+
+        foreach (var type in project.NodeTypes)
+        {
+            if (type.Defaults.Background is not null)
+            {
+                yield return new DirectAssetValue(
+                    type.Defaults.Background,
+                    AssetKind.Image,
+                    $"Тип «{type.Name}», фон");
+            }
+            if (type.Defaults.Music is not null)
+            {
+                yield return new DirectAssetValue(
+                    type.Defaults.Music,
+                    AssetKind.Audio,
+                    $"Тип «{type.Name}», музыка");
+            }
+            foreach (var character in type.Defaults.Characters)
+            {
+                yield return new DirectAssetValue(
+                    character.Sprite,
+                    AssetKind.Image,
+                    $"Тип «{type.Name}», персонаж «{DisplayCharacter(character)}», спрайт");
+                foreach (var voice in character.GetVoiceSounds())
+                {
+                    yield return new DirectAssetValue(
+                        voice,
+                        AssetKind.Audio,
+                        $"Тип «{type.Name}», персонаж «{DisplayCharacter(character)}», voice-блип");
+                }
+            }
+        }
+
+        foreach (var node in project.Nodes)
+        {
+            yield return new DirectAssetValue(
+                node.Background,
+                AssetKind.Image,
+                $"Нода «{DisplayNode(node)}», фон");
+            yield return new DirectAssetValue(
+                node.Music,
+                AssetKind.Audio,
+                $"Нода «{DisplayNode(node)}», музыка");
+            foreach (var character in node.Characters)
+            {
+                yield return new DirectAssetValue(
+                    character.Sprite,
+                    AssetKind.Image,
+                    $"Нода «{DisplayNode(node)}», персонаж «{DisplayCharacter(character)}», спрайт");
+                foreach (var voice in character.GetVoiceSounds())
+                {
+                    yield return new DirectAssetValue(
+                        voice,
+                        AssetKind.Audio,
+                        $"Нода «{DisplayNode(node)}», персонаж «{DisplayCharacter(character)}», voice-блип");
+                }
+            }
+            foreach (var output in node.Outputs)
+            {
+                yield return new DirectAssetValue(
+                    output.TransitionSound,
+                    AssetKind.Audio,
+                    $"Нода «{DisplayNode(node)}», переход «{output.Label}»");
+            }
+        }
     }
 
     private static ProjectDiagnostic Warning(string location, string message) =>
@@ -304,4 +467,9 @@ public static class ProjectDiagnostics
 
     private static string DisplayCharacter(CharacterPlacement character) =>
         string.IsNullOrWhiteSpace(character.Name) ? character.Id : character.Name;
+
+    private sealed record DirectAssetValue(
+        string Value,
+        AssetKind ExpectedKind,
+        string Location);
 }
