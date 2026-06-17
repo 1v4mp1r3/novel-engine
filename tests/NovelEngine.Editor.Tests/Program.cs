@@ -8,7 +8,9 @@ var tests = new (string Name, Action Run)[]
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
+    ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
+    ("project resolver prefers folder-named json project", ProjectResolverPrefersFolderNamedJsonProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
@@ -139,6 +141,26 @@ static void ProjectResolverOpensOnlyProject()
     }
 }
 
+static void ProjectResolverOpensOnlyJsonProject()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var projectPath = Path.Combine(directory, "custom-name.json");
+        File.WriteAllText(projectPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath == projectPath, "Resolver did not open the only .json project file.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed .json workspace directory.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a folder with one .json project as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
 static void ProjectResolverPrefersFolderNamedProject()
 {
     var directory = CreateTempDirectory();
@@ -155,6 +177,29 @@ static void ProjectResolverPrefersFolderNamedProject()
 
         Assert(result.ProjectPath == preferredPath, "Resolver did not prefer the folder-named project.");
         Assert(!result.CreatedEmptyWorkspace, "Resolver marked a preferred project folder as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverPrefersFolderNamedJsonProject()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var preferredPath = Path.Combine(
+            directory,
+            $"{Path.GetFileName(directory)}.json");
+        var otherPath = Path.Combine(directory, "other.json");
+        File.WriteAllText(preferredPath, "{}");
+        File.WriteAllText(otherPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(result.ProjectPath == preferredPath, "Resolver did not prefer the folder-named .json project.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a preferred .json project folder as empty.");
     }
     finally
     {

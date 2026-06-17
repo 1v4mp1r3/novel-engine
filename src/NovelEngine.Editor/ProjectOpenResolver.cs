@@ -9,7 +9,11 @@ internal sealed record ProjectOpenResult(
 
 internal static class ProjectOpenResolver
 {
-    private const string ProjectPattern = "*.novel.json";
+    private static readonly string[] ProjectPatterns =
+    [
+        "*.novel.json",
+        "*.json",
+    ];
 
     public static ProjectOpenResult Resolve(string inputPath)
     {
@@ -41,8 +45,12 @@ internal static class ProjectOpenResolver
     private static ProjectOpenResult ResolveProjectFromDirectory(string directory)
     {
         directory = Path.GetFullPath(directory);
-        var projectFiles = Directory
-            .EnumerateFiles(directory, ProjectPattern, SearchOption.TopDirectoryOnly)
+        var projectFiles = ProjectPatterns
+            .SelectMany(pattern => Directory.EnumerateFiles(
+                directory,
+                pattern,
+                SearchOption.TopDirectoryOnly))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (projectFiles.Count == 0)
@@ -56,11 +64,7 @@ internal static class ProjectOpenResolver
         var directoryName = Path.GetFileName(directory.TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar));
-        var preferredName = $"{directoryName}.novel.json";
-        var preferredProject = projectFiles.FirstOrDefault(path =>
-            Path.GetFileName(path).Equals(
-                preferredName,
-                StringComparison.OrdinalIgnoreCase));
+        var preferredProject = PreferredProject(projectFiles, directoryName);
         if (preferredProject is not null)
         {
             return new ProjectOpenResult(
@@ -81,5 +85,28 @@ internal static class ProjectOpenResolver
             null,
             directory,
             CreatedEmptyWorkspace: true);
+    }
+
+    private static string? PreferredProject(
+        IReadOnlyList<string> projectFiles,
+        string directoryName)
+    {
+        foreach (var preferredName in new[]
+        {
+            $"{directoryName}.novel.json",
+            $"{directoryName}.json",
+        })
+        {
+            var preferredProject = projectFiles.FirstOrDefault(path =>
+                Path.GetFileName(path).Equals(
+                    preferredName,
+                    StringComparison.OrdinalIgnoreCase));
+            if (preferredProject is not null)
+            {
+                return preferredProject;
+            }
+        }
+
+        return null;
     }
 }
