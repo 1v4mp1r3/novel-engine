@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, BitmapImage?> _assetPreviewImageCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
 
     public MainWindow()
         : this(null)
@@ -252,6 +253,7 @@ public partial class MainWindow : Window
         _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
+        ClearProjectAnalysisCaches();
         var structureChanges = EnsureWorkspaceStructure();
         var filesChanged = SyncFilesFromDisk(refreshCode: false);
         if (saveStructureChanges && structureChanges > 0 && _projectPath is not null)
@@ -623,6 +625,7 @@ public partial class MainWindow : Window
         {
             RequestCodeRefresh(useStoredSource: false);
         }
+        ClearProjectAnalysisCaches();
         var snapshot = CaptureProjectSnapshot();
         if (!_restoringProjectHistory)
         {
@@ -730,6 +733,7 @@ public partial class MainWindow : Window
             _project = ProjectSerializer.FromJson(entry.Snapshot);
             _projectHistoryIndex = historyIndex;
             _codeHasPendingChanges = false;
+            ClearProjectAnalysisCaches();
             Graph.SetProject(_project);
             if (entry.SelectedNodeId is not null
                 && _project.FindNode(entry.SelectedNodeId) is not null)
@@ -1177,6 +1181,12 @@ public partial class MainWindow : Window
     {
         _assetSizeCache.Clear();
         _assetPreviewImageCache.Clear();
+        _assetUsageCountCache = null;
+    }
+
+    private void ClearProjectAnalysisCaches()
+    {
+        _assetUsageCountCache = null;
     }
 
     private void RefreshNodeAssetPickers(NovelNode? node)
@@ -1413,7 +1423,7 @@ public partial class MainWindow : Window
             assets = assets.Where(asset => AssetMatchesSearch(asset, query));
         }
 
-        var usageCounts = _project.CountAssetReferencesById();
+        var usageCounts = GetAssetUsageCounts();
         var assetViews = assets
             .OrderBy(asset => asset.Kind)
             .ThenBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
@@ -1438,6 +1448,9 @@ public partial class MainWindow : Window
         }
         RefreshAssetPreview();
     }
+
+    private IReadOnlyDictionary<string, int> GetAssetUsageCounts() =>
+        _assetUsageCountCache ??= _project.CountAssetReferencesById();
 
     private static bool AssetMatchesSearch(NovelAsset asset, string query)
     {
