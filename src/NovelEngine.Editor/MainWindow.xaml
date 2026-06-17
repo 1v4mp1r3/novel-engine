@@ -277,7 +277,7 @@
                                     Click="EditNodeScriptBlocks_Click" />
 
                             <TextBlock Text="Выходы / варианты ответа" Style="{StaticResource SectionHeader}" />
-                            <DataGrid x:Name="OutputsGrid" Height="155" AutoGenerateColumns="False" SelectionChanged="OutputsGrid_SelectionChanged" MouseDoubleClick="EditOutput_Click">
+                            <DataGrid x:Name="OutputsGrid" Height="155" AutoGenerateColumns="False" SelectionChanged="OutputsGrid_SelectionChanged" MouseDoubleClick="EditOutput_Click" PreviewMouseRightButtonDown="OutputsGrid_PreviewMouseRightButtonDown" ContextMenuOpening="OutputsGrid_ContextMenuOpening">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Текст" Binding="{Binding Label}" Width="*" />
                                     <DataGridTextColumn Header="Условие" Binding="{Binding Condition}" Width="110" />

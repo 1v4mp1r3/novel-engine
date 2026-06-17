@@ -86,6 +86,8 @@ currently installed on this workstation.
 - Duplicate a dialogue choice to reuse its condition, script, sound, and fade
   settings without copying its graph connection.
 - Move dialogue choices up or down to control their in-game order.
+- Right-click a dialogue choice in the outputs table to edit, duplicate,
+  reorder, disconnect, delete, or open its script blocks.
 - A node may inherit or replace the current background and character set.
 - The node context menu can enable inherited background, music, or characters
   and shows what will be inherited when the player enters from each linked node.

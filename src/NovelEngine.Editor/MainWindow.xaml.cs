@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         CodeEditor.CompletionProvider = ProjectLanguage.GetCompletions;
         AssetsGrid.ContextMenu = new ContextMenu();
+        OutputsGrid.ContextMenu = new ContextMenu();
 
         Graph.SelectionChanged += (_, _) => HandleGraphSelection();
         Graph.ProjectChanged += (_, _) => MarkDirty();
@@ -4185,6 +4186,81 @@ public partial class MainWindow : Window
         MarkDirty();
         SelectOutputView(output.Id);
     }
+
+    private void OutputsGrid_PreviewMouseRightButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            OutputsGrid.SelectedItem = null;
+            return;
+        }
+
+        row.IsSelected = true;
+        OutputsGrid.SelectedItem = row.Item;
+        row.Focus();
+    }
+
+    private void OutputsGrid_ContextMenuOpening(
+        object sender,
+        ContextMenuEventArgs e)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        var canEdit = node?.Kind == NodeKind.Dialogue;
+        var menu = OutputsGrid.ContextMenu ?? new ContextMenu();
+        OutputsGrid.ContextMenu = menu;
+        menu.Items.Clear();
+
+        if (!canEdit)
+        {
+            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите диалоговую ноду"));
+            return;
+        }
+
+        menu.Items.Add(CreateOutputMenuItem("Добавить вариант", () => AddOutput(node!.Id)));
+        if (output is null)
+        {
+            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите вариант"));
+            return;
+        }
+
+        var selectedIndex = OutputsGrid.SelectedIndex;
+        var outputCount = OutputsGrid.Items.Count;
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateOutputMenuItem("Изменить", () => EditOutput_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(CreateOutputMenuItem(
+            "Блоки скрипта...",
+            () => EditOutputScriptBlocks(node!, output)));
+        menu.Items.Add(CreateOutputMenuItem(
+            "Дублировать",
+            () => DuplicateOutput_Click(this, new RoutedEventArgs())));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateOutputMenuItem(
+            "Выше",
+            () => MoveSelectedOutput(-1),
+            selectedIndex > 0));
+        menu.Items.Add(CreateOutputMenuItem(
+            "Ниже",
+            () => MoveSelectedOutput(1),
+            selectedIndex >= 0 && selectedIndex < outputCount - 1));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateOutputMenuItem(
+            "Разорвать переход",
+            () => DisconnectOutput_Click(this, new RoutedEventArgs()),
+            output.TargetNodeId is not null));
+        menu.Items.Add(CreateOutputMenuItem(
+            "Удалить",
+            () => DeleteOutput_Click(this, new RoutedEventArgs())));
+    }
+
+    private static MenuItem CreateOutputMenuItem(
+        string header,
+        Action action,
+        bool isEnabled = true) =>
+        CreateAssetMenuItem(header, action, isEnabled);
 
     private void DisconnectOutput_Click(object sender, RoutedEventArgs e)
     {
