@@ -2236,7 +2236,10 @@ public partial class MainWindow : Window
             RefreshAssets();
             StatusText.Text = $"Импортировано файлов: {dialog.FileNames.Length}";
         }
-        catch (IOException error)
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             MessageBox.Show(
                 this,
@@ -2444,7 +2447,10 @@ public partial class MainWindow : Window
             MarkDirty();
             RefreshAssets();
         }
-        catch (IOException error)
+        catch (Exception error) when (
+            error is IOException
+            or InvalidDataException
+            or UnauthorizedAccessException)
         {
             MessageBox.Show(
                 this,
