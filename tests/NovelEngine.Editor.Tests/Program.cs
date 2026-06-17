@@ -9,6 +9,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
+    ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
@@ -142,6 +143,30 @@ static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
     }
     finally
     {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverExpandsQuotedEnvironmentPaths()
+{
+    var directory = CreateTempDirectory();
+    const string variableName = "NOVEL_ENGINE_TEST_PROJECT";
+    var previous = Environment.GetEnvironmentVariable(variableName);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        File.WriteAllText(projectPath, "{}");
+        Environment.SetEnvironmentVariable(variableName, directory);
+
+        var result = ProjectOpenResolver.Resolve($"\"%{variableName}%\"");
+
+        Assert(result.ProjectPath == projectPath, "Resolver did not expand the quoted environment path.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed the expanded workspace directory.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked an expanded project folder as empty.");
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable(variableName, previous);
         Directory.Delete(directory, recursive: true);
     }
 }
