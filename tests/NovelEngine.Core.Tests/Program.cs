@@ -1353,6 +1353,8 @@ static void AssetFoldersMoveFiles()
         var projectPath = Path.Combine(directory, "story.novel.json");
         var project = NovelProject.CreateDefault();
         var asset = ProjectAssets.Import(project, projectPath, source);
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = AssetReference.Create(asset.Id);
 
         ProjectAssets.CreateFolder(project, "characters/heroes");
         var conflictingTarget = Path.Combine(
@@ -1379,6 +1381,9 @@ static void AssetFoldersMoveFiles()
             Path.GetFileName(ProjectAssets.ResolvePath(projectPath, asset))
                 == "hero-2.png",
             "Moved asset did not receive a unique file name.");
+        Assert(
+            project.ResolveAssetReference(scene.Background) == asset.Path,
+            "Moved asset reference did not resolve to the new asset path.");
 
         ProjectAssets.RenameFolder(
             project,
