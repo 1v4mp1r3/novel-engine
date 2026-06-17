@@ -3116,8 +3116,7 @@ public partial class MainWindow : Window
             node.PropertyOverrides.Add("characters");
         }
         InheritCharactersCheck.IsChecked = false;
-        var id = CreateUniqueCharacterId(dialog.SelectedCharacter.Id, node.Characters);
-        node.Characters.Add(dialog.SelectedCharacter.CloneWithId(id));
+        _project.AddCharacterClone(node.Id, dialog.SelectedCharacter);
         MarkDirty();
         StatusText.Text = $"Персонаж «{CharacterLabel(dialog.SelectedCharacter)}» добавлен из библиотеки";
     }
@@ -3209,72 +3208,6 @@ public partial class MainWindow : Window
         target.VoiceEveryNthCharacter = source.VoiceEveryNthCharacter;
     }
 
-    private static string CreateUniqueCharacterId(
-        string preferredId,
-        IEnumerable<CharacterPlacement> characters)
-    {
-        var seed = SanitizeCharacterId(preferredId);
-        var existing = characters
-            .Select(character => character.Id)
-            .ToHashSet(StringComparer.Ordinal);
-        if (!existing.Contains(seed))
-        {
-            return seed;
-        }
-
-        for (var index = 2; ; index++)
-        {
-            var candidate = $"{seed}-{index}";
-            if (!existing.Contains(candidate))
-            {
-                return candidate;
-            }
-        }
-    }
-
-    private static string CreateDuplicateCharacterName(
-        string name,
-        IEnumerable<CharacterPlacement> characters)
-    {
-        var baseName = string.IsNullOrWhiteSpace(name)
-            ? "Персонаж копия"
-            : $"{name} копия";
-        var existing = characters
-            .Select(character => character.Name)
-            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
-        if (!existing.Contains(baseName))
-        {
-            return baseName;
-        }
-
-        for (var index = 2; ; index++)
-        {
-            var candidate = $"{baseName} {index}";
-            if (!existing.Contains(candidate))
-            {
-                return candidate;
-            }
-        }
-    }
-
-    private static string SanitizeCharacterId(string value)
-    {
-        var cleaned = new string(
-            value
-                .Trim()
-                .Select(character =>
-                    character is '_' or '-' || char.IsLetterOrDigit(character)
-                        ? character
-                        : '-')
-                .ToArray())
-            .Trim('-');
-        if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
-        {
-            cleaned = $"character-{cleaned}";
-        }
-        return cleaned;
-    }
-
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
@@ -3300,15 +3233,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var duplicateId = CreateUniqueCharacterId($"{character.Id}-copy", node.Characters);
-        var duplicate = character.CloneWithId(duplicateId);
-        duplicate.Name = CreateDuplicateCharacterName(character.Name, node.Characters);
-        var sourceIndex = node.Characters.FindIndex(candidate => candidate.Id == character.Id);
-        node.Characters.Insert(sourceIndex < 0 ? node.Characters.Count : sourceIndex + 1, duplicate);
-        if (node.UsesTypeDefaults)
-        {
-            node.PropertyOverrides.Add("characters");
-        }
+        var duplicate = _project.DuplicateCharacter(node.Id, character.Id);
         MarkDirty();
         SelectCharacterView(duplicate.Id);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» продублирован";
@@ -3343,19 +3268,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        var currentIndex = node.Characters.FindIndex(candidate => candidate.Id == character.Id);
-        var targetIndex = currentIndex + Math.Sign(direction);
-        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= node.Characters.Count)
+        if (!_project.MoveCharacter(node.Id, character.Id, direction))
         {
             return;
         }
 
-        (node.Characters[currentIndex], node.Characters[targetIndex]) =
-            (node.Characters[targetIndex], node.Characters[currentIndex]);
-        if (node.UsesTypeDefaults)
-        {
-            node.PropertyOverrides.Add("characters");
-        }
         MarkDirty();
         SelectCharacterView(character.Id);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён в списке";
@@ -3371,14 +3288,11 @@ public partial class MainWindow : Window
         }
 
         var characterId = character.Id;
-        character.Position = position;
-        character.HasCustomTransform = false;
-        character.Scale = 1;
-        character.Rotation = 0;
-        if (node.UsesTypeDefaults)
+        if (!_project.SetCharacterPosition(node.Id, character.Id, position))
         {
-            node.PropertyOverrides.Add("characters");
+            return;
         }
+
         MarkDirty();
         SelectCharacterView(characterId);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён: {CharacterPositionLabel(position)}";

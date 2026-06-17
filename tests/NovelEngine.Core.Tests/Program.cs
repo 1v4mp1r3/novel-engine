@@ -15,6 +15,7 @@ var tests = new (string Name, Action Run)[]
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("characters flow through transitions", CharactersFlow),
+    ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
     ("runtime save restores node and script state", RuntimeSaveRestoresState),
     ("transition settings survive JSON round trip", TransitionSettingsRoundTrip),
@@ -444,6 +445,99 @@ static void CharactersFlow()
 
     Assert(player.State.CurrentCharacters.Count == 1, "Character was not inherited.");
     Assert(player.State.CurrentCharacters[0].Name == "Герой", "Wrong character inherited.");
+}
+
+static void NodeCharacterOperationsPreserveDataAndOrder()
+{
+    var project = NovelProject.CreateDefault();
+    project.AssetFolders.Add("characters");
+    project.AssetFolders.Add("voices");
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "hero_sprite",
+            Kind = AssetKind.Image,
+            Path = "files/characters/hero.png",
+            Folder = "characters",
+        });
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "hero_voice",
+            Kind = AssetKind.Audio,
+            Path = "files/voices/hero.wav",
+            Folder = "voices",
+        });
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.UsesTypeDefaults = true;
+    scene.InheritCharacters = false;
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой",
+            Sprite = "@hero_sprite",
+            Position = CharacterPosition.Left,
+            HasCustomTransform = true,
+            X = 640,
+            Y = 470,
+            Scale = 1.25,
+            Rotation = -5,
+            VoiceSounds = ["@hero_voice"],
+            VoicePitch = 1.4,
+            VoiceEveryNthCharacter = 2,
+        });
+    scene.Characters.Add(
+        new CharacterPlacement
+        {
+            Id = "friend",
+            Name = "Друг",
+            Position = CharacterPosition.Right,
+        });
+
+    var duplicate = project.DuplicateCharacter(scene.Id, "hero");
+
+    Assert(duplicate.Id == "hero-copy", "Duplicate character id was not based on the source id.");
+    Assert(duplicate.Name == "Герой копия", "Duplicate character name was not marked as a copy.");
+    Assert(duplicate.Sprite == "@hero_sprite", "Duplicate character sprite was not copied.");
+    Assert(
+        duplicate.GetVoiceSounds().SequenceEqual(["@hero_voice"]),
+        "Duplicate character voice sounds were not copied.");
+    Assert(duplicate.VoicePitch == 1.4, "Duplicate character voice pitch was not copied.");
+    Assert(duplicate.VoiceEveryNthCharacter == 2, "Duplicate character voice cadence was not copied.");
+    Assert(
+        scene.Characters.Select(character => character.Id).SequenceEqual(["hero", "hero-copy", "friend"]),
+        "Duplicate character was not inserted next to the source.");
+    Assert(
+        scene.PropertyOverrides.Contains("characters"),
+        "Character operation did not mark type-default characters as overridden.");
+
+    Assert(project.MoveCharacter(scene.Id, "friend", -1), "Character did not move up.");
+    Assert(
+        scene.Characters.Select(character => character.Id).SequenceEqual(["hero", "friend", "hero-copy"]),
+        "Character order after moving up is wrong.");
+    Assert(!project.MoveCharacter(scene.Id, "hero", -1), "First character moved beyond the top boundary.");
+
+    Assert(
+        project.SetCharacterPosition(scene.Id, duplicate.Id, CharacterPosition.Center),
+        "Character position did not change.");
+    Assert(duplicate.Position == CharacterPosition.Center, "Character position was not applied.");
+    Assert(
+        !duplicate.HasCustomTransform && duplicate.Scale == 1 && duplicate.Rotation == 0,
+        "Position change did not reset custom transform.");
+    Assert(
+        !project.SetCharacterPosition(scene.Id, duplicate.Id, CharacterPosition.Center),
+        "Unchanged character position should not report an edit.");
+
+    var added = project.AddCharacterClone(
+        scene.Id,
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Герой из библиотеки",
+        });
+    Assert(added.Id == "hero-2", "Library character clone id was not made unique.");
+    project.Validate();
 }
 
 static void NodePreviewRestoresState()

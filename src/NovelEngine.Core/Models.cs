@@ -608,6 +608,78 @@ public sealed class NovelProject
         return true;
     }
 
+    public CharacterPlacement DuplicateCharacter(string nodeId, string characterId)
+    {
+        var node = FindNode(nodeId)
+            ?? throw new InvalidOperationException("Нода не найдена.");
+        var character = node.Characters.FirstOrDefault(candidate => candidate.Id == characterId)
+            ?? throw new InvalidOperationException("Персонаж не найден.");
+
+        var duplicate = character.CloneWithId(
+            CreateUniqueCharacterId($"{character.Id}-copy", node.Characters));
+        duplicate.Name = CreateDuplicateCharacterName(character.Name, node.Characters);
+        var sourceIndex = node.Characters.IndexOf(character);
+        node.Characters.Insert(sourceIndex < 0 ? node.Characters.Count : sourceIndex + 1, duplicate);
+        MarkCharactersOverridden(node);
+        return duplicate;
+    }
+
+    public CharacterPlacement AddCharacterClone(string nodeId, CharacterPlacement source)
+    {
+        var node = FindNode(nodeId)
+            ?? throw new InvalidOperationException("Нода не найдена.");
+        var character = source.CloneWithId(CreateUniqueCharacterId(source.Id, node.Characters));
+        node.Characters.Add(character);
+        MarkCharactersOverridden(node);
+        return character;
+    }
+
+    public bool MoveCharacter(string nodeId, string characterId, int direction)
+    {
+        if (direction == 0)
+        {
+            return false;
+        }
+
+        var node = FindNode(nodeId);
+        if (node is null)
+        {
+            return false;
+        }
+
+        var currentIndex = node.Characters.FindIndex(character => character.Id == characterId);
+        var targetIndex = currentIndex + Math.Sign(direction);
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= node.Characters.Count)
+        {
+            return false;
+        }
+
+        (node.Characters[currentIndex], node.Characters[targetIndex]) =
+            (node.Characters[targetIndex], node.Characters[currentIndex]);
+        MarkCharactersOverridden(node);
+        return true;
+    }
+
+    public bool SetCharacterPosition(
+        string nodeId,
+        string characterId,
+        CharacterPosition position)
+    {
+        var node = FindNode(nodeId);
+        var character = node?.Characters.FirstOrDefault(candidate => candidate.Id == characterId);
+        if (node is null || character is null || character.Position == position)
+        {
+            return false;
+        }
+
+        character.Position = position;
+        character.HasCustomTransform = false;
+        character.Scale = 1;
+        character.Rotation = 0;
+        MarkCharactersOverridden(node);
+        return true;
+    }
+
     public void Connect(string sourceNodeId, string outputId, string targetNodeId)
     {
         var source = FindNode(sourceNodeId)
@@ -1093,6 +1165,80 @@ public sealed class NovelProject
             {
                 return candidate;
             }
+        }
+    }
+
+    private static string CreateUniqueCharacterId(
+        string preferredId,
+        IEnumerable<CharacterPlacement> characters)
+    {
+        var seed = SanitizeCharacterId(preferredId);
+        var existing = characters
+            .Select(character => character.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!existing.Contains(seed))
+        {
+            return seed;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{seed}-{index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string CreateDuplicateCharacterName(
+        string name,
+        IEnumerable<CharacterPlacement> characters)
+    {
+        var baseName = string.IsNullOrWhiteSpace(name)
+            ? "Персонаж копия"
+            : $"{name} копия";
+        var existing = characters
+            .Select(character => character.Name)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!existing.Contains(baseName))
+        {
+            return baseName;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseName} {index}";
+            if (!existing.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    private static string SanitizeCharacterId(string value)
+    {
+        var cleaned = new string(
+            value
+                .Trim()
+                .Select(character =>
+                    character is '_' or '-' || char.IsLetterOrDigit(character)
+                        ? character
+                        : '-')
+                .ToArray())
+            .Trim('-');
+        if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
+        {
+            cleaned = $"character-{cleaned}";
+        }
+        return cleaned;
+    }
+
+    private static void MarkCharactersOverridden(NovelNode node)
+    {
+        if (node.UsesTypeDefaults)
+        {
+            node.PropertyOverrides.Add("characters");
         }
     }
 
