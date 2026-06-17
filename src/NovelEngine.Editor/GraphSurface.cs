@@ -192,9 +192,14 @@ public sealed class GraphSurface : FrameworkElement
         DrawGrid(drawingContext);
 
         _connections.Clear();
-        DrawConnections(drawingContext);
+        var viewport = new Rect(RenderSize);
+        DrawConnections(drawingContext, viewport);
         foreach (var node in Project.Nodes)
         {
+            if (!IntersectsViewport(GetNodeRectangle(node), viewport))
+            {
+                continue;
+            }
             DrawNode(drawingContext, node);
         }
 
@@ -762,7 +767,7 @@ public sealed class GraphSurface : FrameworkElement
         }
     }
 
-    private void DrawConnections(DrawingContext drawingContext)
+    private void DrawConnections(DrawingContext drawingContext, Rect viewport)
     {
         EnsureNodeLookup();
         foreach (var node in Project.Nodes)
@@ -778,6 +783,10 @@ public sealed class GraphSurface : FrameworkElement
 
                 var source = GetOutputPort(node, output, outputIndex);
                 var geometry = CreateCurveGeometry(source.Center, GetInputPort(target).Center);
+                if (!IntersectsViewport(geometry.Bounds, viewport))
+                {
+                    continue;
+                }
                 drawingContext.DrawGeometry(null, ConnectionPen, geometry);
                 _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
             }
@@ -1044,6 +1053,13 @@ public sealed class GraphSurface : FrameworkElement
 
     private static Rect MakeHitArea(Point center) =>
         new(center.X - 12, center.Y - 12, 24, 24);
+
+    private static bool IntersectsViewport(Rect bounds, Rect viewport)
+    {
+        var expanded = viewport;
+        expanded.Inflate(32, 32);
+        return bounds.IntersectsWith(expanded);
+    }
 
     private Point ScreenToWorld(Point point) =>
         point - _viewOffset;
