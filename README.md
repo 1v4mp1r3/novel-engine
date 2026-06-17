@@ -54,6 +54,7 @@ New projects create the default managed asset folders:
 ```powershell
 dotnet build NovelEngine.sln
 dotnet run --project tests/NovelEngine.Core.Tests/NovelEngine.Core.Tests.csproj
+dotnet run --project tests/NovelEngine.Editor.Tests/NovelEngine.Editor.Tests.csproj
 ```
 
 The C++ runtime requires a separate C++20 compiler and CMake. They are not
