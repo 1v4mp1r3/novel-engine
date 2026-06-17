@@ -1157,7 +1157,9 @@ static void ProjectAssetSyncDiscoversFilesFromDisk()
     {
         var projectPath = Path.Combine(directory, "story.novel.json");
         var physicalFolder = Path.Combine(directory, "files", "backgrounds");
+        var emptyNestedFolder = Path.Combine(directory, "files", "characters", "heroes");
         Directory.CreateDirectory(physicalFolder);
+        Directory.CreateDirectory(emptyNestedFolder);
         var imagePath = Path.Combine(physicalFolder, "MountFuji.jpg");
         File.WriteAllBytes(imagePath, [255, 216, 255, 217]);
         var project = NovelProject.CreateDefault();
@@ -1167,6 +1169,8 @@ static void ProjectAssetSyncDiscoversFilesFromDisk()
 
         Assert(changes >= 2, "Sync did not report the discovered folder and file.");
         Assert(project.AssetFolders.Contains("backgrounds"), "Physical folder was not registered.");
+        Assert(project.AssetFolders.Contains("characters"), "Physical parent folder was not registered.");
+        Assert(project.AssetFolders.Contains("characters/heroes"), "Physical empty nested folder was not registered.");
         Assert(asset is not null, "Physical file was not registered.");
         asset = project.Assets.Single();
         Assert(asset.Kind == AssetKind.Image, "Discovered image kind was not detected.");
