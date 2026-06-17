@@ -45,6 +45,10 @@ public sealed class CodeEditorControl : RichTextBox
     private readonly List<EditorSnapshot> _undoHistory = [];
     private readonly List<EditorSnapshot> _redoHistory = [];
     private EditorSnapshot _currentSnapshot = new(string.Empty, 0);
+    private string? _renderedSource;
+    private IReadOnlyList<ProjectLanguageSyntaxSpan> _renderedSpans = [];
+    private int? _renderedErrorStart;
+    private int _renderedErrorLength;
     private bool _updatingDocument;
     private bool _restoringHistory;
 
@@ -157,6 +161,11 @@ public sealed class CodeEditorControl : RichTextBox
         int errorLength = 0)
     {
         var source = SourceText;
+        if (IsRendered(source, spans, errorStart, errorLength))
+        {
+            return;
+        }
+
         var caretOffset = Math.Clamp(SourceCaretOffset, 0, source.Length);
         ReplaceDocument(source, spans, errorStart, errorLength);
         SetCaretOffset(caretOffset);
@@ -514,11 +523,39 @@ public sealed class CodeEditorControl : RichTextBox
                     isError);
             }
             Document.PageWidth = 100_000;
+            _renderedSource = source;
+            _renderedSpans = spans.ToArray();
+            _renderedErrorStart = errorStart;
+            _renderedErrorLength = errorLength;
         }
         finally
         {
             _updatingDocument = false;
         }
+    }
+
+    private bool IsRendered(
+        string source,
+        IReadOnlyList<ProjectLanguageSyntaxSpan> spans,
+        int? errorStart,
+        int errorLength)
+    {
+        if (_renderedSource != source
+            || _renderedErrorStart != errorStart
+            || _renderedErrorLength != errorLength
+            || _renderedSpans.Count != spans.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < spans.Count; index++)
+        {
+            if (_renderedSpans[index] != spans[index])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void AppendText(
