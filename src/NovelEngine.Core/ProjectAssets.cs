@@ -172,19 +172,22 @@ public static class ProjectAssets
         }
 
         var projectDirectory = GetProjectDirectory(projectPath);
+        var knownRelativePaths = project.Assets
+            .Select(asset => asset.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownFullPaths = project.Assets
+            .Select(asset => ResolvePath(projectPath, asset))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var file in Directory.EnumerateFiles(
             root,
             "*",
             SearchOption.AllDirectories))
         {
+            var fullPath = Path.GetFullPath(file);
             var relativeProjectPath = Path.GetRelativePath(projectDirectory, file)
                 .Replace('\\', '/');
-            var existing = project.Assets.FirstOrDefault(asset =>
-                asset.Path.Equals(relativeProjectPath, StringComparison.OrdinalIgnoreCase)
-                || ResolvePath(projectPath, asset).Equals(
-                    Path.GetFullPath(file),
-                    StringComparison.OrdinalIgnoreCase));
-            if (existing is not null)
+            if (knownRelativePaths.Contains(relativeProjectPath)
+                || knownFullPaths.Contains(fullPath))
             {
                 continue;
             }
@@ -194,7 +197,9 @@ public static class ProjectAssets
                 ?.Replace('\\', '/')
                 ?? string.Empty;
             var before = project.Assets.Count;
-            _ = Import(project, projectPath, file, relativeFolder);
+            var imported = Import(project, projectPath, file, relativeFolder);
+            knownRelativePaths.Add(imported.Path);
+            knownFullPaths.Add(ResolvePath(projectPath, imported));
             changes += project.Assets.Count - before;
         }
 
