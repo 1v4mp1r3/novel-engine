@@ -1210,6 +1210,7 @@ public partial class MainWindow : Window
             }
             PreservePendingSourceCode();
             ProjectSerializer.Save(_project, _projectPath);
+            _savedProjectSnapshot = CaptureProjectSnapshot();
             _dirty = false;
             _workspaceNeedsProjectFile = false;
             if (refreshCode && !_codeHasPendingChanges)
