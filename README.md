@@ -123,6 +123,8 @@ currently installed on this workstation.
 - Visual-block dialogs support duplicate, copy, paste, `Ctrl+C`/`Ctrl+V`,
   `Ctrl+D`, `Delete`, and `Alt+Up/Down` so repeated route logic can be reused
   and reordered without retyping every block.
+- Right-click a visual script block to open the same edit, duplicate, copy,
+  paste, move, and delete actions from a context menu.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
 - Conditions created through the visual builder are saved as structured data

@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
@@ -51,6 +52,9 @@ public sealed class VisualScriptBlocksWindow : Window
             Margin = new Thickness(0, 0, 0, 10),
         };
         _blockList.MouseDoubleClick += (_, _) => EditSelectedBlock();
+        _blockList.PreviewMouseRightButtonDown += (_, e) => SelectBlockUnderMouse(e.OriginalSource);
+        _blockList.ContextMenu = new ContextMenu();
+        _blockList.ContextMenuOpening += (_, _) => RebuildBlockContextMenu();
         _blockList.SelectionChanged += (_, _) => UpdateButtons();
 
         _previewBox = DialogUi.TextBox(string.Empty, multiline: true);
@@ -251,6 +255,54 @@ public sealed class VisualScriptBlocksWindow : Window
 
         (_blocks[index], _blocks[target]) = (_blocks[target], _blocks[index]);
         RefreshList(target);
+    }
+
+    private void SelectBlockUnderMouse(object? source)
+    {
+        var current = source as DependencyObject;
+        while (current is not null && current != _blockList)
+        {
+            if (current is ListBoxItem item)
+            {
+                item.IsSelected = true;
+                item.Focus();
+                return;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+    }
+
+    private void RebuildBlockContextMenu()
+    {
+        var index = _blockList.SelectedIndex;
+        var selected = index >= 0 && index < _blocks.Count;
+        var menu = _blockList.ContextMenu ?? new ContextMenu();
+        menu.Items.Clear();
+        menu.Items.Add(CreateMenuItem("Изменить", EditSelectedBlock, selected));
+        menu.Items.Add(CreateMenuItem("Дублировать", DuplicateSelectedBlock, selected));
+        menu.Items.Add(CreateMenuItem("Копировать", CopySelectedBlock, selected));
+        menu.Items.Add(CreateMenuItem("Вставить", PasteBlocks, _clipboardBlocks.Count > 0));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Выше", () => MoveSelectedBlock(-1), selected && index > 0));
+        menu.Items.Add(CreateMenuItem("Ниже", () => MoveSelectedBlock(1), selected && index < _blocks.Count - 1));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateMenuItem("Удалить", DeleteSelectedBlock, selected));
+        _blockList.ContextMenu = menu;
+    }
+
+    private static MenuItem CreateMenuItem(
+        string header,
+        Action action,
+        bool isEnabled)
+    {
+        var item = new MenuItem
+        {
+            Header = header,
+            IsEnabled = isEnabled,
+        };
+        item.Click += (_, _) => action();
+        return item;
     }
 
     private void ImportFromScript()
