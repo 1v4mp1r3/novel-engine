@@ -36,6 +36,20 @@ public sealed class VisualScriptBlock
         };
 }
 
+public static class VisualScriptBlockOperations
+{
+    public static VisualScriptBlock CloneWithNewId(VisualScriptBlock block)
+    {
+        var clone = block.Clone();
+        clone.Id = $"block-{Guid.NewGuid():N}";
+        return clone;
+    }
+
+    public static IReadOnlyList<VisualScriptBlock> CloneForPaste(
+        IEnumerable<VisualScriptBlock> blocks) =>
+        blocks.Select(CloneWithNewId).ToList();
+}
+
 public static class VisualScriptCompiler
 {
     public static IReadOnlyList<VisualScriptBlock> ParseScript(string script)

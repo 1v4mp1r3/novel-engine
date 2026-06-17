@@ -22,6 +22,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks import simple scripts", VisualScriptBlocksImportSimpleScripts),
     ("visual script blocks describe semantic labels", VisualScriptBlocksDescribeSemanticLabels),
+    ("visual script blocks clone for paste safely", VisualScriptBlocksCloneForPasteSafely),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
@@ -823,6 +824,49 @@ static void VisualScriptBlocksDescribeSemanticLabels()
                 "Комментарий: setup route",
             ]),
         "Visual script block descriptions changed.");
+}
+
+static void VisualScriptBlocksCloneForPasteSafely()
+{
+    var source = new[]
+    {
+        new VisualScriptBlock
+        {
+            Id = "source-route",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "route",
+            Value = "\"good\"",
+        },
+        new VisualScriptBlock
+        {
+            Id = "source-comment",
+            Kind = VisualScriptBlockKind.Comment,
+            Text = "after choice",
+        },
+    };
+
+    var pasted = VisualScriptBlockOperations.CloneForPaste(source);
+
+    Assert(pasted.Count == 2, "Paste clone count changed.");
+    Assert(
+        pasted.All(block => block.Id.StartsWith("block-", StringComparison.Ordinal)),
+        "Pasted blocks did not receive editor ids.");
+    Assert(
+        pasted.Select(block => block.Id).Distinct(StringComparer.Ordinal).Count() == 2,
+        "Pasted block ids are not unique.");
+    Assert(
+        pasted[0].Kind == source[0].Kind
+            && pasted[0].VariableName == source[0].VariableName
+            && pasted[0].Value == source[0].Value,
+        "Pasted variable block lost authored data.");
+    Assert(
+        pasted[1].Text == source[1].Text,
+        "Pasted comment block lost authored data.");
+
+    pasted[0].VariableName = "changed";
+    Assert(
+        source[0].VariableName == "route",
+        "Pasted block mutated the source block.");
 }
 
 static void VisualScriptBlocksValidateGeneratedScripts()

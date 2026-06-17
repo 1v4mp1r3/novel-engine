@@ -11,11 +11,14 @@ public sealed class VisualScriptBlocksWindow : Window
     private readonly List<VisualScriptBlock> _blocks;
     private readonly IReadOnlyList<string> _knownVariables;
     private readonly string _importScript;
+    private readonly List<VisualScriptBlock> _clipboardBlocks = [];
     private readonly ListBox _blockList;
     private readonly TextBox _previewBox;
     private readonly TextBlock _summaryText;
     private readonly Button _editButton;
     private readonly Button _duplicateButton;
+    private readonly Button _copyButton;
+    private readonly Button _pasteButton;
     private readonly Button _deleteButton;
     private readonly Button _moveUpButton;
     private readonly Button _moveDownButton;
@@ -57,9 +60,12 @@ public sealed class VisualScriptBlocksWindow : Window
 
         _editButton = CreateButton("Изменить", EditSelectedBlock);
         _duplicateButton = CreateButton("Дублировать", DuplicateSelectedBlock);
+        _copyButton = CreateButton("Копировать", CopySelectedBlock);
+        _pasteButton = CreateButton("Вставить", PasteBlocks);
         _deleteButton = CreateButton("Удалить", DeleteSelectedBlock);
         _moveUpButton = CreateButton("Выше", () => MoveSelectedBlock(-1));
         _moveDownButton = CreateButton("Ниже", () => MoveSelectedBlock(1));
+        KeyDown += (_, e) => HandleKeyboard(e);
 
         Content = CreateContent();
         RefreshList();
@@ -105,6 +111,8 @@ public sealed class VisualScriptBlocksWindow : Window
         var panel = CreateButtonPanel();
         panel.Children.Add(_editButton);
         panel.Children.Add(_duplicateButton);
+        panel.Children.Add(_copyButton);
+        panel.Children.Add(_pasteButton);
         panel.Children.Add(_moveUpButton);
         panel.Children.Add(_moveDownButton);
         panel.Children.Add(_deleteButton);
@@ -184,10 +192,40 @@ public sealed class VisualScriptBlocksWindow : Window
             return;
         }
 
-        var duplicate = _blocks[index].Clone();
-        duplicate.Id = $"block-{Guid.NewGuid():N}";
+        var duplicate = VisualScriptBlockOperations.CloneWithNewId(_blocks[index]);
         _blocks.Insert(index + 1, duplicate);
         RefreshList(index + 1);
+    }
+
+    private void CopySelectedBlock()
+    {
+        var index = _blockList.SelectedIndex;
+        if (index < 0 || index >= _blocks.Count)
+        {
+            return;
+        }
+
+        _clipboardBlocks.Clear();
+        _clipboardBlocks.Add(_blocks[index].Clone());
+        UpdateButtons();
+    }
+
+    private void PasteBlocks()
+    {
+        if (_clipboardBlocks.Count == 0)
+        {
+            return;
+        }
+
+        var index = _blockList.SelectedIndex;
+        var insertIndex = index >= 0 && index < _blocks.Count
+            ? index + 1
+            : _blocks.Count;
+        var pasted = VisualScriptBlockOperations
+            .CloneForPaste(_clipboardBlocks)
+            .ToList();
+        _blocks.InsertRange(insertIndex, pasted);
+        RefreshList(insertIndex);
     }
 
     private void DeleteSelectedBlock()
@@ -300,6 +338,25 @@ public sealed class VisualScriptBlocksWindow : Window
         UpdateButtons();
     }
 
+    private void HandleKeyboard(KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control)
+        {
+            return;
+        }
+
+        if (e.Key == Key.C)
+        {
+            CopySelectedBlock();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.V)
+        {
+            PasteBlocks();
+            e.Handled = true;
+        }
+    }
+
     private void UpdatePreview()
     {
         _summaryText.Text = $"Блоков: {_blocks.Count}";
@@ -319,6 +376,8 @@ public sealed class VisualScriptBlocksWindow : Window
         var selected = index >= 0 && index < _blocks.Count;
         _editButton.IsEnabled = selected;
         _duplicateButton.IsEnabled = selected;
+        _copyButton.IsEnabled = selected;
+        _pasteButton.IsEnabled = _clipboardBlocks.Count > 0;
         _deleteButton.IsEnabled = selected;
         _moveUpButton.IsEnabled = selected && index > 0;
         _moveDownButton.IsEnabled = selected && index < _blocks.Count - 1;
