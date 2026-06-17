@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("runtime save restores node and script state", RuntimeSaveRestoresState),
     ("transition settings survive JSON round trip", TransitionSettingsRoundTrip),
     ("node preview restores inherited state", NodePreviewRestoresState),
+    ("choice availability waits for dialogue typing", ChoiceAvailabilityWaitsForDialogueTyping),
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
     ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
     ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
@@ -639,6 +640,34 @@ static void NodePreviewRestoresState()
     Assert(
         Convert.ToString(player.State.Variables["route"]) == "street",
         "Preview did not restore script variables.");
+}
+
+static void ChoiceAvailabilityWaitsForDialogueTyping()
+{
+    Assert(
+        !ChoiceAvailability.CanEnable(
+            choicesReady: false,
+            paused: false,
+            transitioning: false),
+        "Choices were enabled before dialogue typing finished.");
+    Assert(
+        ChoiceAvailability.CanEnable(
+            choicesReady: true,
+            paused: false,
+            transitioning: false),
+        "Choices were not enabled after dialogue typing finished.");
+    Assert(
+        !ChoiceAvailability.CanEnable(
+            choicesReady: true,
+            paused: true,
+            transitioning: false),
+        "Choices were enabled while paused.");
+    Assert(
+        !ChoiceAvailability.CanEnable(
+            choicesReady: true,
+            paused: false,
+            transitioning: true),
+        "Choices were enabled during a transition.");
 }
 
 static void InheritedMusicDoesNotChangeTrack()

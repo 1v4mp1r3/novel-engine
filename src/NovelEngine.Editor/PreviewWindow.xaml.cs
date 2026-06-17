@@ -38,6 +38,7 @@ public partial class PreviewWindow : Window
     private bool _transitioning;
     private bool _paused;
     private bool _mainMenuActive;
+    private bool _choicesReady;
     private CancellationTokenSource? _dialogueCts;
 
     public PreviewWindow(
@@ -113,6 +114,7 @@ public partial class PreviewWindow : Window
             : Visibility.Visible;
         DialogueText.Text = string.Empty;
         ChoicesPanel.Children.Clear();
+        _choicesReady = false;
 
         _dialogueCts = new CancellationTokenSource();
         _ = TypeDialogueAsync(node, _dialogueCts.Token);
@@ -140,7 +142,8 @@ public partial class PreviewWindow : Window
             end.Click += (_, _) => Close();
             ChoicesPanel.Children.Add(end);
         }
-        SetChoicesEnabled(!_paused && !_transitioning);
+        _choicesReady = true;
+        UpdateChoiceAvailability();
     }
 
     private void RefreshDebugState(NovelNode node)
@@ -184,6 +187,7 @@ public partial class PreviewWindow : Window
         _transitionPlayer.Stop();
         StopAllVoicePlayers(close: true);
         ChoicesPanel.Children.Clear();
+        _choicesReady = false;
         NodeTitleText.Text = string.Empty;
         SpeakerText.Text = string.Empty;
         SpeakerText.Visibility = Visibility.Collapsed;
@@ -340,7 +344,7 @@ public partial class PreviewWindow : Window
         }
 
         _transitioning = true;
-        SetChoicesEnabled(false);
+        UpdateChoiceAvailability();
         PlayTransitionSound(output.TransitionSound);
 
         try
@@ -376,7 +380,7 @@ public partial class PreviewWindow : Window
         finally
         {
             _transitioning = false;
-            SetChoicesEnabled(true);
+            UpdateChoiceAvailability();
         }
     }
 
@@ -563,6 +567,12 @@ public partial class PreviewWindow : Window
             button.IsEnabled = enabled;
         }
     }
+
+    private void UpdateChoiceAvailability() =>
+        SetChoicesEnabled(ChoiceAvailability.CanEnable(
+            _choicesReady,
+            _paused,
+            _transitioning));
 
     private async Task TypeDialogueAsync(NovelNode node, CancellationToken cancellationToken)
     {
@@ -768,7 +778,7 @@ public partial class PreviewWindow : Window
     private void SetPaused(bool paused)
     {
         _paused = paused;
-        SetChoicesEnabled(!_paused && !_transitioning);
+        UpdateChoiceAvailability();
         if (_paused)
         {
             _musicPlayer.Pause();
