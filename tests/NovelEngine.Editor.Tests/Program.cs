@@ -12,6 +12,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
+    ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
 };
 
@@ -228,6 +229,34 @@ static void RecentProjectsIgnoreMissingPaths()
             Assert(
                 entries[0].Path == existingProject,
                 "Recent projects lost the existing path while pruning missing entries.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsKeepWorkspaceFolders()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var workspace = Path.Combine(directory, "workspace");
+        Directory.CreateDirectory(workspace);
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            RecentProjectsStore.Remember(workspace);
+
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 1, "Recent projects did not keep the workspace folder.");
+            Assert(entries[0].Path == workspace, "Recent workspace path changed.");
+            Assert(
+                entries[0].DisplayName == "workspace",
+                "Recent workspace display name was not derived from the folder.");
         });
     }
     finally
