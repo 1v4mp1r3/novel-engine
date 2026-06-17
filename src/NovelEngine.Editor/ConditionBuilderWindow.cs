@@ -112,6 +112,15 @@ public sealed class ConditionBuilderWindow : Window
 
     private void UpdatePreview()
     {
+        if (_rawFallbackCondition.Length > 0
+            && SelectedMode is VisualConditionKind.Comparison
+            && VariableName.Length == 0)
+        {
+            _previewText.Text =
+                $"Текущее условие не входит в визуальные формы: {_rawFallbackCondition}";
+            return;
+        }
+
         var condition = BuildCondition();
         _previewText.Text = condition.Length == 0
             ? "Показывать всегда"
