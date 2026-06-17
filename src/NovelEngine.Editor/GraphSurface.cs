@@ -18,6 +18,7 @@ public sealed class GraphSurface : FrameworkElement
     private const double HoverHitCacheDistance = 4;
     private const double DragRenderEpsilon = 0.5;
     private const int TextLayoutCacheLimit = 2048;
+    private const int ConnectionGeometryCacheLimit = 4096;
 
     private static readonly Typeface NodeTypeface = new("Segoe UI");
     private static readonly Brush SurfaceBrush = FrozenBrush(15, 22, 31);
@@ -43,6 +44,8 @@ public sealed class GraphSurface : FrameworkElement
 
     private readonly List<ConnectionVisual> _connections = [];
     private readonly Dictionary<string, NovelNode> _nodesById = [];
+    private readonly Dictionary<ConnectionGeometryKey, StreamGeometry>
+        _connectionGeometryCache = [];
     private Vector _viewOffset = new(80, 80);
     private string? _dragNodeId;
     private Point _dragStart;
@@ -892,26 +895,46 @@ public sealed class GraphSurface : FrameworkElement
     private void DrawConnections(DrawingContext drawingContext, Rect viewport)
     {
         EnsureNodeLookup();
-        foreach (var node in Project.Nodes)
+        var worldViewport = new Rect(
+            -_viewOffset.X,
+            -_viewOffset.Y,
+            viewport.Width,
+            viewport.Height);
+        drawingContext.PushTransform(
+            new TranslateTransform(_viewOffset.X, _viewOffset.Y));
+        try
         {
-            for (var outputIndex = 0; outputIndex < node.Outputs.Count; outputIndex++)
+            foreach (var node in Project.Nodes)
             {
-                var output = node.Outputs[outputIndex];
-                if (output.TargetNodeId is null
-                    || !_nodesById.TryGetValue(output.TargetNodeId, out var target))
+                for (var outputIndex = 0; outputIndex < node.Outputs.Count; outputIndex++)
                 {
-                    continue;
-                }
+                    var output = node.Outputs[outputIndex];
+                    if (output.TargetNodeId is null
+                        || !_nodesById.TryGetValue(output.TargetNodeId, out var target))
+                    {
+                        continue;
+                    }
 
-                var source = GetOutputPort(node, output, outputIndex);
-                var geometry = CreateCurveGeometry(source.Center, GetInputPort(target).Center);
-                if (!IntersectsViewport(geometry.Bounds, viewport))
-                {
-                    continue;
+                    var source = GetWorldOutputCenter(node, outputIndex);
+                    var targetPoint = GetWorldInputCenter(target);
+                    var geometry = GetConnectionGeometry(
+                        node.Id,
+                        output.Id,
+                        output.TargetNodeId,
+                        source,
+                        targetPoint);
+                    if (!IntersectsViewport(geometry.Bounds, worldViewport))
+                    {
+                        continue;
+                    }
+                    drawingContext.DrawGeometry(null, ConnectionPen, geometry);
+                    _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
                 }
-                drawingContext.DrawGeometry(null, ConnectionPen, geometry);
-                _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
             }
+        }
+        finally
+        {
+            drawingContext.Pop();
         }
     }
 
@@ -956,6 +979,36 @@ public sealed class GraphSurface : FrameworkElement
                 false);
         }
         geometry.Freeze();
+        return geometry;
+    }
+
+    private StreamGeometry GetConnectionGeometry(
+        string sourceNodeId,
+        string outputId,
+        string targetNodeId,
+        Point start,
+        Point end)
+    {
+        var key = new ConnectionGeometryKey(
+            sourceNodeId,
+            outputId,
+            targetNodeId,
+            Round(start.X),
+            Round(start.Y),
+            Round(end.X),
+            Round(end.Y));
+        if (_connectionGeometryCache.TryGetValue(key, out var geometry))
+        {
+            return geometry;
+        }
+
+        if (_connectionGeometryCache.Count >= ConnectionGeometryCacheLimit)
+        {
+            _connectionGeometryCache.Clear();
+        }
+
+        geometry = CreateCurveGeometry(start, end);
+        _connectionGeometryCache[key] = geometry;
         return geometry;
     }
 
@@ -1103,10 +1156,14 @@ public sealed class GraphSurface : FrameworkElement
 
     private ConnectionVisual? HitConnection(Point point)
     {
+        var worldPoint = ScreenToWorld(point);
         return _connections
             .AsEnumerable()
             .Reverse()
-            .FirstOrDefault(connection => connection.Geometry.StrokeContains(ConnectionHitPen, point));
+            .FirstOrDefault(
+                connection => connection.Geometry.StrokeContains(
+                    ConnectionHitPen,
+                    worldPoint));
     }
 
     private static SolidColorBrush FrozenBrush(byte red, byte green, byte blue)
@@ -1181,6 +1238,14 @@ public sealed class GraphSurface : FrameworkElement
         return new InputPort(node.Id, center, MakeHitArea(center));
     }
 
+    private static Point GetWorldOutputCenter(NovelNode node, int index) =>
+        new(
+            node.X + NodeWidth,
+            node.Y + HeaderHeight + 76 + index * OutputRowHeight);
+
+    private static Point GetWorldInputCenter(NovelNode node) =>
+        new(node.X, node.Y + HeaderHeight + 20);
+
     private Rect GetNodeRectangle(NovelNode node) =>
         new(
             node.X + _viewOffset.X,
@@ -1203,6 +1268,9 @@ public sealed class GraphSurface : FrameworkElement
 
     private static bool NearlyEqual(double first, double second) =>
         Math.Abs(first - second) < DragRenderEpsilon;
+
+    private static double Round(double value) =>
+        Math.Round(value, 2);
 
     private Point ScreenToWorld(Point point) =>
         point - _viewOffset;
@@ -1235,6 +1303,15 @@ public sealed class GraphSurface : FrameworkElement
         TextAlignment Alignment,
         double PixelsPerDip,
         string Culture);
+
+    private sealed record ConnectionGeometryKey(
+        string SourceNodeId,
+        string OutputId,
+        string TargetNodeId,
+        double StartX,
+        double StartY,
+        double EndX,
+        double EndY);
 
     private readonly record struct InputPort(
         string NodeId,
