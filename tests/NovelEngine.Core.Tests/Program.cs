@@ -1818,13 +1818,13 @@ static void BuildCompilerEmitsPackage()
         Assert(
             !Path.IsPathRooted(builtLibraryCharacter.VoiceSound)
                 && builtLibraryCharacter.VoiceSound.StartsWith(
-                    "assets/external/",
+                    "files/external/",
                     StringComparison.Ordinal),
             "Compiled library character voice sound did not become a build-relative path.");
         Assert(
             builtLibraryCharacter.GetVoiceSounds().All(voice =>
                 !Path.IsPathRooted(voice)
-                && voice.StartsWith("assets/external/", StringComparison.Ordinal)),
+                && voice.StartsWith("files/external/", StringComparison.Ordinal)),
             "Compiled library character voice list did not become build-relative paths.");
         Assert(
             builtLibraryCharacter.GetVoiceSounds().All(voice =>
@@ -1851,7 +1851,7 @@ static void BuildCompilerEmitsPackage()
         Assert(
             !Path.IsPathRooted(builtMenuElement.Image)
                 && builtMenuElement.Image.StartsWith(
-                    "assets/external/",
+                    "files/external/",
                     StringComparison.Ordinal),
             "Compiled main menu image did not become a build-relative path.");
         Assert(

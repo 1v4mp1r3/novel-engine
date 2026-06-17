@@ -390,8 +390,8 @@ public static class NovelBuildCompiler
 
     private static string BuildAssetPath(string folder, string fileName) =>
         folder.Length == 0
-            ? $"assets/{fileName}"
-            : $"assets/{folder}/{fileName}";
+            ? $"{ProjectAssets.ManagedFilesDirectoryName}/{fileName}"
+            : $"{ProjectAssets.ManagedFilesDirectoryName}/{folder}/{fileName}";
 
     private static string ResolveSourcePath(
         string projectDirectory,

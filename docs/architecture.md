@@ -73,8 +73,9 @@ node.
 
 `NovelBuildCompiler` reparses the project language and validates the concrete
 runtime graph and scripts. It copies catalog and direct-path assets into an
-atomic build directory, rewrites runtime paths, removes source code from release
-builds, and emits `game.novel.json` plus `manifest.json`.
+atomic build directory under the same `files/` layout used by editor projects,
+rewrites runtime paths, removes source code from release builds, and emits
+`game.novel.json` plus `manifest.json`.
 
 Run and debug commands launch the editor executable in a separate
 `--play-build` process. This process only loads the compiled package and can be

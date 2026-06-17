@@ -120,7 +120,8 @@ currently installed on this workstation.
 - Double-click a project diagnostic to jump to the affected node, code
   declaration, or asset.
 - Compiled packages are written to `build/<project-name>` beside the project.
-  They contain a validated runtime project, manifest, and copied assets.
+  They contain a validated runtime project, manifest, and copied files under
+  the same `files/` layout used by editor projects.
 - The file manager supports nested project folders; assets can be created,
   renamed, moved, and referenced without depending on their physical path.
 - Use the file manager search box to filter assets by id, folder, path, file
