@@ -1258,6 +1258,12 @@ static void AssetFoldersMoveFiles()
         Assert(
             File.Exists(Path.Combine(directory, "files", "cast", "heroes", "hero.png")),
             "Untracked physical file did not move with the renamed folder.");
+        AssertThrows<InvalidOperationException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, "cast/heroes"),
+            "Deleting a folder with registered assets should fail.");
+        AssertThrows<InvalidOperationException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, "cast"),
+            "Deleting a parent folder with registered nested assets should fail.");
 
         ProjectAssets.CreateFolder(project, "unused/child");
         var unusedDirectory = Path.Combine(directory, "files", "unused");
