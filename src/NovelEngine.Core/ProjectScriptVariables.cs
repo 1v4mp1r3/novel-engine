@@ -18,7 +18,7 @@ public static partial class ProjectScriptVariables
             AddBlocks(node.ScriptBlocks, variables);
             foreach (var output in node.Outputs)
             {
-                AddCondition(output.Condition, variables);
+                AddCondition(output, variables);
                 AddScript(output.Script, variables);
                 AddBlocks(output.ScriptBlocks, variables);
             }
@@ -47,6 +47,29 @@ public static partial class ProjectScriptVariables
             {
                 variables.Add(match.Groups["name"].Value);
             }
+        }
+    }
+
+    private static void AddCondition(NodeOutput output, ISet<string> variables)
+    {
+        if (output.ConditionExpression is not null)
+        {
+            AddCondition(output.ConditionExpression, variables);
+        }
+        AddCondition(output.Condition, variables);
+    }
+
+    private static void AddCondition(
+        VisualConditionExpression expression,
+        ISet<string> variables)
+    {
+        var variable = expression.VariableName.Trim();
+        if ((expression.Kind is VisualConditionKind.VariableTrue
+                or VisualConditionKind.VariableFalse
+                or VisualConditionKind.Comparison)
+            && Identifier().IsMatch(variable))
+        {
+            variables.Add(variable);
         }
     }
 

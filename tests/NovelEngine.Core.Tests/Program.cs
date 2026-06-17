@@ -739,6 +739,13 @@ static void ProjectScriptVariablesCollectAuthoredNames()
             VariableName = "trust",
             Value = "1",
         });
+    dialogue.Outputs[1].ConditionExpression = new VisualConditionExpression
+    {
+        Kind = VisualConditionKind.Comparison,
+        VariableName = "mood",
+        Operator = "==",
+        Value = "\"brave\"",
+    };
 
     var variables = ProjectScriptVariables.Collect(project);
 
@@ -747,6 +754,7 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     Assert(variables.Contains("temporary_flag"), "Type script variable was not collected.");
     Assert(variables.Contains("route"), "Node visual block variable was not collected.");
     Assert(variables.Contains("met_hero"), "Condition variable was not collected.");
+    Assert(variables.Contains("mood"), "Structured condition variable was not collected.");
     Assert(variables.Contains("trust"), "Output visual block variable was not collected.");
 }
 
