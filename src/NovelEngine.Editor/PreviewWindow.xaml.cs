@@ -39,6 +39,8 @@ public partial class PreviewWindow : Window
     private bool _paused;
     private bool _mainMenuActive;
     private bool _choicesReady;
+    private bool _skipTypingRequested;
+    private int _typingVersion;
     private CancellationTokenSource? _dialogueCts;
 
     public PreviewWindow(
@@ -115,9 +117,10 @@ public partial class PreviewWindow : Window
         DialogueText.Text = string.Empty;
         ChoicesPanel.Children.Clear();
         _choicesReady = false;
+        _skipTypingRequested = false;
 
         _dialogueCts = new CancellationTokenSource();
-        _ = TypeDialogueAsync(node, _dialogueCts.Token);
+        _ = TypeDialogueAsync(node, _dialogueCts.Token, ++_typingVersion);
     }
 
     private void ShowChoices()
@@ -574,7 +577,10 @@ public partial class PreviewWindow : Window
             _paused,
             _transitioning));
 
-    private async Task TypeDialogueAsync(NovelNode node, CancellationToken cancellationToken)
+    private async Task TypeDialogueAsync(
+        NovelNode node,
+        CancellationToken cancellationToken,
+        int version)
     {
         var text = node.Text;
         var voice = ResolveVoice(node);
@@ -585,6 +591,11 @@ public partial class PreviewWindow : Window
             foreach (var character in text)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (_skipTypingRequested)
+                {
+                    DialogueText.Text = text;
+                    break;
+                }
                 while (_paused)
                 {
                     await Task.Delay(35, cancellationToken);
@@ -605,17 +616,52 @@ public partial class PreviewWindow : Window
                 }
                 if (_settings.TextDelayMs > 0)
                 {
-                    await Task.Delay(_settings.TextDelayMs, cancellationToken);
+                    await WaitTypingDelayAsync(cancellationToken);
                 }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            ShowChoices();
+            if (version == _typingVersion)
+            {
+                ShowChoices();
+            }
         }
         catch (OperationCanceledException)
         {
             // A new node started rendering.
         }
+        finally
+        {
+            if (version == _typingVersion)
+            {
+                _skipTypingRequested = false;
+            }
+        }
+    }
+
+    private async Task WaitTypingDelayAsync(CancellationToken cancellationToken)
+    {
+        var remaining = _settings.TextDelayMs;
+        while (remaining > 0 && !_skipTypingRequested)
+        {
+            var step = Math.Min(remaining, 15);
+            await Task.Delay(step, cancellationToken);
+            remaining -= step;
+        }
+    }
+
+    private bool TrySkipTyping()
+    {
+        if (_mainMenuActive
+            || _transitioning
+            || _choicesReady
+            || _dialogueCts is null)
+        {
+            return false;
+        }
+
+        _skipTypingRequested = true;
+        return true;
     }
 
     private CharacterVoice? ResolveVoice(NovelNode node)
@@ -990,6 +1036,12 @@ public partial class PreviewWindow : Window
             return;
         }
 
+        if ((e.Key is Key.Space or Key.Enter) && TrySkipTyping())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key is >= Key.D1 and <= Key.D9)
         {
             var index = e.Key - Key.D1;
@@ -998,6 +1050,14 @@ public partial class PreviewWindow : Window
             {
                 buttons[index].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             }
+        }
+    }
+
+    private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (TrySkipTyping())
+        {
+            e.Handled = true;
         }
     }
 

@@ -9,6 +9,7 @@
         WindowStartupLocation="CenterOwner"
         Background="#080C12"
         KeyDown="Window_KeyDown"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp"
         MouseRightButtonUp="Window_MouseRightButtonUp"
         Closed="Window_Closed">
     <Grid x:Name="RootGrid">
