@@ -9,6 +9,7 @@ namespace NovelEngine.Editor;
 public sealed class VisualScriptBlocksWindow : Window
 {
     private readonly List<VisualScriptBlock> _blocks;
+    private readonly IReadOnlyList<string> _knownVariables;
     private readonly ListBox _blockList;
     private readonly TextBox _previewBox;
     private readonly TextBlock _summaryText;
@@ -20,9 +21,11 @@ public sealed class VisualScriptBlocksWindow : Window
 
     public VisualScriptBlocksWindow(
         IEnumerable<VisualScriptBlock> blocks,
-        string title)
+        string title,
+        IEnumerable<string>? knownVariables = null)
     {
         _blocks = blocks.Select(block => block.Clone()).ToList();
+        _knownVariables = NormalizeVariables(knownVariables);
         Title = title;
         Width = 720;
         Height = 620;
@@ -126,7 +129,7 @@ public sealed class VisualScriptBlocksWindow : Window
                     : "true",
             Text = kind == VisualScriptBlockKind.Comment ? "Комментарий" : string.Empty,
         };
-        var dialog = new VisualScriptBlockEditorWindow(block)
+        var dialog = new VisualScriptBlockEditorWindow(block, _knownVariables)
         {
             Owner = this,
         };
@@ -148,7 +151,9 @@ public sealed class VisualScriptBlocksWindow : Window
             return;
         }
 
-        var dialog = new VisualScriptBlockEditorWindow(_blocks[index])
+        var dialog = new VisualScriptBlockEditorWindow(
+            _blocks[index],
+            _knownVariables)
         {
             Owner = this,
         };
@@ -274,17 +279,28 @@ public sealed class VisualScriptBlocksWindow : Window
     {
         public override string ToString() => $"{Index}. {Text}";
     }
+
+    private static IReadOnlyList<string> NormalizeVariables(
+        IEnumerable<string>? variables) =>
+        variables?
+            .Where(variable => !string.IsNullOrWhiteSpace(variable))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        ?? [];
 }
 
 public sealed class VisualScriptBlockEditorWindow : Window
 {
     private readonly string _blockId;
     private readonly ComboBox _kindBox;
-    private readonly TextBox _variableBox;
+    private readonly ComboBox _variableBox;
     private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBox _commentBox;
 
-    public VisualScriptBlockEditorWindow(VisualScriptBlock block)
+    public VisualScriptBlockEditorWindow(
+        VisualScriptBlock block,
+        IEnumerable<string>? knownVariables = null)
     {
         _blockId = string.IsNullOrWhiteSpace(block.Id)
             ? $"block-{Guid.NewGuid():N}"
@@ -303,7 +319,13 @@ public sealed class VisualScriptBlockEditorWindow : Window
             Margin = new Thickness(0, 4, 0, 12),
         };
         _kindBox.SelectionChanged += (_, _) => UpdateFields();
-        _variableBox = DialogUi.TextBox(block.VariableName);
+        _variableBox = new ComboBox
+        {
+            IsEditable = true,
+            ItemsSource = NormalizeVariables(knownVariables),
+            Text = block.VariableName,
+            Margin = new Thickness(0, 4, 0, 12),
+        };
         _valueEditor = new ScriptLiteralEditorControl();
         _valueEditor.LoadLiteral(block.Value);
         _commentBox = DialogUi.TextBox(block.Text, multiline: true);
@@ -387,4 +409,13 @@ public sealed class VisualScriptBlockEditorWindow : Window
     private sealed record BlockKindChoice(
         VisualScriptBlockKind Kind,
         string Label);
+
+    private static IReadOnlyList<string> NormalizeVariables(
+        IEnumerable<string>? variables) =>
+        variables?
+            .Where(variable => !string.IsNullOrWhiteSpace(variable))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        ?? [];
 }

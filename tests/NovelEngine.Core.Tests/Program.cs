@@ -19,6 +19,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
+    ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
@@ -623,6 +624,51 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
     Assert(
         parsed.FindNode(dialogue.Id)?.Outputs[0].ScriptBlocks.Single().Id == "choice-score",
         "Project language apply dropped output visual script blocks.");
+}
+
+static void ProjectScriptVariablesCollectAuthoredNames()
+{
+    var project = NovelProject.CreateDefault();
+    project.NodeTypes.Add(
+        new NodeTypeDefinition
+        {
+            Name = "ScoredScene",
+            BaseType = "scene",
+            Defaults =
+            {
+                Script = "unset temporary_flag",
+            },
+        });
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+
+    scene.Script = "set score = 1\nadd courage 2";
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "route-block",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "route",
+            Value = "\"intro\"",
+        });
+    dialogue.Outputs[0].Condition = "!met_hero";
+    dialogue.Outputs[0].ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "trust-block",
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "trust",
+            Value = "1",
+        });
+
+    var variables = ProjectScriptVariables.Collect(project);
+
+    Assert(variables.Contains("score"), "Script variable was not collected.");
+    Assert(variables.Contains("courage"), "Add variable was not collected.");
+    Assert(variables.Contains("temporary_flag"), "Type script variable was not collected.");
+    Assert(variables.Contains("route"), "Node visual block variable was not collected.");
+    Assert(variables.Contains("met_hero"), "Condition variable was not collected.");
+    Assert(variables.Contains("trust"), "Output visual block variable was not collected.");
 }
 
 static void RemovingNodeDisconnectsOutputs()

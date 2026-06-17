@@ -540,7 +540,8 @@ public partial class MainWindow : Window
 
         var dialog = new VisualScriptBlocksWindow(
             node.ScriptBlocks,
-            "Блоки скрипта при входе")
+            "Блоки скрипта при входе",
+            ProjectScriptVariables.Collect(_project))
         {
             Owner = this,
         };
@@ -3891,7 +3892,12 @@ public partial class MainWindow : Window
         }
 
         var output = _project.AddChoice(node.Id);
-        var dialog = new OutputEditorWindow(output) { Owner = this };
+        var dialog = new OutputEditorWindow(
+            output,
+            ProjectScriptVariables.Collect(_project))
+        {
+            Owner = this,
+        };
         if (dialog.ShowDialog() != true)
         {
             _project.RemoveOutput(node.Id, output.Id);
@@ -3914,7 +3920,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new OutputEditorWindow(output) { Owner = this };
+        var dialog = new OutputEditorWindow(
+            output,
+            ProjectScriptVariables.Collect(_project))
+        {
+            Owner = this,
+        };
         if (dialog.ShowDialog() != true || !ValidateOutputDialog(dialog))
         {
             return;

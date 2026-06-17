@@ -15,10 +15,13 @@ public sealed class OutputEditorWindow : Window
     private readonly TextBox _labelBox;
     private readonly TextBox _conditionBox;
     private readonly TextBox _scriptBox;
+    private readonly IReadOnlyList<string> _knownVariables;
     private readonly List<VisualScriptBlock> _scriptBlocks;
     private readonly Button _scriptBlocksButton;
 
-    public OutputEditorWindow(NodeOutput output)
+    public OutputEditorWindow(
+        NodeOutput output,
+        IEnumerable<string>? knownVariables = null)
     {
         Title = "Вариант ответа";
         Width = 560;
@@ -29,6 +32,12 @@ public sealed class OutputEditorWindow : Window
         _labelBox = DialogUi.TextBox(output.Label);
         _conditionBox = DialogUi.TextBox(output.Condition);
         _scriptBox = DialogUi.TextBox(output.Script, multiline: true);
+        _knownVariables = knownVariables?
+            .Where(variable => !string.IsNullOrWhiteSpace(variable))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            ?? [];
         _scriptBlocks = output.ScriptBlocks
             .Select(block => block.Clone())
             .ToList();
@@ -82,7 +91,8 @@ public sealed class OutputEditorWindow : Window
     {
         var dialog = new VisualScriptBlocksWindow(
             _scriptBlocks,
-            "Блоки скрипта варианта")
+            "Блоки скрипта варианта",
+            _knownVariables)
         {
             Owner = this,
         };
@@ -98,7 +108,7 @@ public sealed class OutputEditorWindow : Window
 
     private void BuildCondition()
     {
-        var dialog = new ConditionBuilderWindow(_conditionBox.Text)
+        var dialog = new ConditionBuilderWindow(_conditionBox.Text, _knownVariables)
         {
             Owner = this,
         };

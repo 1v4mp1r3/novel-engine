@@ -10,11 +10,13 @@ public sealed partial class ConditionBuilderWindow : Window
 {
     private readonly ComboBox _modeBox;
     private readonly ComboBox _operatorBox;
-    private readonly TextBox _variableBox;
+    private readonly ComboBox _variableBox;
     private readonly ScriptLiteralEditorControl _valueEditor;
     private readonly TextBlock _previewText;
 
-    public ConditionBuilderWindow(string condition)
+    public ConditionBuilderWindow(
+        string condition,
+        IEnumerable<string>? knownVariables = null)
     {
         Title = "Собрать условие";
         Width = 480;
@@ -34,7 +36,12 @@ public sealed partial class ConditionBuilderWindow : Window
             ItemsSource = Operators,
             Margin = new Thickness(0, 4, 0, 12),
         };
-        _variableBox = DialogUi.TextBox(string.Empty);
+        _variableBox = new ComboBox
+        {
+            IsEditable = true,
+            ItemsSource = NormalizeVariables(knownVariables),
+            Margin = new Thickness(0, 4, 0, 12),
+        };
         _valueEditor = new ScriptLiteralEditorControl();
         _previewText = new TextBlock
         {
@@ -45,7 +52,8 @@ public sealed partial class ConditionBuilderWindow : Window
 
         _modeBox.SelectionChanged += (_, _) => UpdateFields();
         _operatorBox.SelectionChanged += (_, _) => UpdatePreview();
-        _variableBox.TextChanged += (_, _) => UpdatePreview();
+        _variableBox.SelectionChanged += (_, _) => UpdatePreview();
+        _variableBox.KeyUp += (_, _) => UpdatePreview();
         _valueEditor.LiteralChanged += (_, _) => UpdatePreview();
 
         Content = CreateContent();
@@ -135,7 +143,7 @@ public sealed partial class ConditionBuilderWindow : Window
 
     private string BuildCondition()
     {
-        var variable = _variableBox.Text.Trim();
+        var variable = VariableName;
         return SelectedMode switch
         {
             ConditionMode.Always => string.Empty,
@@ -200,6 +208,17 @@ public sealed partial class ConditionBuilderWindow : Window
 
     private static readonly IReadOnlyList<string> Operators =
         ["==", "!=", ">=", "<=", ">", "<"];
+
+    private string VariableName => _variableBox.Text.Trim();
+
+    private static IReadOnlyList<string> NormalizeVariables(
+        IEnumerable<string>? variables) =>
+        variables?
+            .Where(variable => !string.IsNullOrWhiteSpace(variable))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+        ?? [];
 
     private sealed record ModeChoice(ConditionMode Mode, string Label);
 
