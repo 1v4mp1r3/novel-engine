@@ -1096,10 +1096,22 @@ static void ProjectAssetImportCopiesFiles()
 
         var asset = ProjectAssets.Import(project, projectPath, source);
         var target = ProjectAssets.ResolvePath(projectPath, asset);
+        var secondSourceDirectory = Path.Combine(directory, "external");
+        Directory.CreateDirectory(secondSourceDirectory);
+        var secondSource = Path.Combine(secondSourceDirectory, "Ночной фон.png");
+        File.WriteAllBytes(secondSource, [137, 80, 78, 71, 2]);
+        var secondAsset = ProjectAssets.Import(project, projectPath, secondSource);
+        var secondTarget = ProjectAssets.ResolvePath(projectPath, secondAsset);
 
         Assert(asset.Kind == AssetKind.Image, "Imported image kind was not detected.");
         Assert(AssetReference.IsValidId(asset.Id), "Generated asset id is invalid.");
         Assert(File.Exists(target), "Imported file was not copied into the project.");
+        Assert(File.Exists(secondTarget), "Second imported file was not copied into the project.");
+        Assert(asset.Id != secondAsset.Id, "Second imported asset reused the first id.");
+        Assert(asset.Path != secondAsset.Path, "Second imported asset reused the first path.");
+        Assert(
+            Path.GetFileName(secondTarget).Contains("-2", StringComparison.Ordinal),
+            "Second imported asset did not receive a unique file name.");
         Assert(
             target.Contains(
                 Path.Combine("files", "images"),
