@@ -46,12 +46,21 @@ public static partial class NovelScript
             if (addMatch.Success)
             {
                 var name = addMatch.Groups["name"].Value;
-                var amount = Convert.ToDouble(
-                    ParseLiteral(addMatch.Groups["value"].Value),
-                    CultureInfo.InvariantCulture);
-                var current = state.Variables.TryGetValue(name, out var existing)
-                    ? Convert.ToDouble(existing, CultureInfo.InvariantCulture)
-                    : 0d;
+                var amountValue = ParseLiteral(addMatch.Groups["value"].Value);
+                if (!TryNumber(amountValue, out var amount))
+                {
+                    throw new InvalidDataException(
+                        $"Команда add ожидает число: {line}");
+                }
+
+                var current = 0d;
+                if (state.Variables.TryGetValue(name, out var existing)
+                    && !TryNumber(existing, out current))
+                {
+                    throw new InvalidDataException(
+                        $"Переменная «{name}» не является числом для add.");
+                }
+
                 state.Variables[name] = current + amount;
                 continue;
             }

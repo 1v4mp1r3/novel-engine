@@ -20,6 +20,8 @@ toggle met_alice
 Both `#` and `//` comments are accepted. Variable names use Latin letters,
 digits, and `_`, and cannot start with a digit. Values may be strings, numbers,
 booleans, or `null`.
+`add name value` treats a missing variable as `0`; the added value and any
+existing variable value must be numeric.
 `toggle name` flips a variable through the same truthiness rules used by
 conditions; a missing variable becomes `true`.
 The visual-block editor can import these simple commands from text scripts:

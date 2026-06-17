@@ -17,6 +17,7 @@ var tests = new (string Name, Action Run)[]
     ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("novel script toggles variables", NovelScriptTogglesVariables),
+    ("novel script rejects invalid add operands", NovelScriptRejectsInvalidAddOperands),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
     ("visual script blocks import simple scripts", VisualScriptBlocksImportSimpleScripts),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
@@ -86,6 +87,7 @@ static void ProjectDiagnosticsReportAuthoringIssues()
     var project = NovelProject.CreateDefault();
     var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
     dialogue.Speaker = string.Empty;
+    dialogue.Script = "add score nope";
     dialogue.Outputs[0].Script = "dance";
     dialogue.Outputs[0].ScriptBlocks.Add(
         new VisualScriptBlock
@@ -114,6 +116,10 @@ static void ProjectDiagnosticsReportAuthoringIssues()
             diagnostic => diagnostic.Location.Contains("visual blocks", StringComparison.Ordinal)
                 && diagnostic.Message.Contains("bad-variable", StringComparison.Ordinal)),
         "Broken visual script block location was not reported.");
+    Assert(
+        report.Diagnostics.Any(
+            diagnostic => diagnostic.Message.Contains("ожидает число", StringComparison.Ordinal)),
+        "Invalid add operand was not reported as a script diagnostic.");
 }
 
 static void ProjectDiagnosticsCheckPhysicalAssets()
@@ -594,6 +600,22 @@ static void NovelScriptTogglesVariables()
         state.Variables.TryGetValue("route", out var route)
             && route is false,
         "Toggle did not use truthiness for non-boolean values.");
+}
+
+static void NovelScriptRejectsInvalidAddOperands()
+{
+    AssertThrows<InvalidDataException>(
+        () => NovelScript.Execute("add score nope", new ScriptState()),
+        "Add command accepted a non-numeric amount.");
+
+    AssertThrows<InvalidDataException>(
+        () => NovelScript.Execute(
+            """
+            set score = true
+            add score 1
+            """,
+            new ScriptState()),
+        "Add command accepted a non-numeric existing variable.");
 }
 
 static void VisualScriptBlocksRoundTripAndRun()
