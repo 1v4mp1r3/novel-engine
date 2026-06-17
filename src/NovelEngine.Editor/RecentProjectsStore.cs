@@ -30,7 +30,7 @@ internal static class RecentProjectsStore
                 File.ReadAllText(path),
                 JsonOptions) ?? [];
             return entries
-                .Where(entry => Exists(entry.Path))
+                .Where(entry => IsUsableEntry(entry))
                 .OrderByDescending(entry => entry.LastOpenedUtc)
                 .Take(MaxEntries)
                 .ToList();
@@ -81,6 +81,9 @@ internal static class RecentProjectsStore
             // if the cache cannot be written.
         }
     }
+
+    private static bool IsUsableEntry(RecentProjectEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Path) && Exists(entry.Path);
 
     private static bool Exists(string path) =>
         File.Exists(path) || Directory.Exists(path);
