@@ -15,6 +15,7 @@ public sealed class GraphSurface : FrameworkElement
     private const double OutputRowHeight = 29;
     private const double PortRadius = 7;
     private const double GridSize = 32;
+    private const double HoverHitCacheDistance = 4;
 
     private static readonly Typeface NodeTypeface = new("Segoe UI");
     private static readonly Brush SurfaceBrush = FrozenBrush(15, 22, 31);
@@ -52,6 +53,8 @@ public sealed class GraphSurface : FrameworkElement
     private Point _contextWorldPosition;
     private bool _needsInitialCenter = true;
     private bool _renderQueued;
+    private Point _lastHoverHitPoint = new(double.NaN, double.NaN);
+    private Cursor? _lastHoverCursor;
 
     public GraphSurface()
     {
@@ -315,11 +318,7 @@ public sealed class GraphSurface : FrameworkElement
 
         if (_dragNodeId is null)
         {
-            Cursor = HitOutputPort(position) is not null
-                ? Cursors.Cross
-                : HitNode(position) is not null
-                    ? Cursors.SizeAll
-                    : Cursors.Arrow;
+            UpdateHoverCursor(position);
             return;
         }
 
@@ -351,6 +350,7 @@ public sealed class GraphSurface : FrameworkElement
         {
             _panning = false;
             Cursor = Cursors.Arrow;
+            ResetHoverHitCache();
             ReleaseMouseCapture();
             return;
         }
@@ -382,6 +382,7 @@ public sealed class GraphSurface : FrameworkElement
 
         ReleaseMouseCapture();
         _dragNodeId = null;
+        ResetHoverHitCache();
         if (_dragMoved)
         {
             ProjectChanged?.Invoke(this, EventArgs.Empty);
@@ -767,6 +768,40 @@ public sealed class GraphSurface : FrameworkElement
                 InvalidateVisual();
             },
             DispatcherPriority.Render);
+    }
+
+    private void UpdateHoverCursor(Point position)
+    {
+        if (_lastHoverCursor is not null
+            && DistanceSquared(position, _lastHoverHitPoint)
+                <= HoverHitCacheDistance * HoverHitCacheDistance)
+        {
+            return;
+        }
+
+        var cursor = HitOutputPort(position) is not null
+            ? Cursors.Cross
+            : HitNode(position) is not null
+                ? Cursors.SizeAll
+                : Cursors.Arrow;
+        _lastHoverHitPoint = position;
+        _lastHoverCursor = cursor;
+        if (!ReferenceEquals(Cursor, cursor))
+        {
+            Cursor = cursor;
+        }
+    }
+
+    private void ResetHoverHitCache()
+    {
+        _lastHoverCursor = null;
+        _lastHoverHitPoint = new Point(double.NaN, double.NaN);
+    }
+
+    private static double DistanceSquared(Point first, Point second)
+    {
+        var delta = first - second;
+        return delta.X * delta.X + delta.Y * delta.Y;
     }
 
     private void DrawGrid(DrawingContext drawingContext)
