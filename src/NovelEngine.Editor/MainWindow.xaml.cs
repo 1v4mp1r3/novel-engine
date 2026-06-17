@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 {
     private const int MaxProjectHistoryEntries = 100;
     private const int MaxHighlightedCodeLength = 40_000;
+    private const int MaxLiveCodeAnalysisLength = 80_000;
     private const int MaxHighlightedSyntaxSpans = 2_500;
 
     private NovelProject _project = NovelProject.CreateDefault();
@@ -889,6 +890,18 @@ public partial class MainWindow : Window
     {
         var source = CodeEditor.SourceText;
         SetCodeCursorCache(source);
+        if (source.Length > MaxLiveCodeAnalysisLength)
+        {
+            _parsedCodeSource = null;
+            _parsedCodeProject = null;
+            ApplyCodeHighlighting(source, null);
+            CodeStatusText.Foreground = Brushes.Goldenrod;
+            CodeStatusText.Text = _codeHasPendingChanges
+                ? "Большой файл — Ctrl+Enter применит и проверит код"
+                : "Большой файл — live-проверка отключена";
+            return;
+        }
+
         try
         {
             _ = GetParsedCodeProject(source);
