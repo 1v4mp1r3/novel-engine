@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -28,6 +29,7 @@ public partial class PreviewWindow : Window
     private readonly string _assetDirectory;
     private readonly bool _debugMode;
     private readonly NovelBuildManifest? _buildManifest;
+    private readonly string _saveDirectoryName;
     private readonly MediaPlayer _musicPlayer = new();
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
@@ -56,6 +58,7 @@ public partial class PreviewWindow : Window
         _assetDirectory = assetDirectory;
         _debugMode = debugMode;
         _buildManifest = buildManifest;
+        _saveDirectoryName = CreateSaveDirectoryName(project, buildManifest);
         DebugPanel.Visibility = debugMode
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -983,22 +986,37 @@ public partial class PreviewWindow : Window
 
     private string GetSaveDirectory()
     {
-        var safeTitle = string.Concat(
-            _project.Title.Select(
-                character => Path.GetInvalidFileNameChars().Contains(character)
-                    ? '_'
-                    : character));
-        if (safeTitle.Length == 0)
-        {
-            safeTitle = "NovelProject";
-        }
         var directory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "NovelEngine",
             "Saves",
-            safeTitle);
+            _saveDirectoryName);
         Directory.CreateDirectory(directory);
         return directory;
+    }
+
+    private static string CreateSaveDirectoryName(
+        NovelProject project,
+        NovelBuildManifest? buildManifest)
+    {
+        var safeTitle = string.Concat(
+            project.Title.Select(
+                character => Path.GetInvalidFileNameChars().Contains(character)
+                    ? '_'
+                    : character)).Trim();
+        if (safeTitle.Length == 0)
+        {
+            safeTitle = "NovelProject";
+        }
+
+        var key = buildManifest?.BuildId;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = Convert.ToHexString(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(ProjectSerializer.ToJson(project))))[..12];
+        }
+        return $"{safeTitle}-{key[..Math.Min(12, key.Length)]}";
     }
 
     private static Task AnimateOpacity(
