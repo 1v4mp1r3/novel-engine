@@ -39,6 +39,7 @@ public sealed class GraphSurface : FrameworkElement
         FrozenPen(FrozenBrush(245, 190, 80), 2.4, DashStyles.Dash);
 
     private readonly List<ConnectionVisual> _connections = [];
+    private readonly Dictionary<string, NovelNode> _nodesById = [];
     private Vector _viewOffset = new(80, 80);
     private string? _dragNodeId;
     private Point _dragStart;
@@ -76,6 +77,7 @@ public sealed class GraphSurface : FrameworkElement
         Project = project;
         SelectedNodeId = null;
         _needsInitialCenter = true;
+        RebuildNodeLookup();
         RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -123,6 +125,7 @@ public sealed class GraphSurface : FrameworkElement
         }
 
         SelectedNodeId = null;
+        RebuildNodeLookup();
         RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
@@ -140,6 +143,7 @@ public sealed class GraphSurface : FrameworkElement
         {
             var duplicate = Project.DuplicateNode(SelectedNodeId);
             SelectedNodeId = duplicate.Id;
+            RebuildNodeLookup();
             RequestRender();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             ProjectChanged?.Invoke(this, EventArgs.Empty);
@@ -150,7 +154,11 @@ public sealed class GraphSurface : FrameworkElement
         }
     }
 
-    public void RefreshGraph() => RequestRender();
+    public void RefreshGraph()
+    {
+        RebuildNodeLookup();
+        RequestRender();
+    }
 
     public void CenterGraph()
     {
@@ -451,6 +459,7 @@ public sealed class GraphSurface : FrameworkElement
     private void SelectCreatedNode(NovelNode node)
     {
         SelectedNodeId = node.Id;
+        RebuildNodeLookup();
         RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
@@ -755,14 +764,14 @@ public sealed class GraphSurface : FrameworkElement
 
     private void DrawConnections(DrawingContext drawingContext)
     {
-        var nodesById = Project.Nodes.ToDictionary(node => node.Id);
+        EnsureNodeLookup();
         foreach (var node in Project.Nodes)
         {
             for (var outputIndex = 0; outputIndex < node.Outputs.Count; outputIndex++)
             {
                 var output = node.Outputs[outputIndex];
                 if (output.TargetNodeId is null
-                    || !nodesById.TryGetValue(output.TargetNodeId, out var target))
+                    || !_nodesById.TryGetValue(output.TargetNodeId, out var target))
                 {
                     continue;
                 }
@@ -772,6 +781,23 @@ public sealed class GraphSurface : FrameworkElement
                 drawingContext.DrawGeometry(null, ConnectionPen, geometry);
                 _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
             }
+        }
+    }
+
+    private void EnsureNodeLookup()
+    {
+        if (_nodesById.Count != Project.Nodes.Count)
+        {
+            RebuildNodeLookup();
+        }
+    }
+
+    private void RebuildNodeLookup()
+    {
+        _nodesById.Clear();
+        foreach (var node in Project.Nodes)
+        {
+            _nodesById[node.Id] = node;
         }
     }
 
