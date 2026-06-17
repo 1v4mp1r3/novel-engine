@@ -26,6 +26,13 @@ scene/dialogue types through multiple inheritance levels. Compilation resolves
 the type chain, applies overridden defaults, and emits concrete runtime nodes.
 The graph and code editor are two representations of the same project model.
 
+Visual script blocks are stored in project JSON on nodes and outputs as
+`VisualScriptBlock` lists. They compile into the same small `NovelScript`
+commands used by hand-written scripts (`set`, `add`, `unset`) and are executed
+after the matching text script. This keeps a future Scratch-like block editor on
+top of the same runtime semantics instead of introducing a second scripting
+engine.
+
 ## Asset catalog
 
 Each project owns a typed asset catalog. Imported files are copied into
@@ -74,8 +81,9 @@ node.
 `NovelBuildCompiler` reparses the project language and validates the concrete
 runtime graph and scripts. It copies catalog and direct-path assets into an
 atomic build directory under the same `files/` layout used by editor projects,
-rewrites runtime paths, removes source code from release builds, and emits
-`game.novel.json` plus `manifest.json`.
+rewrites runtime paths, reapplies visual script blocks from the saved project
+model, removes source code from release builds, and emits `game.novel.json` plus
+`manifest.json`.
 
 Run and debug commands launch the editor executable in a separate
 `--play-build` process. This process only loads the compiled package and can be

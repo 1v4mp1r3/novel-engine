@@ -53,7 +53,10 @@ public sealed class NovelPlayer
         Enter(start);
         foreach (var step in path)
         {
-            NovelScript.Execute(step.Output.Script, State);
+            VisualScriptCompiler.Execute(
+                step.Output.Script,
+                step.Output.ScriptBlocks,
+                State);
             Enter(step.Target);
         }
 
@@ -116,7 +119,7 @@ public sealed class NovelPlayer
 
         var target = _project.FindNode(output.TargetNodeId)
             ?? throw new InvalidOperationException("Выход не подключён к ноде.");
-        NovelScript.Execute(output.Script, State);
+        VisualScriptCompiler.Execute(output.Script, output.ScriptBlocks, State);
         return Enter(target);
     }
 
@@ -138,7 +141,7 @@ public sealed class NovelPlayer
             State.CurrentCharacters.AddRange(node.Characters.Select(character => character.Clone()));
         }
 
-        NovelScript.Execute(node.Script, State);
+        VisualScriptCompiler.Execute(node.Script, node.ScriptBlocks, State);
         CurrentNode = node;
         return node;
     }

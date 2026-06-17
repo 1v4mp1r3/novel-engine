@@ -16,6 +16,8 @@ var tests = new (string Name, Action Run)[]
     ("project JSON round trip", ProjectJsonRoundTrip),
     ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
+    ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
+    ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("characters flow through transitions", CharactersFlow),
     ("node character operations preserve data and order", NodeCharacterOperationsPreserveDataAndOrder),
     ("inherited music does not change track", InheritedMusicDoesNotChangeTrack),
@@ -44,6 +46,7 @@ var tests = new (string Name, Action Run)[]
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
     ("project language suggests context completions", ProjectLanguageSuggestsCompletions),
     ("project language finds nested code scopes", ProjectLanguageFindsScopes),
+    ("build compiler preserves visual script blocks", BuildCompilerPreservesVisualScriptBlocks),
     ("build compiler emits runnable package", BuildCompilerEmitsPackage),
 };
 
@@ -519,6 +522,67 @@ static void RuntimeStateFlows()
     Assert(
         Convert.ToDouble(player.State.Variables["score"]) == 3,
         "Script variables did not flow through transitions.");
+}
+
+static void VisualScriptBlocksRoundTripAndRun()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+    var end = project.AddNode(NodeKind.Scene, 760, 120);
+    dialogue.Outputs[0].TargetNodeId = end.Id;
+    scene.Script = "set score = 1";
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-add-score",
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "score",
+            Value = "2",
+        });
+    dialogue.Outputs[0].ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "choice-set-route",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "route",
+            Value = "\"good\"",
+        });
+
+    var restored = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
+    var player = new NovelPlayer(restored);
+    var start = player.Start();
+    player.Choose(start.Outputs[0].Id);
+    player.Choose(scene.Outputs[0].Id);
+    player.Choose(dialogue.Outputs[0].Id);
+
+    Assert(
+        Convert.ToDouble(player.State.Variables["score"]) == 3,
+        "Visual script blocks did not run after text script.");
+    Assert(
+        (string?)player.State.Variables["route"] == "good",
+        "Output visual script block did not run.");
+    Assert(
+        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 1,
+        "Visual script blocks were lost during JSON round trip.");
+}
+
+static void VisualScriptBlocksValidateGeneratedScripts()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "invalid-name",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "bad-name",
+            Value = "1",
+        });
+
+    AssertThrows<InvalidDataException>(
+        project.Validate,
+        "Visual script block validation accepted an invalid generated command.");
 }
 
 static void RemovingNodeDisconnectsOutputs()
@@ -1726,6 +1790,57 @@ static void ProjectLanguageFindsScopes()
         scopes.Any(scope => scope.Depth == 0)
             && scopes.Any(scope => scope.Depth == 1),
         "Nested scope depths were not detected.");
+}
+
+static void BuildCompilerPreservesVisualScriptBlocks()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-visual-block-build-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+        scene.ScriptBlocks.Add(
+            new VisualScriptBlock
+            {
+                Id = "scene-route",
+                Kind = VisualScriptBlockKind.SetVariable,
+                VariableName = "route",
+                Value = "\"intro\"",
+            });
+        dialogue.Outputs[0].ScriptBlocks.Add(
+            new VisualScriptBlock
+            {
+                Id = "choice-score",
+                Kind = VisualScriptBlockKind.AddVariable,
+                VariableName = "score",
+                Value = "1",
+            });
+        project.SourceCode = ProjectLanguage.Format(project);
+        ProjectSerializer.Save(project, projectPath);
+
+        var result = NovelBuildCompiler.Compile(
+            project,
+            projectPath,
+            Path.Combine(directory, "build", "story"),
+            debugSymbols: true);
+        var built = NovelBuildCompiler.LoadBuild(result.ManifestPath).Project;
+
+        Assert(
+            built.FindNode(scene.Id)?.ScriptBlocks.Single().Id == "scene-route",
+            "Build compiler dropped node visual script blocks.");
+        Assert(
+            built.FindNode(dialogue.Id)?.Outputs[0].ScriptBlocks.Single().Id == "choice-score",
+            "Build compiler dropped output visual script blocks.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
 }
 
 static void BuildCompilerEmitsPackage()

@@ -243,6 +243,7 @@ public sealed class NodeOutput
     public string? TargetNodeId { get; set; }
     public string Condition { get; set; } = string.Empty;
     public string Script { get; set; } = string.Empty;
+    public List<VisualScriptBlock> ScriptBlocks { get; init; } = [];
     public string TransitionSound { get; set; } = string.Empty;
     public int FadeDurationMs { get; set; } = 350;
 }
@@ -286,6 +287,7 @@ public sealed class NovelNode
     public bool InheritCharacters { get; set; } = true;
     public List<CharacterPlacement> Characters { get; init; } = [];
     public string Script { get; set; } = string.Empty;
+    public List<VisualScriptBlock> ScriptBlocks { get; init; } = [];
     public float X { get; set; }
     public float Y { get; set; }
     public List<NodeOutput> Outputs { get; init; } = [];
@@ -534,6 +536,8 @@ public sealed class NovelProject
             X = source.X + offsetX,
             Y = source.Y + offsetY,
         };
+        duplicate.ScriptBlocks.AddRange(
+            source.ScriptBlocks.Select(block => block.Clone()));
         duplicate.PropertyOverrides.UnionWith(source.PropertyOverrides);
         duplicate.Characters.AddRange(
             source.Characters.Select(character => character.CloneWithId(CreateId("char"))));
@@ -547,6 +551,11 @@ public sealed class NovelProject
                 TransitionSound = output.TransitionSound,
                 FadeDurationMs = output.FadeDurationMs,
             }));
+        foreach (var pair in source.Outputs.Zip(duplicate.Outputs))
+        {
+            pair.Second.ScriptBlocks.AddRange(
+                pair.First.ScriptBlocks.Select(block => block.Clone()));
+        }
 
         Nodes.Add(duplicate);
         return duplicate;
@@ -587,6 +596,8 @@ public sealed class NovelProject
             TransitionSound = source.TransitionSound,
             FadeDurationMs = source.FadeDurationMs,
         };
+        duplicate.ScriptBlocks.AddRange(
+            source.ScriptBlocks.Select(block => block.Clone()));
 
         var sourceIndex = node.Outputs.IndexOf(source);
         node.Outputs.Insert(sourceIndex + 1, duplicate);
@@ -918,6 +929,7 @@ public sealed class NovelProject
                 throw new InvalidDataException(
                     $"Нода «{node.Title}» должна иметь ровно один выход.");
             }
+            VisualScriptCompiler.Validate(node.ScriptBlocks);
 
             foreach (var output in node.Outputs)
             {
@@ -930,6 +942,7 @@ public sealed class NovelProject
                     throw new InvalidDataException(
                         $"Длительность перехода «{output.Label}» должна быть от 0 до 10000 мс.");
                 }
+                VisualScriptCompiler.Validate(output.ScriptBlocks);
             }
 
             var characterIds = new HashSet<string>(StringComparer.Ordinal);

@@ -862,11 +862,17 @@ public static class ProjectLanguage
     {
         foreach (var node in project.Nodes)
         {
-            NovelScript.Execute(node.Script, new ScriptState());
+            VisualScriptCompiler.Execute(
+                node.Script,
+                node.ScriptBlocks,
+                new ScriptState());
             foreach (var output in node.Outputs)
             {
                 _ = NovelScript.Evaluate(output.Condition, new ScriptState());
-                NovelScript.Execute(output.Script, new ScriptState());
+                VisualScriptCompiler.Execute(
+                    output.Script,
+                    output.ScriptBlocks,
+                    new ScriptState());
             }
         }
     }

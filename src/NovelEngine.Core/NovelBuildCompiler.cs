@@ -54,6 +54,7 @@ public static class NovelBuildCompiler
             : project.SourceCode;
         var runtimeProject = ProjectLanguage.Parse(source);
         CopyMainMenu(project.MainMenu, runtimeProject.MainMenu);
+        CopyVisualScriptBlocks(project, runtimeProject);
         runtimeProject.SourceCode = debugSymbols ? source : string.Empty;
         runtimeProject.Validate();
 
@@ -123,6 +124,33 @@ public static class NovelBuildCompiler
         destination.Elements.Clear();
         destination.Elements.AddRange(
             source.Elements.Select(element => element.Clone()));
+    }
+
+    private static void CopyVisualScriptBlocks(
+        NovelProject source,
+        NovelProject destination)
+    {
+        foreach (var sourceNode in source.Nodes)
+        {
+            var destinationNode = destination.FindNode(sourceNode.Id);
+            if (destinationNode is null)
+            {
+                continue;
+            }
+
+            destinationNode.ScriptBlocks.Clear();
+            destinationNode.ScriptBlocks.AddRange(
+                sourceNode.ScriptBlocks.Select(block => block.Clone()));
+            for (var index = 0; index < sourceNode.Outputs.Count
+                && index < destinationNode.Outputs.Count; index++)
+            {
+                var sourceOutput = sourceNode.Outputs[index];
+                var destinationOutput = destinationNode.Outputs[index];
+                destinationOutput.ScriptBlocks.Clear();
+                destinationOutput.ScriptBlocks.AddRange(
+                    sourceOutput.ScriptBlocks.Select(block => block.Clone()));
+            }
+        }
     }
 
     public static NovelBuildManifest LoadManifest(string manifestPath)

@@ -108,6 +108,10 @@ currently installed on this workstation.
   shown.
 - Open the `Код` tab to author node types, nodes, connections, inheritance,
   assets, and transitions as source code. Press `Ctrl+Enter` to compile it.
+- Project JSON can also store visual script blocks for node entry scripts and
+  choice transition scripts. Blocks compile to the same runtime commands as the
+  text script language, so a future block editor can coexist with hand-written
+  code.
 - Open the `Файлы` tab to import assets into the project and address them from
   code through stable references such as `@city_night` or `@main_theme`.
 - Entry scripts and choice conditions use the language documented in
