@@ -340,19 +340,48 @@ public sealed class VisualScriptBlocksWindow : Window
 
     private void HandleKeyboard(KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.Control)
-        {
-            return;
-        }
+        var modifiers = Keyboard.Modifiers;
+        var hasControl = (modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        var hasAlt = (modifiers & ModifierKeys.Alt) == ModifierKeys.Alt;
 
-        if (e.Key == Key.C)
+        if (hasControl && e.Key == Key.C)
         {
             CopySelectedBlock();
             e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.V)
+
+        if (hasControl && e.Key == Key.V)
         {
             PasteBlocks();
+            e.Handled = true;
+            return;
+        }
+
+        if (hasControl && e.Key == Key.D)
+        {
+            DuplicateSelectedBlock();
+            e.Handled = true;
+            return;
+        }
+
+        if (hasAlt && e.Key == Key.Up)
+        {
+            MoveSelectedBlock(-1);
+            e.Handled = true;
+            return;
+        }
+
+        if (hasAlt && e.Key == Key.Down)
+        {
+            MoveSelectedBlock(1);
+            e.Handled = true;
+            return;
+        }
+
+        if (modifiers == ModifierKeys.None && e.Key == Key.Delete)
+        {
+            DeleteSelectedBlock();
             e.Handled = true;
         }
     }
