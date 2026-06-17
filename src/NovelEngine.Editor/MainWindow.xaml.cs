@@ -65,6 +65,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
         _nodeAssetChoicesCache = [];
     private AssetPickerCacheStamp? _assetPickerCacheStamp;
+    private ProjectDiagnosticReport? _projectDiagnosticsCache;
 
     public MainWindow()
         : this(null)
@@ -1187,12 +1188,14 @@ public partial class MainWindow : Window
         _assetSizeCache.Clear();
         _assetPreviewImageCache.Clear();
         _assetUsageCountCache = null;
+        _projectDiagnosticsCache = null;
         ClearNodeAssetPickerCaches();
     }
 
     private void ClearProjectAnalysisCaches()
     {
         _assetUsageCountCache = null;
+        _projectDiagnosticsCache = null;
     }
 
     private void RefreshNodeAssetPickers(NovelNode? node)
@@ -4812,7 +4815,7 @@ public partial class MainWindow : Window
 
     private ProjectDiagnosticReport RefreshProjectDiagnostics(bool showPanel)
     {
-        var report = ProjectDiagnostics.Analyze(_project, _projectPath);
+        var report = GetProjectDiagnostics();
         var diagnostics = report.Diagnostics
             .Select(diagnostic => new DiagnosticView(diagnostic))
             .ToList();
@@ -4851,6 +4854,9 @@ public partial class MainWindow : Window
         }
         return report;
     }
+
+    private ProjectDiagnosticReport GetProjectDiagnostics() =>
+        _projectDiagnosticsCache ??= ProjectDiagnostics.Analyze(_project, _projectPath);
 
     private void HideDiagnostics_Click(object sender, RoutedEventArgs e) =>
         DiagnosticsPanel.Visibility = Visibility.Collapsed;
