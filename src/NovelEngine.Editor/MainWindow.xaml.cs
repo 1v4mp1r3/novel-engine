@@ -374,6 +374,7 @@ public partial class MainWindow : Window
                 MusicBox.Clear();
                 RefreshNodeAssetPickers(null);
                 ScriptBox.Clear();
+                EditNodeScriptBlocksButton.Content = "Блоки скрипта (0)";
                 CharactersGrid.ItemsSource = null;
                 OutputsGrid.ItemsSource = null;
                 SetCharacterButtons(false);
@@ -398,6 +399,8 @@ public partial class MainWindow : Window
             InheritCharactersCheck.IsChecked = node.InheritCharacters;
             InheritCharactersCheck.IsEnabled = node.Kind != NodeKind.Start;
             ScriptBox.Text = node.Script;
+            EditNodeScriptBlocksButton.Content =
+                $"Блоки скрипта ({node.ScriptBlocks.Count})";
             CharactersGrid.ItemsSource = node.Characters
                 .Select(character => new CharacterView(character))
                 .ToList();
@@ -434,6 +437,7 @@ public partial class MainWindow : Window
         yield return InheritCharactersCheck;
         yield return CharactersGrid;
         yield return ScriptBox;
+        yield return EditNodeScriptBlocksButton;
         yield return OutputsGrid;
     }
 
@@ -459,7 +463,10 @@ public partial class MainWindow : Window
 
         try
         {
-            NovelScript.Execute(ScriptBox.Text, new ScriptState());
+            VisualScriptCompiler.Execute(
+                ScriptBox.Text,
+                node.ScriptBlocks,
+                new ScriptState());
         }
         catch (InvalidDataException error)
         {
@@ -516,6 +523,37 @@ public partial class MainWindow : Window
         Graph.RefreshGraph();
         MarkDirty();
         return true;
+    }
+
+    private void EditNodeScriptBlocks_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ApplyProperties())
+        {
+            return;
+        }
+
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (node is null)
+        {
+            return;
+        }
+
+        var dialog = new VisualScriptBlocksWindow(
+            node.ScriptBlocks,
+            "Блоки скрипта при входе")
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        node.ScriptBlocks.Clear();
+        node.ScriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        MarkDirty();
+        StatusText.Text =
+            $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}";
     }
 
     private static void MarkOverrideIfChanged<T>(
@@ -3889,7 +3927,10 @@ public partial class MainWindow : Window
         try
         {
             _ = NovelScript.Evaluate(dialog.Condition, new ScriptState());
-            NovelScript.Execute(dialog.Script, new ScriptState());
+            VisualScriptCompiler.Execute(
+                dialog.Script,
+                dialog.ScriptBlocks,
+                new ScriptState());
             return true;
         }
         catch (InvalidDataException error)
@@ -4789,6 +4830,7 @@ public partial class MainWindow : Window
         public string Id => Output.Id;
         public string Label => Output.Label;
         public string Condition => Output.Condition.Length == 0 ? "всегда" : Output.Condition;
+        public int BlockCount => Output.ScriptBlocks.Count;
     }
 
     private sealed record AssetView(

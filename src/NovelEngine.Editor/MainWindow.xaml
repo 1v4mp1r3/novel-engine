@@ -271,12 +271,17 @@
 
                             <TextBlock Text="Скрипт при входе" Style="{StaticResource SectionHeader}" />
                             <TextBox x:Name="ScriptBox" Height="110" FontFamily="Cascadia Mono" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" />
+                            <Button x:Name="EditNodeScriptBlocksButton"
+                                    Content="Блоки скрипта (0)"
+                                    HorizontalAlignment="Left"
+                                    Click="EditNodeScriptBlocks_Click" />
 
                             <TextBlock Text="Выходы / варианты ответа" Style="{StaticResource SectionHeader}" />
                             <DataGrid x:Name="OutputsGrid" Height="155" AutoGenerateColumns="False" SelectionChanged="OutputsGrid_SelectionChanged" MouseDoubleClick="EditOutput_Click">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Текст" Binding="{Binding Label}" Width="*" />
                                     <DataGridTextColumn Header="Условие" Binding="{Binding Condition}" Width="110" />
+                                    <DataGridTextColumn Header="Блоки" Binding="{Binding BlockCount}" Width="65" />
                                     <DataGridTextColumn Header="Цель" Binding="{Binding TargetTitle}" Width="115" />
                                 </DataGrid.Columns>
                             </DataGrid>

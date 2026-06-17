@@ -112,6 +112,8 @@ currently installed on this workstation.
   choice transition scripts. Blocks compile to the same runtime commands as the
   text script language, so a future block editor can coexist with hand-written
   code.
+- In the node properties panel, use `Блоки скрипта` to edit entry-script blocks;
+  in a choice editor, use the same button to attach blocks to that transition.
 - Open the `Файлы` tab to import assets into the project and address them from
   code through stable references such as `@city_night` or `@main_theme`.
 - Entry scripts and choice conditions use the language documented in

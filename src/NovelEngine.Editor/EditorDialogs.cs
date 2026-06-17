@@ -15,18 +15,30 @@ public sealed class OutputEditorWindow : Window
     private readonly TextBox _labelBox;
     private readonly TextBox _conditionBox;
     private readonly TextBox _scriptBox;
+    private readonly List<VisualScriptBlock> _scriptBlocks;
+    private readonly Button _scriptBlocksButton;
 
     public OutputEditorWindow(NodeOutput output)
     {
         Title = "Вариант ответа";
         Width = 560;
-        Height = 440;
+        Height = 500;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
         _labelBox = DialogUi.TextBox(output.Label);
         _conditionBox = DialogUi.TextBox(output.Condition);
         _scriptBox = DialogUi.TextBox(output.Script, multiline: true);
+        _scriptBlocks = output.ScriptBlocks
+            .Select(block => block.Clone())
+            .ToList();
+        _scriptBlocksButton = new Button
+        {
+            MinWidth = 150,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 12),
+        };
+        _scriptBlocksButton.Click += (_, _) => EditScriptBlocks();
 
         var panel = DialogUi.Panel();
         panel.Children.Add(DialogUi.Label("Текст варианта"));
@@ -36,20 +48,47 @@ public sealed class OutputEditorWindow : Window
         panel.Children.Add(DialogUi.Label("Скрипт при выборе"));
         _scriptBox.Height = 150;
         panel.Children.Add(_scriptBox);
+        panel.Children.Add(_scriptBlocksButton);
         panel.Children.Add(DialogUi.Buttons(Save, this));
         Content = panel;
+        RefreshScriptBlocksButton();
     }
 
     public string OutputLabel => _labelBox.Text.Trim();
     public string Condition => _conditionBox.Text.Trim();
     public string Script => _scriptBox.Text.Trim();
+    public IReadOnlyList<VisualScriptBlock> ScriptBlocks =>
+        _scriptBlocks.Select(block => block.Clone()).ToList();
 
     public void ApplyTo(NodeOutput output)
     {
         output.Label = OutputLabel;
         output.Condition = Condition;
         output.Script = Script;
+        output.ScriptBlocks.Clear();
+        output.ScriptBlocks.AddRange(ScriptBlocks);
     }
+
+    private void EditScriptBlocks()
+    {
+        var dialog = new VisualScriptBlocksWindow(
+            _scriptBlocks,
+            "Блоки скрипта варианта")
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _scriptBlocks.Clear();
+        _scriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        RefreshScriptBlocksButton();
+    }
+
+    private void RefreshScriptBlocksButton() =>
+        _scriptBlocksButton.Content = $"Блоки скрипта ({_scriptBlocks.Count})";
 
     private void Save()
     {
