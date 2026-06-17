@@ -40,6 +40,8 @@ public partial class MainWindow : Window
     private int[] _codeLineStarts = [0];
     private int _lastCodeCursorOffset = -1;
     private bool _codeCursorCacheDirty = true;
+    private string? _codeSyntaxSource;
+    private IReadOnlyList<ProjectLanguageSyntaxSpan> _codeSyntaxSpans = [];
     private bool _codeRefreshPending = true;
     private bool _codeRefreshUseStoredSource = true;
     private bool _syncingFilesFromDisk;
@@ -900,7 +902,7 @@ public partial class MainWindow : Window
         try
         {
             CodeEditor.ApplySyntax(
-                ProjectLanguage.GetSyntaxSpans(source),
+                GetCodeSyntaxSpans(source),
                 errorStart,
                 errorStart.HasValue
                     ? ErrorTokenLength(source, errorStart.Value)
@@ -910,6 +912,18 @@ public partial class MainWindow : Window
         {
             _syncingCode = wasSyncing;
         }
+    }
+
+    private IReadOnlyList<ProjectLanguageSyntaxSpan> GetCodeSyntaxSpans(string source)
+    {
+        if (_codeSyntaxSource == source)
+        {
+            return _codeSyntaxSpans;
+        }
+
+        _codeSyntaxSource = source;
+        _codeSyntaxSpans = ProjectLanguage.GetSyntaxSpans(source);
+        return _codeSyntaxSpans;
     }
 
     private static int ErrorTokenLength(string source, int start)
