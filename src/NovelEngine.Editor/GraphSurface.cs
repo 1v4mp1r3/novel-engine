@@ -16,6 +16,7 @@ public sealed class GraphSurface : FrameworkElement
     private const double PortRadius = 7;
     private const double GridSize = 32;
     private const double HoverHitCacheDistance = 4;
+    private const double DragRenderEpsilon = 0.5;
 
     private static readonly Typeface NodeTypeface = new("Segoe UI");
     private static readonly Brush SurfaceBrush = FrozenBrush(15, 22, 31);
@@ -296,7 +297,8 @@ public sealed class GraphSurface : FrameworkElement
         if (_panning)
         {
             var nextOffset = _panOffsetStart + (position - _panStart);
-            if (nextOffset == _viewOffset)
+            if (NearlyEqual(nextOffset.X, _viewOffset.X)
+                && NearlyEqual(nextOffset.Y, _viewOffset.Y))
             {
                 return;
             }
@@ -307,7 +309,8 @@ public sealed class GraphSurface : FrameworkElement
 
         if (_connectionDrag is not null)
         {
-            if (_connectionDrag.Cursor == position)
+            if (NearlyEqual(_connectionDrag.Cursor.X, position.X)
+                && NearlyEqual(_connectionDrag.Cursor.Y, position.Y))
             {
                 return;
             }
@@ -330,7 +333,7 @@ public sealed class GraphSurface : FrameworkElement
 
         var nextX = (float)(_dragNodeStart.X + position.X - _dragStart.X);
         var nextY = (float)(_dragNodeStart.Y + position.Y - _dragStart.Y);
-        if (node.X == nextX && node.Y == nextY)
+        if (NearlyEqual(node.X, nextX) && NearlyEqual(node.Y, nextY))
         {
             return;
         }
@@ -1111,6 +1114,9 @@ public sealed class GraphSurface : FrameworkElement
         expanded.Inflate(32, 32);
         return bounds.IntersectsWith(expanded);
     }
+
+    private static bool NearlyEqual(double first, double second) =>
+        Math.Abs(first - second) < DragRenderEpsilon;
 
     private Point ScreenToWorld(Point point) =>
         point - _viewOffset;
