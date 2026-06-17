@@ -52,12 +52,19 @@ static void WorkspaceProjectCreatesDefaultFolders()
         Assert(
             Directory.Exists(Path.Combine(directory, "autosaves")),
             "Autosave directory was not created.");
+        var project = ProjectSerializer.Load(projectPath);
+        Assert(
+            project.Title == Path.GetFileName(directory),
+            "Project title did not use the workspace folder name.");
 
         foreach (var folder in ProjectAssets.DefaultProjectFolders)
         {
             Assert(
                 Directory.Exists(Path.Combine(directory, "files", folder)),
                 $"Default asset folder was not created: {folder}");
+            Assert(
+                project.AssetFolders.Contains(folder, StringComparer.OrdinalIgnoreCase),
+                $"Default asset folder was not saved in the project file: {folder}");
         }
     }
     finally
