@@ -7,6 +7,7 @@ var tests = new (string Name, Action Run)[]
 {
     ("workspace project creates default folders", WorkspaceProjectCreatesDefaultFolders),
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
+    ("workspace project can be resolved after creation", WorkspaceProjectCanBeResolvedAfterCreation),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
@@ -108,6 +109,29 @@ static void WorkspaceProjectPathAvoidsExistingFile()
         Assert(
             Path.GetFileName(secondPath) == $"{Path.GetFileName(directory)}-2.novel.json",
             "Available project path did not use the expected numeric suffix.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void WorkspaceProjectCanBeResolvedAfterCreation()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var projectPath = ProjectWorkspace.CreateProjectInDirectory(directory);
+
+        var fromFile = ProjectOpenResolver.Resolve(projectPath);
+        var fromFolder = ProjectOpenResolver.Resolve(directory);
+
+        Assert(fromFile.ProjectPath == projectPath, "Created project did not resolve from its file path.");
+        Assert(fromFile.WorkspaceDirectory == directory, "Created project file did not resolve to its workspace.");
+        Assert(!fromFile.CreatedEmptyWorkspace, "Created project file resolved as an empty workspace.");
+        Assert(fromFolder.ProjectPath == projectPath, "Created project did not resolve from its workspace folder.");
+        Assert(fromFolder.WorkspaceDirectory == directory, "Created project folder changed workspace.");
+        Assert(!fromFolder.CreatedEmptyWorkspace, "Created project folder resolved as an empty workspace.");
     }
     finally
     {
