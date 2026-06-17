@@ -15,6 +15,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
     ("autosave pruning keeps newest snapshots", AutoSavePruningKeepsNewestSnapshots),
+    ("autosave pruning skips locked snapshots", AutoSavePruningSkipsLockedSnapshots),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
     ("recent projects ignore corrupt cache", RecentProjectsIgnoreCorruptCache),
     ("recent projects ignore blank cache entries", RecentProjectsIgnoreBlankCacheEntries),
@@ -298,6 +299,44 @@ static void AutoSavePruningKeepsNewestSnapshots()
         Assert(File.Exists(middle), "Autosave pruning deleted a retained snapshot.");
         Assert(File.Exists(newest), "Autosave pruning deleted the newest snapshot.");
         Assert(File.Exists(otherProject), "Autosave pruning deleted a different project's snapshot.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void AutoSavePruningSkipsLockedSnapshots()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var oldest = Path.Combine(directory, "story-20260617-100000.novel.json");
+        var locked = Path.Combine(directory, "story-20260617-110000.novel.json");
+        var newest = Path.Combine(directory, "story-20260617-120000.novel.json");
+        File.WriteAllText(oldest, "{}");
+        File.WriteAllText(locked, "{}");
+        File.WriteAllText(newest, "{}");
+        File.SetLastWriteTimeUtc(oldest, new DateTime(2026, 6, 17, 10, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(locked, new DateTime(2026, 6, 17, 11, 0, 0, DateTimeKind.Utc));
+        File.SetLastWriteTimeUtc(newest, new DateTime(2026, 6, 17, 12, 0, 0, DateTimeKind.Utc));
+
+        AutoSaveStore.Prune(
+            directory,
+            "story",
+            keepCount: 1,
+            delete: path =>
+            {
+                if (path.Equals(locked, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new IOException("locked");
+                }
+                File.Delete(path);
+            });
+
+        Assert(!File.Exists(oldest), "Autosave pruning stopped after a locked snapshot.");
+        Assert(File.Exists(locked), "Autosave pruning deleted the simulated locked snapshot.");
+        Assert(File.Exists(newest), "Autosave pruning deleted the newest snapshot.");
     }
     finally
     {

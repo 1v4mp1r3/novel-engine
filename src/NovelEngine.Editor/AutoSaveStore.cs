@@ -31,14 +31,34 @@ internal static class AutoSaveStore
         }
     }
 
-    public static void Prune(string directory, string stem, int keepCount)
+    public static void Prune(
+        string directory,
+        string stem,
+        int keepCount,
+        Action<string>? delete = null)
     {
+        delete ??= File.Delete;
         foreach (var file in Directory
             .EnumerateFiles(directory, $"{stem}-*.novel.json")
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .Skip(keepCount))
         {
-            File.Delete(file);
+            TryDelete(file, delete);
+        }
+    }
+
+    private static void TryDelete(string path, Action<string> delete)
+    {
+        try
+        {
+            delete(path);
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException)
+        {
+            // Autosave pruning is best-effort; one locked snapshot should not
+            // prevent later autosaves or pruning of other old snapshots.
         }
     }
 }
