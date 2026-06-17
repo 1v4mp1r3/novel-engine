@@ -1399,6 +1399,12 @@ static void ProjectAssetSyncDiscoversFilesFromDisk()
             ProjectAssets.SyncFromDisk(project, projectPath) == 0,
             "Second sync created duplicate records.");
         Assert(project.Assets.Count == 2, "Second sync duplicated an asset.");
+        Assert(
+            Directory.GetFiles(physicalFolder, "MountFuji-*.jpg").Length == 0,
+            "Sync created duplicate physical image files.");
+        Assert(
+            Directory.GetFiles(voiceFolder, "hero-blip-*.wav").Length == 0,
+            "Sync created duplicate physical voice files.");
     }
     finally
     {
