@@ -87,6 +87,8 @@ public sealed class VisualScriptBlocksWindow : Window
     {
         var panel = CreateButtonPanel();
         panel.Children.Add(CreateButton("+ set", () => AddBlock(VisualScriptBlockKind.SetVariable)));
+        panel.Children.Add(CreateButton("+ flag on", () => AddBlock(VisualScriptBlockKind.SetFlagTrue)));
+        panel.Children.Add(CreateButton("+ flag off", () => AddBlock(VisualScriptBlockKind.SetFlagFalse)));
         panel.Children.Add(CreateButton("+ add", () => AddBlock(VisualScriptBlockKind.AddVariable)));
         panel.Children.Add(CreateButton("+ unset", () => AddBlock(VisualScriptBlockKind.UnsetVariable)));
         panel.Children.Add(CreateButton("+ toggle", () => AddBlock(VisualScriptBlockKind.ToggleVariable)));
@@ -133,6 +135,8 @@ public sealed class VisualScriptBlocksWindow : Window
             VariableName = kind == VisualScriptBlockKind.Comment ? string.Empty : "flag",
             Value = kind == VisualScriptBlockKind.UnsetVariable
                 || kind == VisualScriptBlockKind.ToggleVariable
+                || kind == VisualScriptBlockKind.SetFlagTrue
+                || kind == VisualScriptBlockKind.SetFlagFalse
                 || kind == VisualScriptBlockKind.Comment
                     ? string.Empty
                     : "true",
@@ -480,6 +484,8 @@ public sealed class VisualScriptBlockEditorWindow : Window
     private static readonly IReadOnlyList<BlockKindChoice> KindChoices =
     [
         new(VisualScriptBlockKind.SetVariable, "Установить переменную"),
+        new(VisualScriptBlockKind.SetFlagTrue, "Включить флаг"),
+        new(VisualScriptBlockKind.SetFlagFalse, "Выключить флаг"),
         new(VisualScriptBlockKind.AddVariable, "Прибавить к переменной"),
         new(VisualScriptBlockKind.UnsetVariable, "Удалить переменную"),
         new(VisualScriptBlockKind.ToggleVariable, "Переключить флаг"),

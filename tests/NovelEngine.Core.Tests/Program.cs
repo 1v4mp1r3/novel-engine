@@ -612,6 +612,13 @@ static void VisualScriptBlocksRoundTripAndRun()
             VariableName = "score",
             Value = "2",
         });
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-visited-flag",
+            Kind = VisualScriptBlockKind.SetFlagTrue,
+            VariableName = "visited_intro",
+        });
     dialogue.Outputs[0].ScriptBlocks.Add(
         new VisualScriptBlock
         {
@@ -635,7 +642,11 @@ static void VisualScriptBlocksRoundTripAndRun()
         (string?)player.State.Variables["route"] == "good",
         "Output visual script block did not run.");
     Assert(
-        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 1,
+        player.State.Variables.TryGetValue("visited_intro", out var visitedIntro)
+            && visitedIntro is true,
+        "Flag visual script block did not run.");
+    Assert(
+        restored.FindNode(scene.Id)?.ScriptBlocks.Count == 2,
         "Visual script blocks were lost during JSON round trip.");
 }
 
@@ -646,6 +657,8 @@ static void VisualScriptBlocksImportSimpleScripts()
         # setup route
         // setup score
         set route = "good"
+        set visited_intro = true
+        set route_locked = false
         add score 2
         toggle met_hero
         unset temporary_flag
@@ -653,10 +666,18 @@ static void VisualScriptBlocksImportSimpleScripts()
 
     var script = VisualScriptCompiler.Compile(blocks);
 
-    Assert(blocks.Count == 6, "Script import produced the wrong block count.");
+    Assert(blocks.Count == 8, "Script import produced the wrong block count.");
     Assert(
         script.Contains("set route = \"good\"", StringComparison.Ordinal),
         "Imported set command was not compiled back.");
+    Assert(
+        blocks.Any(block => block.Kind == VisualScriptBlockKind.SetFlagTrue
+            && block.VariableName == "visited_intro"),
+        "Imported true set command did not become a flag-on block.");
+    Assert(
+        blocks.Any(block => block.Kind == VisualScriptBlockKind.SetFlagFalse
+            && block.VariableName == "route_locked"),
+        "Imported false set command did not become a flag-off block.");
     Assert(
         script.Contains("add score 2", StringComparison.Ordinal),
         "Imported add command was not compiled back.");

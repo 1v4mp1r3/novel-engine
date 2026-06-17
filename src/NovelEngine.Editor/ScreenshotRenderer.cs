@@ -301,9 +301,15 @@ internal static class ScreenshotRenderer
                     VariableName = "route",
                     Value = "\"good\"",
                 },
+                new VisualScriptBlock
+                {
+                    Id = "smoke-flag-off",
+                    Kind = VisualScriptBlockKind.SetFlagFalse,
+                    VariableName = "route_locked",
+                },
             ],
             "Visual script blocks smoke",
-            ["met_hero", "route"],
+            ["met_hero", "route", "route_locked"],
             "toggle imported_flag")
         {
             Width = 560,
@@ -319,7 +325,8 @@ internal static class ScreenshotRenderer
             DispatcherPriority.ApplicationIdle);
         var script = VisualScriptCompiler.Compile(window.Blocks);
         if (!script.Contains("toggle met_hero", StringComparison.Ordinal)
-            || !script.Contains("set route = \"good\"", StringComparison.Ordinal))
+            || !script.Contains("set route = \"good\"", StringComparison.Ordinal)
+            || !script.Contains("set route_locked = false", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Visual script blocks smoke compiled unexpected script: {script}");

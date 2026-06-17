@@ -9,6 +9,8 @@ public enum VisualScriptBlockKind
     AddVariable,
     UnsetVariable,
     ToggleVariable,
+    SetFlagTrue,
+    SetFlagFalse,
     Comment,
 }
 
@@ -60,13 +62,18 @@ public static partial class VisualScriptCompiler
             var setMatch = SetCommand().Match(line);
             if (setMatch.Success)
             {
+                var value = setMatch.Groups["value"].Value.Trim();
                 blocks.Add(
                     new VisualScriptBlock
                     {
                         Id = $"imported-{index++}",
-                        Kind = VisualScriptBlockKind.SetVariable,
+                        Kind = value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                            ? VisualScriptBlockKind.SetFlagTrue
+                            : value.Equals("false", StringComparison.OrdinalIgnoreCase)
+                                ? VisualScriptBlockKind.SetFlagFalse
+                                : VisualScriptBlockKind.SetVariable,
                         VariableName = setMatch.Groups["name"].Value,
-                        Value = setMatch.Groups["value"].Value.Trim(),
+                        Value = value,
                     });
                 continue;
             }
@@ -160,6 +167,10 @@ public static partial class VisualScriptCompiler
         {
             VisualScriptBlockKind.SetVariable =>
                 $"set {RequiredVariableName(block)} = {RequiredValue(block)}",
+            VisualScriptBlockKind.SetFlagTrue =>
+                $"set {RequiredVariableName(block)} = true",
+            VisualScriptBlockKind.SetFlagFalse =>
+                $"set {RequiredVariableName(block)} = false",
             VisualScriptBlockKind.AddVariable =>
                 $"add {RequiredVariableName(block)} {RequiredValue(block)}",
             VisualScriptBlockKind.UnsetVariable =>
