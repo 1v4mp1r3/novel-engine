@@ -64,8 +64,9 @@ $items = @(
         Argument = '%V'
     },
     @{
-        Key = 'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
+        Key = 'HKCU:\Software\Classes\*\shell\NovelEngine.Open'
         Argument = '%1'
+        AppliesTo = 'System.ItemName:".novel.json"'
     }
 )
 
@@ -77,7 +78,12 @@ foreach ($item in $items) {
     Set-Item -Path $key -Value $menuText
     New-ItemProperty -Path $key -Name 'MUIVerb' -Value $menuText -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $key -Name 'Icon' -Value $iconPath -PropertyType String -Force | Out-Null
+    if ($item.AppliesTo) {
+        New-ItemProperty -Path $key -Name 'AppliesTo' -Value $item.AppliesTo -PropertyType String -Force | Out-Null
+    } else {
+        Remove-ItemProperty -Path $key -Name 'AppliesTo' -ErrorAction SilentlyContinue
+    }
     Set-Item -Path $commandKey -Value ('{0} "{1}"' -f $baseCommand, $item.Argument)
 }
 
-Write-Host ('Explorer context menu item "{0}" installed for project folders and .novel.json files.' -f $menuText)
+Write-Host ('Explorer context menu item "{0}" installed for project folders and *.novel.json files.' -f $menuText)
