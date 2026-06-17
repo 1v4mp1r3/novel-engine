@@ -1258,6 +1258,25 @@ static void AssetFoldersMoveFiles()
         Assert(
             File.Exists(Path.Combine(directory, "files", "cast", "heroes", "hero.png")),
             "Untracked physical file did not move with the renamed folder.");
+
+        ProjectAssets.CreateFolder(project, "unused/child");
+        var unusedDirectory = Path.Combine(directory, "files", "unused");
+        var unusedChildDirectory = Path.Combine(unusedDirectory, "child");
+        Directory.CreateDirectory(unusedChildDirectory);
+        AssertThrows<InvalidOperationException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, "unused"),
+            "Deleting a folder with nested folders should fail.");
+
+        ProjectAssets.DeleteFolder(project, projectPath, "unused/child");
+        ProjectAssets.DeleteFolder(project, projectPath, "unused");
+        Assert(
+            !project.AssetFolders.Contains("unused/child")
+                && !project.AssetFolders.Contains("unused"),
+            "Deleted empty folders were left in the project model.");
+        Assert(
+            !Directory.Exists(unusedChildDirectory)
+                && !Directory.Exists(unusedDirectory),
+            "Deleted empty folders were left on disk.");
     }
     finally
     {
@@ -1596,4 +1615,19 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static void AssertThrows<TException>(Action action, string message)
+    where TException : Exception
+{
+    try
+    {
+        action();
+    }
+    catch (TException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(message);
 }
