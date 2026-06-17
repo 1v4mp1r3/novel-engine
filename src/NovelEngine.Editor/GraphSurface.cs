@@ -56,6 +56,7 @@ public sealed class GraphSurface : FrameworkElement
     private bool _renderQueued;
     private Point _lastHoverHitPoint = new(double.NaN, double.NaN);
     private Cursor? _lastHoverCursor;
+    private double _pixelsPerDip = 1;
 
     public GraphSurface()
     {
@@ -185,6 +186,7 @@ public sealed class GraphSurface : FrameworkElement
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
+        _pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         if (_needsInitialCenter && ActualWidth > 0 && ActualHeight > 0)
         {
             CenterGraph();
@@ -994,7 +996,7 @@ public sealed class GraphSurface : FrameworkElement
             NodeTypeface,
             size,
             brush,
-            VisualTreeHelper.GetDpi(this).PixelsPerDip)
+            _pixelsPerDip)
         {
             MaxTextWidth = Math.Max(1, maxWidth),
             MaxLineCount = 1,
