@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using NovelEngine.Core;
 using NovelEngine.Editor;
 
@@ -24,6 +25,8 @@ var tests = new (string Name, Action Run)[]
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
+    ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
+    ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
 };
 
 var failed = 0;
@@ -607,6 +610,43 @@ static void RecentProjectsKeepOnlyNewestEntries()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void GraphHitTestCachePrefersTopmostNode()
+{
+    var bottom = new NovelNode { Id = "bottom", Kind = NodeKind.Scene };
+    var top = new NovelNode { Id = "top", Kind = NodeKind.Dialogue };
+    var cache = new GraphHitTestCache();
+    cache.AddNode(new GraphNodeHitArea(bottom, new Rect(0, 0, 120, 80)));
+    cache.AddNode(new GraphNodeHitArea(top, new Rect(20, 20, 120, 80)));
+
+    var hit = cache.HitNode(new Point(30, 30));
+
+    Assert(ReferenceEquals(hit, top), "Hit test cache did not prefer the topmost node.");
+}
+
+static void GraphHitTestCacheReturnsPorts()
+{
+    var inputNode = new NovelNode { Id = "dialogue", Kind = NodeKind.Dialogue };
+    var cache = new GraphHitTestCache();
+    cache.AddInputPort(
+        new GraphInputPortHitArea(
+            inputNode,
+            new Point(10, 20),
+            new Rect(0, 10, 20, 20)));
+    cache.AddOutputPort(
+        new GraphOutputPortHitArea(
+            "scene",
+            "next",
+            new Point(100, 20),
+            new Rect(90, 10, 20, 20)));
+
+    var inputHit = cache.HitInputPort(new Point(8, 18));
+    var outputHit = cache.HitOutputPort(new Point(98, 18));
+
+    Assert(ReferenceEquals(inputHit, inputNode), "Hit test cache returned the wrong input node.");
+    Assert(outputHit?.NodeId == "scene", "Hit test cache returned the wrong output node.");
+    Assert(outputHit?.OutputId == "next", "Hit test cache returned the wrong output id.");
 }
 
 static void WithRecentProjectsStore(string storePath, Action action)

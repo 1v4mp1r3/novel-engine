@@ -43,6 +43,7 @@ public sealed class GraphSurface : FrameworkElement
         FrozenPen(FrozenBrush(245, 190, 80), 2.4, DashStyles.Dash);
 
     private readonly List<ConnectionVisual> _connections = [];
+    private readonly GraphHitTestCache _hitTestCache = new();
     private readonly Dictionary<string, NovelNode> _nodesById = [];
     private readonly Dictionary<ConnectionGeometryKey, StreamGeometry>
         _connectionGeometryCache = [];
@@ -61,6 +62,7 @@ public sealed class GraphSurface : FrameworkElement
     private Point _lastHoverHitPoint = new(double.NaN, double.NaN);
     private Cursor? _lastHoverCursor;
     private double _pixelsPerDip = 1;
+    private bool _hitTestCacheDirty = true;
     private readonly Dictionary<TextLayoutKey, FormattedText> _textLayoutCache = [];
 
     public GraphSurface()
@@ -87,6 +89,8 @@ public sealed class GraphSurface : FrameworkElement
         Project = project;
         SelectedNodeId = null;
         _needsInitialCenter = true;
+        _hitTestCache.Clear();
+        _hitTestCacheDirty = true;
         RebuildNodeLookup();
         RequestRender();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
@@ -829,6 +833,7 @@ public sealed class GraphSurface : FrameworkElement
 
     private void RequestRender()
     {
+        InvalidateHitTestCache();
         if (_renderQueued)
         {
             return;
@@ -842,6 +847,37 @@ public sealed class GraphSurface : FrameworkElement
                 InvalidateVisual();
             },
             DispatcherPriority.Render);
+    }
+
+    private void InvalidateHitTestCache()
+    {
+        _hitTestCacheDirty = true;
+        ResetHoverHitCache();
+    }
+
+    private void EnsureHitTestCache()
+    {
+        if (!_hitTestCacheDirty)
+        {
+            return;
+        }
+
+        _hitTestCache.Clear();
+        foreach (var node in Project.Nodes)
+        {
+            var bounds = GetNodeRectangle(node);
+            _hitTestCache.AddNode(new GraphNodeHitArea(node, bounds));
+            if (node.Kind != NodeKind.Start)
+            {
+                _hitTestCache.AddInputPort(GetInputPort(node));
+            }
+            for (var index = 0; index < node.Outputs.Count; index++)
+            {
+                _hitTestCache.AddOutputPort(
+                    GetOutputPort(node, node.Outputs[index], index));
+            }
+        }
+        _hitTestCacheDirty = false;
     }
 
     private void UpdateHoverCursor(Point position)
@@ -1185,33 +1221,25 @@ public sealed class GraphSurface : FrameworkElement
         return pen;
     }
 
-    private NovelNode? HitNode(Point point) =>
-        Project.Nodes
-            .AsEnumerable()
-            .Reverse()
-            .FirstOrDefault(node => GetNodeRectangle(node).Contains(point));
-
-    private NovelNode? HitInputPort(Point point) =>
-        Project.Nodes.FirstOrDefault(
-            node => node.Kind != NodeKind.Start && GetInputPort(node).HitArea.Contains(point));
-
-    private OutputPort? HitOutputPort(Point point)
+    private NovelNode? HitNode(Point point)
     {
-        foreach (var node in Project.Nodes)
-        {
-            for (var index = 0; index < node.Outputs.Count; index++)
-            {
-                var port = GetOutputPort(node, node.Outputs[index], index);
-                if (port.HitArea.Contains(point))
-                {
-                    return port;
-                }
-            }
-        }
-        return null;
+        EnsureHitTestCache();
+        return _hitTestCache.HitNode(point);
     }
 
-    private OutputPort? GetOutputPort(string nodeId, string outputId)
+    private NovelNode? HitInputPort(Point point)
+    {
+        EnsureHitTestCache();
+        return _hitTestCache.HitInputPort(point);
+    }
+
+    private GraphOutputPortHitArea? HitOutputPort(Point point)
+    {
+        EnsureHitTestCache();
+        return _hitTestCache.HitOutputPort(point);
+    }
+
+    private GraphOutputPortHitArea? GetOutputPort(string nodeId, string outputId)
     {
         var node = Project.FindNode(nodeId);
         if (node is null)
@@ -1222,20 +1250,20 @@ public sealed class GraphSurface : FrameworkElement
         return index < 0 ? null : GetOutputPort(node, node.Outputs[index], index);
     }
 
-    private OutputPort GetOutputPort(NovelNode node, NodeOutput output, int index)
+    private GraphOutputPortHitArea GetOutputPort(NovelNode node, NodeOutput output, int index)
     {
         var rectangle = GetNodeRectangle(node);
         var center = new Point(
             rectangle.Right,
             rectangle.Top + HeaderHeight + 76 + index * OutputRowHeight);
-        return new OutputPort(node.Id, output.Id, center, MakeHitArea(center));
+        return new GraphOutputPortHitArea(node.Id, output.Id, center, MakeHitArea(center));
     }
 
-    private InputPort GetInputPort(NovelNode node)
+    private GraphInputPortHitArea GetInputPort(NovelNode node)
     {
         var rectangle = GetNodeRectangle(node);
         var center = new Point(rectangle.Left, rectangle.Top + HeaderHeight + 20);
-        return new InputPort(node.Id, center, MakeHitArea(center));
+        return new GraphInputPortHitArea(node, center, MakeHitArea(center));
     }
 
     private static Point GetWorldOutputCenter(NovelNode node, int index) =>
@@ -1312,17 +1340,6 @@ public sealed class GraphSurface : FrameworkElement
         double StartY,
         double EndX,
         double EndY);
-
-    private readonly record struct InputPort(
-        string NodeId,
-        Point Center,
-        Rect HitArea);
-
-    private readonly record struct OutputPort(
-        string NodeId,
-        string OutputId,
-        Point Center,
-        Rect HitArea);
 
     private sealed record InheritanceSourceDescription(
         NovelNode Node,
