@@ -62,6 +62,10 @@ $items = @(
     @{
         Key = 'HKCU:\Software\Classes\Directory\Background\shell\NovelEngine.Open'
         Argument = '%V'
+    },
+    @{
+        Key = 'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
+        Argument = '%1'
     }
 )
 
@@ -76,4 +80,4 @@ foreach ($item in $items) {
     Set-Item -Path $commandKey -Value ('{0} "{1}"' -f $baseCommand, $item.Argument)
 }
 
-Write-Host ('Explorer context menu item "{0}" installed for project folders.' -f $menuText)
+Write-Host ('Explorer context menu item "{0}" installed for project folders and .novel.json files.' -f $menuText)

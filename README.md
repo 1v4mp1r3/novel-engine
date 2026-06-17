@@ -36,13 +36,13 @@ powershell -ExecutionPolicy Bypass -File tools/install-explorer-context-menu.ps1
 
 Remove it later with `uninstall-context-menu.bat`.
 
-After installation, right-click a project folder or empty space inside it and
-choose `Открыть с помощью Novel Engine`. The editor will find the
-`*.novel.json` file in that folder and load the project with its adjacent
-managed files. Empty folders are opened as a workspace too, so you can create a new
-project there with `Ctrl+S`; the editor writes the project file into the opened
-folder, creates `files/` for managed game files, and keeps timestamped backups
-in `autosaves/`.
+After installation, right-click a project folder, empty space inside it, or a
+`*.novel.json` project file and choose `Открыть с помощью Novel Engine`. The
+editor will find the project file in that folder and load the project with its
+adjacent managed files. Empty folders are opened as a workspace too, so you can
+create a new project there with `Ctrl+S`; the editor writes the project file
+into the opened folder, creates `files/` for managed game files, and keeps
+timestamped backups in `autosaves/`.
 The startup screen lists recently opened or created projects for quick switching
 between workspaces.
 Use `File -> Restore autosave...` (`Файл -> Восстановить автосейв...`) to load

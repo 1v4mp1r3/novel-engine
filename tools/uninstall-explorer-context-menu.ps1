@@ -15,7 +15,8 @@ $menuText = -join @(
 
 $keys = @(
     'HKCU:\Software\Classes\Directory\shell\NovelEngine.Open',
-    'HKCU:\Software\Classes\Directory\Background\shell\NovelEngine.Open'
+    'HKCU:\Software\Classes\Directory\Background\shell\NovelEngine.Open',
+    'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
 )
 
 foreach ($key in $keys) {
