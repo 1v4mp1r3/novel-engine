@@ -17,6 +17,7 @@ var tests = new (string Name, Action Run)[]
     ("project save cleans temporary file on failure", ProjectSaveCleansTemporaryFileOnFailure),
     ("background and variables flow through transitions", RuntimeStateFlows),
     ("visual script blocks survive JSON and runtime", VisualScriptBlocksRoundTripAndRun),
+    ("visual script blocks import simple scripts", VisualScriptBlocksImportSimpleScripts),
     ("visual script blocks validate generated scripts", VisualScriptBlocksValidateGeneratedScripts),
     ("visual script blocks survive project language apply", VisualScriptBlocksSurviveProjectLanguageApply),
     ("project script variables collect authored names", ProjectScriptVariablesCollectAuthoredNames),
@@ -580,6 +581,33 @@ static void VisualScriptBlocksRoundTripAndRun()
     Assert(
         restored.FindNode(scene.Id)?.ScriptBlocks.Count == 1,
         "Visual script blocks were lost during JSON round trip.");
+}
+
+static void VisualScriptBlocksImportSimpleScripts()
+{
+    var blocks = VisualScriptCompiler.ParseScript(
+        """
+        # setup route
+        set route = "good"
+        add score 2
+        unset temporary_flag
+        """);
+
+    var script = VisualScriptCompiler.Compile(blocks);
+
+    Assert(blocks.Count == 4, "Script import produced the wrong block count.");
+    Assert(
+        script.Contains("set route = \"good\"", StringComparison.Ordinal),
+        "Imported set command was not compiled back.");
+    Assert(
+        script.Contains("add score 2", StringComparison.Ordinal),
+        "Imported add command was not compiled back.");
+    Assert(
+        script.Contains("unset temporary_flag", StringComparison.Ordinal),
+        "Imported unset command was not compiled back.");
+    AssertThrows<InvalidDataException>(
+        () => VisualScriptCompiler.ParseScript("dance now"),
+        "Unsupported script command was imported into visual blocks.");
 }
 
 static void VisualScriptBlocksValidateGeneratedScripts()

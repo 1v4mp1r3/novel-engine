@@ -17,6 +17,9 @@ unset temporary_flag
 
 Variable names use Latin letters, digits, and `_`, and cannot start with a
 digit. Values may be strings, numbers, booleans, or `null`.
+The visual-block editor can import these simple commands from text scripts:
+comments, `set`, `add`, and `unset`. Unsupported commands stay text-only until
+the block system grows matching block types.
 
 ## Choice conditions
 

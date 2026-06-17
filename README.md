@@ -116,6 +116,8 @@ currently installed on this workstation.
   in a choice editor, use the same button to attach blocks to that transition.
 - Condition and visual-block dialogs suggest variables already used in scripts,
   conditions, and blocks, while still allowing new names.
+- Visual-block dialogs can import simple text scripts (`set`, `add`, `unset`,
+  comments) into editable blocks.
 - Applying source from the `Код` tab preserves existing visual script blocks by
   matching node ids and choice outputs, so block-authored logic is not lost
   during DSL edits.

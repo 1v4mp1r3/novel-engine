@@ -546,7 +546,8 @@ public partial class MainWindow : Window
         var dialog = new VisualScriptBlocksWindow(
             node.ScriptBlocks,
             "Блоки скрипта при входе",
-            ProjectScriptVariables.Collect(_project))
+            ProjectScriptVariables.Collect(_project),
+            node.Script)
         {
             Owner = this,
         };
@@ -567,7 +568,8 @@ public partial class MainWindow : Window
         var dialog = new VisualScriptBlocksWindow(
             output.ScriptBlocks,
             $"Блоки скрипта варианта «{output.Label}»",
-            ProjectScriptVariables.Collect(_project))
+            ProjectScriptVariables.Collect(_project),
+            output.Script)
         {
             Owner = this,
         };

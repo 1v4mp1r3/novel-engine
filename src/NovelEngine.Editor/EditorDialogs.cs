@@ -92,7 +92,8 @@ public sealed class OutputEditorWindow : Window
         var dialog = new VisualScriptBlocksWindow(
             _scriptBlocks,
             "Блоки скрипта варианта",
-            _knownVariables)
+            _knownVariables,
+            _scriptBox.Text)
         {
             Owner = this,
         };

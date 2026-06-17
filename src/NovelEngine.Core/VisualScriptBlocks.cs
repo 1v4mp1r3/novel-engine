@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace NovelEngine.Core;
 
@@ -29,8 +30,81 @@ public sealed class VisualScriptBlock
         };
 }
 
-public static class VisualScriptCompiler
+public static partial class VisualScriptCompiler
 {
+    public static IReadOnlyList<VisualScriptBlock> ParseScript(string script)
+    {
+        var blocks = new List<VisualScriptBlock>();
+        var index = 1;
+        foreach (var sourceLine in script.Replace("\r", string.Empty).Split('\n'))
+        {
+            var line = sourceLine.Trim();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (line.StartsWith('#'))
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.Comment,
+                        Text = line[1..].Trim(),
+                    });
+                continue;
+            }
+
+            var setMatch = SetCommand().Match(line);
+            if (setMatch.Success)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.SetVariable,
+                        VariableName = setMatch.Groups["name"].Value,
+                        Value = setMatch.Groups["value"].Value.Trim(),
+                    });
+                continue;
+            }
+
+            var addMatch = AddCommand().Match(line);
+            if (addMatch.Success)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.AddVariable,
+                        VariableName = addMatch.Groups["name"].Value,
+                        Value = addMatch.Groups["value"].Value.Trim(),
+                    });
+                continue;
+            }
+
+            var unsetMatch = UnsetCommand().Match(line);
+            if (unsetMatch.Success)
+            {
+                blocks.Add(
+                    new VisualScriptBlock
+                    {
+                        Id = $"imported-{index++}",
+                        Kind = VisualScriptBlockKind.UnsetVariable,
+                        VariableName = unsetMatch.Groups["name"].Value,
+                    });
+                continue;
+            }
+
+            throw new InvalidDataException(
+                $"Команда не поддерживается visual blocks: {line}");
+        }
+
+        Validate(blocks);
+        return blocks;
+    }
+
     public static string Compile(IEnumerable<VisualScriptBlock> blocks)
     {
         var builder = new StringBuilder();
@@ -110,6 +184,21 @@ public static class VisualScriptCompiler
         string.IsNullOrWhiteSpace(block.Id)
             ? block.Kind.ToString()
             : $"«{block.Id}»";
+
+    [GeneratedRegex(
+        "^set\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<value>.+)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex SetCommand();
+
+    [GeneratedRegex(
+        "^add\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<value>.+)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex AddCommand();
+
+    [GeneratedRegex(
+        "^unset\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex UnsetCommand();
 }
 
 public static class VisualScriptBlockPreserver

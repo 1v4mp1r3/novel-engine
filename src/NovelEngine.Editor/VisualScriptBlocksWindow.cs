@@ -10,6 +10,7 @@ public sealed class VisualScriptBlocksWindow : Window
 {
     private readonly List<VisualScriptBlock> _blocks;
     private readonly IReadOnlyList<string> _knownVariables;
+    private readonly string _importScript;
     private readonly ListBox _blockList;
     private readonly TextBox _previewBox;
     private readonly TextBlock _summaryText;
@@ -22,10 +23,12 @@ public sealed class VisualScriptBlocksWindow : Window
     public VisualScriptBlocksWindow(
         IEnumerable<VisualScriptBlock> blocks,
         string title,
-        IEnumerable<string>? knownVariables = null)
+        IEnumerable<string>? knownVariables = null,
+        string importScript = "")
     {
         _blocks = blocks.Select(block => block.Clone()).ToList();
         _knownVariables = NormalizeVariables(knownVariables);
+        _importScript = importScript;
         Title = title;
         Width = 720;
         Height = 620;
@@ -84,6 +87,7 @@ public sealed class VisualScriptBlocksWindow : Window
         panel.Children.Add(CreateButton("+ add", () => AddBlock(VisualScriptBlockKind.AddVariable)));
         panel.Children.Add(CreateButton("+ unset", () => AddBlock(VisualScriptBlockKind.UnsetVariable)));
         panel.Children.Add(CreateButton("+ comment", () => AddBlock(VisualScriptBlockKind.Comment)));
+        panel.Children.Add(CreateButton("Импорт из скрипта", ImportFromScript));
         return panel;
     }
 
@@ -204,6 +208,69 @@ public sealed class VisualScriptBlocksWindow : Window
         (_blocks[index], _blocks[target]) = (_blocks[target], _blocks[index]);
         RefreshList(target);
     }
+
+    private void ImportFromScript()
+    {
+        if (string.IsNullOrWhiteSpace(_importScript))
+        {
+            MessageBox.Show(
+                this,
+                "В текстовом скрипте сейчас нет команд для импорта.",
+                "Импорт из скрипта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        IReadOnlyList<VisualScriptBlock> imported;
+        try
+        {
+            imported = VisualScriptCompiler.ParseScript(_importScript);
+        }
+        catch (InvalidDataException error)
+        {
+            MessageBox.Show(
+                this,
+                error.Message,
+                "Импорт из скрипта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (imported.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "В текстовом скрипте нет поддерживаемых команд.",
+                "Импорт из скрипта",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (_blocks.Count > 0)
+        {
+            var action = MessageBox.Show(
+                this,
+                "Заменить текущие блоки импортированными?\n\nДа — заменить, Нет — добавить в конец.",
+                "Импорт из скрипта",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+            if (action == MessageBoxResult.Cancel)
+            {
+                return;
+            }
+            if (action == MessageBoxResult.Yes)
+            {
+                _blocks.Clear();
+            }
+        }
+
+        _blocks.AddRange(imported.Select(block => block.Clone()));
+        RefreshList(Math.Max(0, _blocks.Count - imported.Count));
+    }
+
 
     private void RefreshList(int selectedIndex = -1)
     {
