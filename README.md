@@ -138,4 +138,6 @@ currently installed on this workstation.
   menu area that references the asset.
 - Right-click an image in `files/characters` to create a library character from
   that sprite, add it to the selected node, or attach voice blips from
-  `files/voices` to the matching character.
+  `files/voices` to the matching character. If the sprite is not used by any
+  character yet, the same menu can create a library character with the selected
+  voice blip already attached.

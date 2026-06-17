@@ -83,6 +83,7 @@ public sealed class CharacterEditorWindow : Window
         IEnumerable<NovelAsset> voiceAssets,
         string? suggestedName = null,
         string? suggestedSprite = null,
+        IEnumerable<string>? suggestedVoices = null,
         bool requireSprite = false)
     {
         _requiresSprite = requireSprite;
@@ -98,9 +99,12 @@ public sealed class CharacterEditorWindow : Window
             spriteAssets,
             character?.Sprite ?? suggestedSprite ?? string.Empty,
             requireSprite ? "Выберите спрайт" : "Без спрайта");
+        var voiceReferences = character is null
+            ? suggestedVoices?.ToList() ?? []
+            : CharacterVoiceReferences(character);
         _voiceList = CreateAssetList(
             voiceAssets,
-            CharacterVoiceReferences(character));
+            voiceReferences);
         _voicePitchBox = DialogUi.TextBox(
             (character?.VoicePitch ?? 1).ToString(CultureInfo.InvariantCulture));
         _voiceEveryBox = DialogUi.TextBox(

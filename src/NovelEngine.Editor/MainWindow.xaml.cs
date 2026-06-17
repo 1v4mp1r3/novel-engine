@@ -1824,8 +1824,7 @@ public partial class MainWindow : Window
 
         if (targets.Count == 0)
         {
-            return CreateDisabledAssetMenuItem(
-                "Подвязать voice-блип: персонаж со спрайтом не найден");
+            return CreateCharacterWithVoiceMenu(asset, voices);
         }
 
         if (voices.Count == 1 && targets.Count == 1)
@@ -1856,6 +1855,28 @@ public partial class MainWindow : Window
                     () => target.Bind(voice)));
             }
             menu.Items.Add(voiceMenu);
+        }
+        return menu;
+    }
+
+    private MenuItem CreateCharacterWithVoiceMenu(
+        NovelAsset spriteAsset,
+        IReadOnlyList<NovelAsset> voices)
+    {
+        if (voices.Count == 1)
+        {
+            var voice = voices[0];
+            return CreateAssetMenuItem(
+                $"Создать персонажа с voice-блипом «{voice.Id}»",
+                () => CreateLibraryCharacterFromSprite(spriteAsset, voice));
+        }
+
+        var menu = CreateHoverSubmenu("Создать персонажа с voice-блипом");
+        foreach (var voice in voices)
+        {
+            menu.Items.Add(CreateAssetMenuItem(
+                $"{voice.Id}  ·  {Path.GetFileName(voice.Path)}",
+                () => CreateLibraryCharacterFromSprite(spriteAsset, voice)));
         }
         return menu;
     }
@@ -2011,19 +2032,25 @@ public partial class MainWindow : Window
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
 
-    private void CreateLibraryCharacterFromSprite(NovelAsset asset)
+    private void CreateLibraryCharacterFromSprite(
+        NovelAsset asset,
+        NovelAsset? initialVoice = null)
     {
         if (asset.Kind != AssetKind.Image)
         {
             return;
         }
 
+        var suggestedVoices = initialVoice is null
+            ? Array.Empty<string>()
+            : [AssetReference.Create(initialVoice.Id)];
         var dialog = new CharacterEditorWindow(
             null,
             GetCharacterSpriteAssets(),
             GetVoiceBlipAssets(),
             SuggestedCharacterName(asset),
             AssetReference.Create(asset.Id),
+            suggestedVoices,
             requireSprite: true)
         {
             Owner = this,
@@ -2039,7 +2066,9 @@ public partial class MainWindow : Window
         _project.Characters.Add(character);
         MarkDirty();
         StatusText.Text =
-            $"Персонаж «{CharacterLabel(character)}» создан в библиотеке";
+            initialVoice is null
+                ? $"Персонаж «{CharacterLabel(character)}» создан в библиотеке"
+                : $"Персонаж «{CharacterLabel(character)}» создан с voice-блипом «{initialVoice.Id}»";
     }
 
     private void AddCharacterFromSpriteToSelectedNode(NovelAsset asset)
@@ -2056,6 +2085,7 @@ public partial class MainWindow : Window
             GetVoiceBlipAssets(),
             SuggestedCharacterName(asset),
             AssetReference.Create(asset.Id),
+            suggestedVoices: null,
             requireSprite: true)
         {
             Owner = this,
