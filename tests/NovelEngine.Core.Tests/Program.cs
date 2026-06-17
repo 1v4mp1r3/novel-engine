@@ -1252,6 +1252,12 @@ static void AssetFoldersMoveFiles()
         Assert(
             File.Exists(ProjectAssets.ResolvePath(projectPath, asset)),
             "Physical asset disappeared after folder rename.");
+        Assert(
+            !Directory.Exists(Path.Combine(directory, "files", "characters")),
+            "Old physical folder was left behind after rename.");
+        Assert(
+            File.Exists(Path.Combine(directory, "files", "cast", "heroes", "hero.png")),
+            "Untracked physical file did not move with the renamed folder.");
     }
     finally
     {
