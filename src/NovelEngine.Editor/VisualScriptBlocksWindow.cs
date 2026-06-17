@@ -19,6 +19,7 @@ public sealed class VisualScriptBlocksWindow : Window
     private readonly Button _deleteButton;
     private readonly Button _moveUpButton;
     private readonly Button _moveDownButton;
+    private bool _clearImportedScript;
 
     public VisualScriptBlocksWindow(
         IEnumerable<VisualScriptBlock> blocks,
@@ -66,6 +67,8 @@ public sealed class VisualScriptBlocksWindow : Window
 
     public IReadOnlyList<VisualScriptBlock> Blocks =>
         _blocks.Select(block => block.Clone()).ToList();
+
+    public bool ClearImportedScript => _clearImportedScript;
 
     private UIElement CreateContent()
     {
@@ -268,6 +271,13 @@ public sealed class VisualScriptBlocksWindow : Window
         }
 
         _blocks.AddRange(imported.Select(block => block.Clone()));
+        _clearImportedScript = MessageBox.Show(
+            this,
+            "Очистить текстовый скрипт после импорта, чтобы команды не выполнились дважды?",
+            "Импорт из скрипта",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.Yes) == MessageBoxResult.Yes;
         RefreshList(Math.Max(0, _blocks.Count - imported.Count));
     }
 

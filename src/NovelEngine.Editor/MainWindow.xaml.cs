@@ -558,9 +558,20 @@ public partial class MainWindow : Window
 
         node.ScriptBlocks.Clear();
         node.ScriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        if (dialog.ClearImportedScript)
+        {
+            node.Script = string.Empty;
+            if (node.UsesTypeDefaults)
+            {
+                node.PropertyOverrides.Add("script");
+            }
+        }
         MarkDirty();
+        RefreshProperties();
         StatusText.Text =
-            $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}";
+            dialog.ClearImportedScript
+                ? $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}, текстовый скрипт очищен"
+                : $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}";
     }
 
     private void EditOutputScriptBlocks(NovelNode node, NodeOutput output)
@@ -581,10 +592,16 @@ public partial class MainWindow : Window
         output.ScriptBlocks.Clear();
         output.ScriptBlocks.AddRange(
             dialog.Blocks.Select(block => block.Clone()));
+        if (dialog.ClearImportedScript)
+        {
+            output.Script = string.Empty;
+        }
         MarkDirty();
         RefreshProperties();
         StatusText.Text =
-            $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
+            dialog.ClearImportedScript
+                ? $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
+                : $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
     }
 
     private static void MarkOverrideIfChanged<T>(

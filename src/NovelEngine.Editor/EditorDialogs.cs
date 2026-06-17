@@ -104,6 +104,10 @@ public sealed class OutputEditorWindow : Window
 
         _scriptBlocks.Clear();
         _scriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        if (dialog.ClearImportedScript)
+        {
+            _scriptBox.Text = string.Empty;
+        }
         RefreshScriptBlocksButton();
     }
 
