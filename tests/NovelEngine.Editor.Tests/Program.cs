@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using NovelEngine.Core;
@@ -29,6 +30,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
+    ("graph hit test cache handles large graphs quickly", GraphHitTestCacheHandlesLargeGraphsQuickly),
 };
 
 var failed = 0;
@@ -689,6 +691,52 @@ static void GraphHitTestCacheReturnsPorts()
     Assert(ReferenceEquals(inputHit, inputNode), "Hit test cache returned the wrong input node.");
     Assert(outputHit?.NodeId == "scene", "Hit test cache returned the wrong output node.");
     Assert(outputHit?.OutputId == "next", "Hit test cache returned the wrong output id.");
+}
+
+static void GraphHitTestCacheHandlesLargeGraphsQuickly()
+{
+    var cache = new GraphHitTestCache();
+    const int count = 5_000;
+
+    for (var index = 0; index < count; index++)
+    {
+        var x = index * 180;
+        var y = 0;
+        var node = new NovelNode { Id = $"node-{index}", Title = $"Node {index}", Kind = NodeKind.Dialogue };
+        cache.AddNode(new GraphNodeHitArea(node, new Rect(x, y, 120, 72)));
+        cache.AddInputPort(
+            new GraphInputPortHitArea(
+                node,
+                new Point(x, y + 24),
+                new Rect(x - 6, y + 18, 12, 12)));
+        cache.AddOutputPort(
+            new GraphOutputPortHitArea(
+                node.Id,
+                $"out-{index}",
+                new Point(x + 120, y + 24),
+                new Rect(x + 114, y + 18, 12, 12)));
+    }
+
+    var lastX = (count - 1) * 180;
+    var lastY = 0;
+    var nodePoint = new Point(lastX + 40, lastY + 30);
+    var inputPoint = new Point(lastX, lastY + 24);
+    var outputPoint = new Point(lastX + 120, lastY + 24);
+
+    var stopwatch = Stopwatch.StartNew();
+    for (var index = 0; index < 2_000; index++)
+    {
+        Assert(cache.HitNode(nodePoint)?.Id == "node-4999", "Large graph node hit returned the wrong node.");
+        Assert(cache.HitInputPort(inputPoint)?.Id == "node-4999", "Large graph input hit returned the wrong node.");
+        var outputHit = cache.HitOutputPort(outputPoint);
+        Assert(outputHit?.NodeId == "node-4999", "Large graph output hit returned the wrong node.");
+        Assert(outputHit?.OutputId == "out-4999", "Large graph output hit returned the wrong output id.");
+    }
+
+    stopwatch.Stop();
+    Assert(
+        stopwatch.ElapsedMilliseconds < 1_500,
+        $"Large graph hit testing is too slow: {stopwatch.ElapsedMilliseconds}ms.");
 }
 
 static void WithRecentProjectsStore(string storePath, Action action)
