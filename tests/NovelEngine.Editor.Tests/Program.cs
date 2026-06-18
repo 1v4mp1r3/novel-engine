@@ -28,6 +28,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
+    ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
     ("graph hit test cache crosses spatial cells", GraphHitTestCacheCrossesSpatialCells),
@@ -655,6 +656,31 @@ static void RecentProjectsKeepOnlyNewestEntries()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
+{
+    var highlightedLimit = CodeEditorPerformancePolicy.MaxHighlightedCodeLength;
+    var liveAnalysisLimit = CodeEditorPerformancePolicy.MaxLiveCodeAnalysisLength;
+
+    Assert(
+        CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(highlightedLimit),
+        "Syntax highlighting should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(highlightedLimit + 1),
+        "Syntax highlighting should stop beyond the boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldApplyLiveErrorHighlighting(highlightedLimit + 1),
+        "Live error highlighting should not repaint large code documents.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldTrackCursorPosition(highlightedLimit + 1),
+        "Cursor tracking should not scan large code documents.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(liveAnalysisLimit),
+        "Live analysis should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(liveAnalysisLimit + 1),
+        "Live analysis should stop beyond the boundary length.");
 }
 
 static void GraphHitTestCachePrefersTopmostNode()

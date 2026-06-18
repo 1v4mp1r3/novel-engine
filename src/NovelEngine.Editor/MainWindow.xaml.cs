@@ -15,9 +15,6 @@ namespace NovelEngine.Editor;
 public partial class MainWindow : Window
 {
     private const int MaxProjectHistoryEntries = 100;
-    private const int MaxHighlightedCodeLength = 40_000;
-    private const int MaxLiveCodeAnalysisLength = 80_000;
-    private const int MaxHighlightedSyntaxSpans = 2_500;
 
     private NovelProject _project = NovelProject.CreateDefault();
     private string? _projectPath;
@@ -937,7 +934,7 @@ public partial class MainWindow : Window
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
     {
         var source = EnsureCodeCursorCache();
-        if (source.Length > MaxHighlightedCodeLength)
+        if (!CodeEditorPerformancePolicy.ShouldTrackCursorPosition(source.Length))
         {
             if (_lastCodeCursorOffset != -2)
             {
@@ -1006,7 +1003,7 @@ public partial class MainWindow : Window
     {
         var source = CodeEditor.SourceText;
         SetCodeCursorCache(source);
-        if (source.Length > MaxLiveCodeAnalysisLength)
+        if (!CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(source.Length))
         {
             _parsedCodeSource = null;
             _parsedCodeProject = null;
@@ -1031,7 +1028,10 @@ public partial class MainWindow : Window
         }
         catch (ProjectLanguageException error)
         {
-            ApplyCodeHighlighting(source, error);
+            if (CodeEditorPerformancePolicy.ShouldApplyLiveErrorHighlighting(source.Length))
+            {
+                ApplyCodeHighlighting(source, error);
+            }
             CodeStatusText.Foreground = Brushes.IndianRed;
             CodeStatusText.Text = error.Message;
         }
@@ -1055,7 +1055,9 @@ public partial class MainWindow : Window
         var spans = ShouldApplyFullSyntaxHighlighting(source)
             ? GetCodeSyntaxSpans(source)
             : Array.Empty<ProjectLanguageSyntaxSpan>();
-        if (error is null && spans.Count == 0 && source.Length > MaxHighlightedCodeLength)
+        if (error is null
+            && spans.Count == 0
+            && !CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(source.Length))
         {
             return;
         }
@@ -1078,7 +1080,7 @@ public partial class MainWindow : Window
     }
 
     private static bool ShouldApplyFullSyntaxHighlighting(string source) =>
-        source.Length <= MaxHighlightedCodeLength;
+        CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(source.Length);
 
     private IReadOnlyList<ProjectLanguageSyntaxSpan> GetCodeSyntaxSpans(string source)
     {
@@ -1089,7 +1091,7 @@ public partial class MainWindow : Window
 
         _codeSyntaxSource = source;
         _codeSyntaxSpans = ProjectLanguage.GetSyntaxSpans(source);
-        if (_codeSyntaxSpans.Count > MaxHighlightedSyntaxSpans)
+        if (_codeSyntaxSpans.Count > CodeEditorPerformancePolicy.MaxHighlightedSyntaxSpans)
         {
             _codeSyntaxSpans = [];
         }
