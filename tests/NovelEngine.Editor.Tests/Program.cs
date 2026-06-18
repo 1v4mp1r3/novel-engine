@@ -30,6 +30,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
+    ("graph hit test cache crosses spatial cells", GraphHitTestCacheCrossesSpatialCells),
     ("graph hit test cache handles large graphs quickly", GraphHitTestCacheHandlesLargeGraphsQuickly),
 };
 
@@ -691,6 +692,28 @@ static void GraphHitTestCacheReturnsPorts()
     Assert(ReferenceEquals(inputHit, inputNode), "Hit test cache returned the wrong input node.");
     Assert(outputHit?.NodeId == "scene", "Hit test cache returned the wrong output node.");
     Assert(outputHit?.OutputId == "next", "Hit test cache returned the wrong output id.");
+}
+
+static void GraphHitTestCacheCrossesSpatialCells()
+{
+    var node = new NovelNode { Id = "boundary", Kind = NodeKind.Scene };
+    var cache = new GraphHitTestCache();
+    cache.AddNode(new GraphNodeHitArea(node, new Rect(250, 250, 120, 80)));
+    cache.AddInputPort(
+        new GraphInputPortHitArea(
+            node,
+            new Point(256, 280),
+            new Rect(250, 274, 18, 18)));
+    cache.AddOutputPort(
+        new GraphOutputPortHitArea(
+            node.Id,
+            "next",
+            new Point(370, 280),
+            new Rect(364, 274, 18, 18)));
+
+    Assert(ReferenceEquals(cache.HitNode(new Point(320, 290)), node), "Cross-cell node hit failed.");
+    Assert(ReferenceEquals(cache.HitInputPort(new Point(260, 280)), node), "Cross-cell input hit failed.");
+    Assert(cache.HitOutputPort(new Point(370, 280))?.NodeId == node.Id, "Cross-cell output hit failed.");
 }
 
 static void GraphHitTestCacheHandlesLargeGraphsQuickly()
