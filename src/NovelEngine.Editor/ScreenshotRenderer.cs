@@ -540,8 +540,130 @@ internal static class ScreenshotRenderer
         }
     }
 
+    public static void SmokeStartupWindow()
+    {
+        var rootDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "novel-engine-startup-window-smoke");
+        if (Directory.Exists(rootDirectory))
+        {
+            Directory.Delete(rootDirectory, recursive: true);
+        }
+
+        try
+        {
+            Directory.CreateDirectory(rootDirectory);
+            var projectDirectory = Path.Combine(rootDirectory, "recent-project");
+            Directory.CreateDirectory(projectDirectory);
+            var recentEntry = new RecentProjectEntry(
+                projectDirectory,
+                "Smoke Recent Project",
+                DateTime.UtcNow);
+            Exception? clickFailure = null;
+            var window = new ProjectStartupWindow([recentEntry])
+            {
+                Left = -20_000,
+                Top = -20_000,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+            };
+            window.Loaded += (_, _) =>
+            {
+                window.Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        try
+                        {
+                            window.UpdateLayout();
+                            var button = FindButtonContainingText(
+                                window,
+                                recentEntry.DisplayName)
+                                ?? throw new InvalidOperationException(
+                                    "Startup smoke could not find the recent project button.");
+                            button.RaiseEvent(
+                                new RoutedEventArgs(ButtonBase.ClickEvent, button));
+                        }
+                        catch (Exception error) when (
+                            error is InvalidOperationException
+                            or ArgumentException)
+                        {
+                            clickFailure = error;
+                            window.Close();
+                        }
+                    },
+                    DispatcherPriority.ApplicationIdle);
+            };
+
+            var result = window.ShowDialog();
+            if (clickFailure is not null)
+            {
+                throw clickFailure;
+            }
+            if (result != true
+                || window.SelectedAction != ProjectStartupAction.OpenRecent
+                || !string.Equals(
+                    window.SelectedPath,
+                    projectDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Startup smoke did not select the recent project path.");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(rootDirectory))
+            {
+                Directory.Delete(rootDirectory, recursive: true);
+            }
+        }
+    }
+
     private static string? GetAssetViewId(object item) =>
         item.GetType().GetProperty("Id")?.GetValue(item) as string;
+
+    private static Button? FindButtonContainingText(
+        DependencyObject root,
+        string text)
+    {
+        if (root is Button button && ContainsText(button, text))
+        {
+            return button;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            if (FindButtonContainingText(
+                VisualTreeHelper.GetChild(root, index),
+                text) is { } child)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool ContainsText(DependencyObject root, string text)
+    {
+        if (root is TextBlock textBlock
+            && textBlock.Text.Contains(text, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            if (ContainsText(VisualTreeHelper.GetChild(root, index), text))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static MenuItem? FindMenuItem(ItemCollection items, string header)
     {

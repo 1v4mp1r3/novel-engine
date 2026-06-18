@@ -88,6 +88,9 @@ Invoke-Step "Smoke visual script blocks" {
 Invoke-Step "Smoke asset manager" {
     dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --asset-manager-smoke
 }
+Invoke-Step "Smoke startup window" {
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --startup-window-smoke
+}
 Invoke-Step "Smoke compiled debug preview" {
     $screenshotPath = Join-Path ([System.IO.Path]::GetTempPath()) 'novel-engine-compiled-preview-smoke.png'
     Remove-Item -LiteralPath $screenshotPath -ErrorAction SilentlyContinue
