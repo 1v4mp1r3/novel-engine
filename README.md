@@ -62,9 +62,10 @@ Double-click `test.bat`, or run:
 powershell -ExecutionPolicy Bypass -File tools/test.ps1
 ```
 
-The test script runs the solution build, core tests, editor-level tests, and
-editor smoke checks sequentially. Keep these commands sequential because WPF
-generated files share `obj` directories during build.
+The test script runs the solution build, core tests, editor-level tests, editor
+smoke checks, and a compiled debug preview smoke sequentially. Keep these
+commands sequential because WPF generated files share `obj` directories during
+build.
 
 The C++ runtime requires a separate C++20 compiler and CMake. They are not
 currently installed on this workstation.

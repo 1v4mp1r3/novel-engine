@@ -88,3 +88,18 @@ Invoke-Step "Smoke visual script blocks" {
 Invoke-Step "Smoke asset manager" {
     dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --asset-manager-smoke
 }
+Invoke-Step "Smoke compiled debug preview" {
+    $screenshotPath = Join-Path ([System.IO.Path]::GetTempPath()) 'novel-engine-compiled-preview-smoke.png'
+    Remove-Item -LiteralPath $screenshotPath -ErrorAction SilentlyContinue
+    dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --debug-build-screenshot $screenshotPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Compiled preview smoke failed with exit code $LASTEXITCODE."
+    }
+    if (-not (Test-Path -LiteralPath $screenshotPath -PathType Leaf)) {
+        throw 'Compiled preview smoke did not create a screenshot.'
+    }
+    if ((Get-Item -LiteralPath $screenshotPath).Length -lt 1024) {
+        throw 'Compiled preview smoke screenshot is unexpectedly small.'
+    }
+    Remove-Item -LiteralPath $screenshotPath -ErrorAction SilentlyContinue
+}
