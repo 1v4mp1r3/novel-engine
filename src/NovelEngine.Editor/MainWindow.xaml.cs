@@ -5317,6 +5317,16 @@ public partial class MainWindow : Window
 
     private void AutoSaveProject()
     {
+        if (!ShouldRunAutoSave(
+                hasProjectPath: _projectPath is not null,
+                hasWorkspaceDirectory: _workspaceDirectory is not null,
+                dirty: _dirty,
+                workspaceNeedsProjectFile: _workspaceNeedsProjectFile,
+                codeHasPendingChanges: _codeHasPendingChanges))
+        {
+            return;
+        }
+
         if (_projectPath is null)
         {
             if (_workspaceDirectory is null || !SaveProjectToWorkspace())
@@ -5352,6 +5362,21 @@ public partial class MainWindow : Window
         {
             StatusText.Text = $"Автосохранение не удалось: {error.Message}";
         }
+    }
+
+    internal static bool ShouldRunAutoSave(
+        bool hasProjectPath,
+        bool hasWorkspaceDirectory,
+        bool dirty,
+        bool workspaceNeedsProjectFile,
+        bool codeHasPendingChanges)
+    {
+        if (workspaceNeedsProjectFile)
+        {
+            return hasWorkspaceDirectory;
+        }
+
+        return hasProjectPath && (dirty || codeHasPendingChanges);
     }
 
     private void PreservePendingSourceCode()

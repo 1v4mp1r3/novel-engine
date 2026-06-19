@@ -11,6 +11,7 @@ var tests = new (string Name, Action Run)[]
     ("workspace project creates default folders", WorkspaceProjectCreatesDefaultFolders),
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
     ("workspace project can be resolved after creation", WorkspaceProjectCanBeResolvedAfterCreation),
+    ("autosave policy skips unchanged saved projects", AutoSavePolicySkipsUnchangedSavedProjects),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
@@ -169,6 +170,50 @@ static void WorkspaceProjectCanBeResolvedAfterCreation()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void AutoSavePolicySkipsUnchangedSavedProjects()
+{
+    Assert(
+        !MainWindow.ShouldRunAutoSave(
+            hasProjectPath: true,
+            hasWorkspaceDirectory: true,
+            dirty: false,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: false),
+        "Autosave should skip unchanged saved projects.");
+    Assert(
+        MainWindow.ShouldRunAutoSave(
+            hasProjectPath: true,
+            hasWorkspaceDirectory: true,
+            dirty: true,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: false),
+        "Autosave should run for dirty saved projects.");
+    Assert(
+        MainWindow.ShouldRunAutoSave(
+            hasProjectPath: true,
+            hasWorkspaceDirectory: true,
+            dirty: false,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: true),
+        "Autosave should preserve pending code changes.");
+    Assert(
+        MainWindow.ShouldRunAutoSave(
+            hasProjectPath: false,
+            hasWorkspaceDirectory: true,
+            dirty: false,
+            workspaceNeedsProjectFile: true,
+            codeHasPendingChanges: false),
+        "Autosave should create missing workspace project files.");
+    Assert(
+        !MainWindow.ShouldRunAutoSave(
+            hasProjectPath: false,
+            hasWorkspaceDirectory: false,
+            dirty: true,
+            workspaceNeedsProjectFile: true,
+            codeHasPendingChanges: false),
+        "Autosave should skip unsaved projects without a workspace directory.");
 }
 
 static void ProjectResolverOpensDirectProjectFile()
