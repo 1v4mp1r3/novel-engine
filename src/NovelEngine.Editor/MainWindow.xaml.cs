@@ -1101,10 +1101,19 @@ public partial class MainWindow : Window
         _dirty = true;
         RefreshWindowTitle();
         CodeStatusText.Foreground = Brushes.Goldenrod;
-        CodeStatusText.Text = "Проверка кода...";
         StatusText.Text = "Код проекта изменён";
         _codeAnalysisTimer.Stop();
-        _codeAnalysisTimer.Start();
+        if (ShouldScheduleLiveCodeAnalysis(CodeEditor.EstimatedSourceLength))
+        {
+            CodeStatusText.Text = "Проверка кода...";
+            _codeAnalysisTimer.Start();
+        }
+        else
+        {
+            _parsedCodeSource = null;
+            _parsedCodeProject = null;
+            CodeStatusText.Text = "Большой файл — Ctrl+Enter применит и проверит код";
+        }
     }
 
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
@@ -1141,6 +1150,9 @@ public partial class MainWindow : Window
 
     internal static bool ShouldReadCodeCursorSource(int estimatedSourceLength) =>
         CodeEditorPerformancePolicy.ShouldTrackCursorPosition(estimatedSourceLength);
+
+    internal static bool ShouldScheduleLiveCodeAnalysis(int estimatedSourceLength) =>
+        CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(estimatedSourceLength);
 
     private void DisableCodeCursorTrackingForLargeFile()
     {
@@ -1195,7 +1207,7 @@ public partial class MainWindow : Window
     {
         var source = CodeEditor.SourceText;
         SetCodeCursorCache(source);
-        if (!CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(source.Length))
+        if (!ShouldScheduleLiveCodeAnalysis(source.Length))
         {
             _parsedCodeSource = null;
             _parsedCodeProject = null;

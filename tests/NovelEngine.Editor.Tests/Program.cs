@@ -927,6 +927,12 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !MainWindow.ShouldReadCodeCursorSource(highlightedLimit + 1),
         "Cursor source reads should be skipped for oversized documents.");
+    Assert(
+        MainWindow.ShouldScheduleLiveCodeAnalysis(liveAnalysisLimit),
+        "Live code analysis timer should run at the configured boundary length.");
+    Assert(
+        !MainWindow.ShouldScheduleLiveCodeAnalysis(liveAnalysisLimit + 1),
+        "Live code analysis timer should not read oversized documents after typing.");
 }
 
 static void VisualScriptFilterKeepsPreviewCache()
