@@ -35,6 +35,7 @@ var tests = new (string Name, Action Run)[]
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
+    ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -842,6 +843,25 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit + 1),
         "History timer should not run for oversized documents.");
+}
+
+static void VisualScriptFilterKeepsPreviewCache()
+{
+    Assert(
+        VisualScriptBlocksWindow.ShouldUpdatePreview(
+            blocksChanged: true,
+            currentPreview: "set flag = true"),
+        "Visual script preview should refresh after block changes.");
+    Assert(
+        VisualScriptBlocksWindow.ShouldUpdatePreview(
+            blocksChanged: false,
+            currentPreview: string.Empty),
+        "Visual script preview should render the first time.");
+    Assert(
+        !VisualScriptBlocksWindow.ShouldUpdatePreview(
+            blocksChanged: false,
+            currentPreview: "set flag = true"),
+        "Visual script filter changes should keep the compiled preview cache.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()

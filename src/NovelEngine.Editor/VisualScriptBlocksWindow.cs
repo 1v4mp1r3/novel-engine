@@ -50,7 +50,8 @@ public sealed class VisualScriptBlocksWindow : Window
         };
         _filterBox = DialogUi.TextBox(string.Empty);
         _filterBox.Margin = new Thickness(0, 4, 0, 10);
-        _filterBox.TextChanged += (_, _) => RefreshList(GetSelectedBlockIndex());
+        _filterBox.TextChanged += (_, _) =>
+            RefreshList(GetSelectedBlockIndex(), blocksChanged: false);
         _blockList = new ListBox
         {
             Height = 220,
@@ -398,7 +399,7 @@ public sealed class VisualScriptBlocksWindow : Window
     }
 
 
-    private void RefreshList(int selectedIndex = -1)
+    private void RefreshList(int selectedIndex = -1, bool blocksChanged = true)
     {
         var query = _filterBox.Text.Trim();
         var views = _blocks
@@ -417,7 +418,11 @@ public sealed class VisualScriptBlocksWindow : Window
                 _blockList.SelectedIndex = visibleIndex;
             }
         }
-        UpdatePreview();
+        UpdateSummary(views.Count);
+        if (ShouldUpdatePreview(blocksChanged, _previewBox.Text))
+        {
+            UpdatePreview();
+        }
         UpdateButtons();
     }
 
@@ -486,12 +491,18 @@ public sealed class VisualScriptBlocksWindow : Window
         }
     }
 
-    private void UpdatePreview()
+    private void UpdateSummary(int visibleCount)
     {
-        var visibleCount = _blockList.Items.Count;
         _summaryText.Text = string.IsNullOrWhiteSpace(_filterBox.Text)
             ? $"Блоков: {_blocks.Count}"
             : $"Блоков: {_blocks.Count}, показано: {visibleCount}";
+    }
+
+    internal static bool ShouldUpdatePreview(bool blocksChanged, string currentPreview) =>
+        blocksChanged || string.IsNullOrEmpty(currentPreview);
+
+    private void UpdatePreview()
+    {
         try
         {
             _previewBox.Text = VisualScriptCompiler.Compile(_blocks);
