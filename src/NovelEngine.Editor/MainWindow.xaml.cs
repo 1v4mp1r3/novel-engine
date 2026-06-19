@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
     private AssetListStamp? _assetListStamp;
     private AssetFolderTreeStamp? _assetFolderTreeStamp;
+    private AssetPreviewStamp? _assetPreviewStamp;
     private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
@@ -280,6 +281,7 @@ public partial class MainWindow : Window
         _dirty = false;
         _selectedAssetFolder = null;
         _assetFolderTreeStamp = null;
+        _assetPreviewStamp = null;
         ClearProjectAnalysisCaches();
         var structureChanges = EnsureWorkspaceStructure();
         var filesChanged = SyncFilesFromDisk(refreshCode: false);
@@ -1416,6 +1418,7 @@ public partial class MainWindow : Window
         _assetPreviewImageCache.Clear();
         _assetUsageCountCache = null;
         _assetListStamp = null;
+        _assetPreviewStamp = null;
         _projectDiagnosticsCache = null;
         ClearNodeAssetPickerCaches();
     }
@@ -2039,9 +2042,16 @@ public partial class MainWindow : Window
 
     private void RefreshAssetPreview()
     {
+        var view = AssetsGrid.SelectedItem as AssetView;
+        var stamp = CreateAssetPreviewStamp(view?.Asset, view?.UsageCount ?? 0);
+        if (_assetPreviewStamp == stamp)
+        {
+            return;
+        }
+
+        _assetPreviewStamp = stamp;
         StopAssetPreviewPlayback();
         _assetPreviewAudioPath = null;
-        var view = AssetsGrid.SelectedItem as AssetView;
         var selected = view is not null;
         RenameAssetButton.IsEnabled = selected;
         MoveAssetButton.IsEnabled = selected;
@@ -2112,6 +2122,22 @@ public partial class MainWindow : Window
 
         AssetPreviewImage.Source = image;
         AssetPreviewPlaceholder.Visibility = Visibility.Collapsed;
+    }
+
+    internal static AssetPreviewStamp CreateAssetPreviewStamp(
+        NovelAsset? asset,
+        int usageCount)
+    {
+        if (asset is null)
+        {
+            return new AssetPreviewStamp(null, AssetKind.Other, string.Empty, 0);
+        }
+
+        return new AssetPreviewStamp(
+            asset.Id,
+            asset.Kind,
+            asset.Path,
+            usageCount);
     }
 
     private BitmapImage? LoadAssetPreviewImage(string path)
@@ -5799,6 +5825,12 @@ public partial class MainWindow : Window
         int FolderCount,
         int AssetCount,
         int Hash);
+
+    internal readonly record struct AssetPreviewStamp(
+        string? AssetId,
+        AssetKind Kind,
+        string Path,
+        int UsageCount);
 
     internal readonly record struct ProjectExplorerStamp(
         string Query,

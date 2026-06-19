@@ -33,6 +33,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
+    ("asset preview stamp tracks visible input state", AssetPreviewStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
@@ -813,6 +814,39 @@ static void AssetFolderTreeStampTracksVisibleInputState()
             assets,
             "backgrounds"),
         "Asset folder tree stamp should track empty folder rows.");
+}
+
+static void AssetPreviewStampTracksVisibleInputState()
+{
+    var asset = new NovelAsset
+    {
+        Id = "fuji",
+        Kind = AssetKind.Image,
+        Folder = "backgrounds",
+        Path = "files/backgrounds/fuji.jpg",
+    };
+    var baseline = MainWindow.CreateAssetPreviewStamp(asset, usageCount: 2);
+
+    Assert(
+        baseline == MainWindow.CreateAssetPreviewStamp(asset, usageCount: 2),
+        "Asset preview stamp should remain stable for identical preview state.");
+
+    asset.Folder = "renamed_backgrounds";
+    Assert(
+        baseline == MainWindow.CreateAssetPreviewStamp(asset, usageCount: 2),
+        "Asset preview stamp should ignore fields not shown in the preview panel.");
+
+    asset.Path = "files/backgrounds/fuji-large.jpg";
+    Assert(
+        baseline != MainWindow.CreateAssetPreviewStamp(asset, usageCount: 2),
+        "Asset preview stamp should track preview paths.");
+    Assert(
+        baseline != MainWindow.CreateAssetPreviewStamp(asset, usageCount: 3),
+        "Asset preview stamp should track usage counts.");
+    Assert(
+        MainWindow.CreateAssetPreviewStamp(null, usageCount: 0)
+        == MainWindow.CreateAssetPreviewStamp(null, usageCount: 3),
+        "Empty asset preview stamp should ignore usage counts.");
 }
 
 static void DispatcherDebounceGateCollapsesPendingRequests()
