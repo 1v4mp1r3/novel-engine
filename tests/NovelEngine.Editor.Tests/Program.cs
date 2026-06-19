@@ -30,6 +30,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
+    ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -712,6 +713,25 @@ static void DispatcherDebounceGateCollapsesPendingRequests()
 
     Assert(!gate.IsPending, "Dispatcher refresh gate should clear its pending state.");
     Assert(gate.TryRequest(), "Dispatcher refresh gate should allow a request after completion.");
+}
+
+static void AssetFileCachesClearOnlyAfterDiskChanges()
+{
+    Assert(
+        !MainWindow.ShouldClearAssetFileCaches(
+            externalFileEvent: false,
+            diskSyncChangedProject: false),
+        "Plain asset refresh should keep file caches warm.");
+    Assert(
+        MainWindow.ShouldClearAssetFileCaches(
+            externalFileEvent: true,
+            diskSyncChangedProject: false),
+        "External file events should clear file caches.");
+    Assert(
+        MainWindow.ShouldClearAssetFileCaches(
+            externalFileEvent: false,
+            diskSyncChangedProject: true),
+        "Disk sync project changes should clear file caches.");
 }
 
 static void BoundedCacheEvictsLeastRecentlyUsedEntries()

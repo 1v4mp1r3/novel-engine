@@ -117,14 +117,19 @@ public partial class MainWindow : Window
         _filesRefreshTimer.Tick += (_, _) =>
         {
             _filesRefreshTimer.Stop();
-            ClearAssetFileCaches();
             if (ReferenceEquals(WorkspaceTabs.SelectedItem, FilesTab))
             {
-                RefreshAssets();
+                RefreshAssets(externalFileEvent: true);
             }
             else
             {
-                SyncFilesFromDisk(refreshCode: false);
+                var filesChanged = SyncFilesFromDisk(refreshCode: false);
+                if (ShouldClearAssetFileCaches(
+                        externalFileEvent: true,
+                        diskSyncChangedProject: filesChanged))
+                {
+                    ClearAssetFileCaches();
+                }
             }
             RequestDiagnosticsRefresh();
         };
@@ -1188,12 +1193,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefreshAssets(bool syncFromDisk = true)
+    private void RefreshAssets(
+        bool syncFromDisk = true,
+        bool externalFileEvent = false)
     {
+        var filesChanged = false;
         if (syncFromDisk)
         {
+            filesChanged = SyncFilesFromDisk();
+        }
+        if (ShouldClearAssetFileCaches(externalFileEvent, filesChanged))
+        {
             ClearAssetFileCaches();
-            SyncFilesFromDisk();
         }
         RefreshAssetFolders();
         RefreshAssetList();
@@ -1207,6 +1218,11 @@ public partial class MainWindow : Window
         _projectDiagnosticsCache = null;
         ClearNodeAssetPickerCaches();
     }
+
+    internal static bool ShouldClearAssetFileCaches(
+        bool externalFileEvent,
+        bool diskSyncChangedProject) =>
+        externalFileEvent || diskSyncChangedProject;
 
     private void ClearProjectAnalysisCaches()
     {
