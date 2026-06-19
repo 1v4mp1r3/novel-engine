@@ -344,14 +344,18 @@ public sealed class GraphSurface : FrameworkElement
 
         var nextX = (float)(_dragNodeStart.X + position.X - _dragStart.X);
         var nextY = (float)(_dragNodeStart.Y + position.Y - _dragStart.Y);
-        if (NearlyEqual(node.X, nextX) && NearlyEqual(node.Y, nextY))
+        if (!HasMeaningfulDragPositionChange(node.X, node.Y, nextX, nextY))
         {
             return;
         }
 
         node.X = nextX;
         node.Y = nextY;
-        _dragMoved = node.X != _dragNodeStart.X || node.Y != _dragNodeStart.Y;
+        _dragMoved = HasMeaningfulDragPositionChange(
+            _dragNodeStart.X,
+            _dragNodeStart.Y,
+            node.X,
+            node.Y);
         RequestRender(invalidateHitTests: true);
     }
 
@@ -1328,6 +1332,13 @@ public sealed class GraphSurface : FrameworkElement
 
     private static bool NearlyEqual(double first, double second) =>
         Math.Abs(first - second) < DragRenderEpsilon;
+
+    internal static bool HasMeaningfulDragPositionChange(
+        double currentX,
+        double currentY,
+        double nextX,
+        double nextY) =>
+        !NearlyEqual(currentX, nextX) || !NearlyEqual(currentY, nextY);
 
     private static double Round(double value) =>
         Math.Round(value, 2);

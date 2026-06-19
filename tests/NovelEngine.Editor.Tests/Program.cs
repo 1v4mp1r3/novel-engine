@@ -47,6 +47,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
+    ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
@@ -1404,6 +1405,19 @@ static void SceneEditorCharacterListStampTracksVisibleRows()
     Assert(
         baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
         "Scene character list stamp should track added rows.");
+}
+
+static void GraphDragMovementSkipsMicroDeltas()
+{
+    Assert(
+        !GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10.1, 20.1),
+        "Graph node micro drag should not refresh rendering or mark the project dirty.");
+    Assert(
+        GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10.5, 20),
+        "Graph node drag at the render threshold should update X.");
+    Assert(
+        GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
+        "Graph node drag at the render threshold should update Y.");
 }
 
 static void GraphConnectionCurveBoundsIncludeControlPoints()
