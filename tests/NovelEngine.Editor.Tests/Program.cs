@@ -921,6 +921,12 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit + 1),
         "History timer should not run for oversized documents.");
+    Assert(
+        MainWindow.ShouldReadCodeCursorSource(highlightedLimit),
+        "Cursor source reads should include the configured boundary length.");
+    Assert(
+        !MainWindow.ShouldReadCodeCursorSource(highlightedLimit + 1),
+        "Cursor source reads should be skipped for oversized documents.");
 }
 
 static void VisualScriptFilterKeepsPreviewCache()

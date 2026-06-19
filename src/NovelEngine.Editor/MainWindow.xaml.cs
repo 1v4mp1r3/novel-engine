@@ -1109,14 +1109,16 @@ public partial class MainWindow : Window
 
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
     {
-        var source = EnsureCodeCursorCache();
-        if (!CodeEditorPerformancePolicy.ShouldTrackCursorPosition(source.Length))
+        if (!ShouldReadCodeCursorSource(CodeEditor.EstimatedSourceLength))
         {
-            if (_lastCodeCursorOffset != -2)
-            {
-                _lastCodeCursorOffset = -2;
-                CodeCursorText.Text = "Большой файл: позиция курсора отключена";
-            }
+            DisableCodeCursorTrackingForLargeFile();
+            return;
+        }
+
+        var source = EnsureCodeCursorCache();
+        if (!ShouldReadCodeCursorSource(source.Length))
+        {
+            DisableCodeCursorTrackingForLargeFile();
             return;
         }
 
@@ -1135,6 +1137,20 @@ public partial class MainWindow : Window
         var lineStart = _codeLineStarts[Math.Min(lineIndex, _codeLineStarts.Length - 1)];
         CodeCursorText.Text =
             $"Строка {lineIndex + 1}, столбец {offset - lineStart + 1}";
+    }
+
+    internal static bool ShouldReadCodeCursorSource(int estimatedSourceLength) =>
+        CodeEditorPerformancePolicy.ShouldTrackCursorPosition(estimatedSourceLength);
+
+    private void DisableCodeCursorTrackingForLargeFile()
+    {
+        if (_lastCodeCursorOffset == -2)
+        {
+            return;
+        }
+
+        _lastCodeCursorOffset = -2;
+        CodeCursorText.Text = "Большой файл: позиция курсора отключена";
     }
 
     private string EnsureCodeCursorCache()

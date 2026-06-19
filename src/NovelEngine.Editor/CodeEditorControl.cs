@@ -188,6 +188,8 @@ public sealed class CodeEditorControl : RichTextBox
     public int SourceCaretOffset =>
         _caretOffsetCache ?? RefreshCaretOffsetCache();
 
+    public int EstimatedSourceLength => _estimatedSourceLength;
+
     public void ApplySyntax(
         IReadOnlyList<ProjectLanguageSyntaxSpan> spans,
         int? errorStart = null,
