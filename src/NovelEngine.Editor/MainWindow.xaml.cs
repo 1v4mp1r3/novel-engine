@@ -86,7 +86,8 @@ public partial class MainWindow : Window
         OutputsGrid.ContextMenu = new ContextMenu();
 
         Graph.SelectionChanged += (_, _) => HandleGraphSelection();
-        Graph.ProjectChanged += (_, _) => MarkDirty();
+        Graph.ProjectChanged += (_, _) => MarkDirty(
+            refreshGraph: ShouldRefreshGraphForDirtyChange(originatedFromGraphSurface: true));
         Graph.AddChoiceRequested += nodeId => AddOutput(nodeId);
         Graph.PreviewNodeRequested += PreviewNode;
         Graph.EditNodeSceneRequested += EditNodeScene;
@@ -797,7 +798,7 @@ public partial class MainWindow : Window
         return new NodePropertyPanelStamp(node.Id, hash.ToHashCode());
     }
 
-    private void MarkDirty()
+    private void MarkDirty(bool refreshGraph = true)
     {
         if (!_codeHasPendingChanges)
         {
@@ -813,10 +814,16 @@ public partial class MainWindow : Window
         RefreshWindowTitle();
         RefreshExplorer();
         RefreshProperties();
-        Graph.RefreshGraph();
+        if (refreshGraph)
+        {
+            Graph.RefreshGraph();
+        }
         StatusText.Text = "Проект изменён";
         RequestDiagnosticsRefresh();
     }
+
+    internal static bool ShouldRefreshGraphForDirtyChange(bool originatedFromGraphSurface) =>
+        !originatedFromGraphSurface;
 
     private void ResetProjectHistory()
     {

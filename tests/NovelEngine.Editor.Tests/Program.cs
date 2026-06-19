@@ -48,6 +48,7 @@ var tests = new (string Name, Action Run)[]
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
+    ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
@@ -1418,6 +1419,16 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges()
+{
+    Assert(
+        !MainWindow.ShouldRefreshGraphForDirtyChange(originatedFromGraphSurface: true),
+        "Graph-originated project changes already refreshed the graph surface.");
+    Assert(
+        MainWindow.ShouldRefreshGraphForDirtyChange(originatedFromGraphSurface: false),
+        "External project changes should refresh the graph surface.");
 }
 
 static void GraphConnectionCurveBoundsIncludeControlPoints()
