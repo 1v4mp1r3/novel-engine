@@ -510,6 +510,20 @@ public partial class MainWindow : Window
         var inheritCharacters = node.Kind != NodeKind.Start
             && InheritCharactersCheck.IsChecked == true;
         var script = ScriptBox.Text.Trim();
+        if (!HasNodePropertyChanges(
+                node,
+                title,
+                speaker,
+                text,
+                inheritBackground,
+                background,
+                inheritMusic,
+                music,
+                inheritCharacters,
+                script))
+        {
+            return true;
+        }
 
         MarkOverrideIfChanged(node, "title", node.Title, title);
         MarkOverrideIfChanged(node, "speaker", node.Speaker, speaker);
@@ -538,7 +552,6 @@ public partial class MainWindow : Window
         node.Music = music;
         node.InheritCharacters = inheritCharacters;
         node.Script = script;
-        Graph.RefreshGraph();
         MarkDirty();
         return true;
     }
@@ -634,6 +647,27 @@ public partial class MainWindow : Window
             node.PropertyOverrides.Add(property);
         }
     }
+
+    internal static bool HasNodePropertyChanges(
+        NovelNode node,
+        string title,
+        string speaker,
+        string text,
+        bool inheritBackground,
+        string background,
+        bool inheritMusic,
+        string music,
+        bool inheritCharacters,
+        string script) =>
+        !node.Title.Equals(title, StringComparison.Ordinal)
+            || !node.Speaker.Equals(speaker, StringComparison.Ordinal)
+            || !node.Text.Equals(text, StringComparison.Ordinal)
+            || node.InheritBackground != inheritBackground
+            || !node.Background.Equals(background, StringComparison.Ordinal)
+            || node.InheritMusic != inheritMusic
+            || !node.Music.Equals(music, StringComparison.Ordinal)
+            || node.InheritCharacters != inheritCharacters
+            || !node.Script.Equals(script, StringComparison.Ordinal);
 
     private void MarkDirty()
     {

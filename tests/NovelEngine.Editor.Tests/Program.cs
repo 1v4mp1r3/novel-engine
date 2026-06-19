@@ -36,6 +36,7 @@ var tests = new (string Name, Action Run)[]
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
+    ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -862,6 +863,64 @@ static void VisualScriptFilterKeepsPreviewCache()
             blocksChanged: false,
             currentPreview: "set flag = true"),
         "Visual script filter changes should keep the compiled preview cache.");
+}
+
+static void NodePropertyGuardSkipsUnchangedApply()
+{
+    var node = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        Title = "Scene",
+        Speaker = string.Empty,
+        Text = "Line",
+        InheritBackground = false,
+        Background = "@bg",
+        InheritMusic = true,
+        Music = string.Empty,
+        InheritCharacters = false,
+        Script = "set flag = true",
+    };
+
+    Assert(
+        !MainWindow.HasNodePropertyChanges(
+            node,
+            node.Title,
+            node.Speaker,
+            node.Text,
+            node.InheritBackground,
+            node.Background,
+            node.InheritMusic,
+            node.Music,
+            node.InheritCharacters,
+            node.Script),
+        "Unchanged node properties should not refresh the graph.");
+    Assert(
+        MainWindow.HasNodePropertyChanges(
+            node,
+            "Scene 2",
+            node.Speaker,
+            node.Text,
+            node.InheritBackground,
+            node.Background,
+            node.InheritMusic,
+            node.Music,
+            node.InheritCharacters,
+            node.Script),
+        "Changed title should refresh node properties.");
+    Assert(
+        MainWindow.HasNodePropertyChanges(
+            node,
+            node.Title,
+            node.Speaker,
+            node.Text,
+            node.InheritBackground,
+            node.Background,
+            node.InheritMusic,
+            node.Music,
+            node.InheritCharacters,
+            "set flag = false"),
+        "Changed script should refresh node properties.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()
