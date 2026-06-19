@@ -3011,12 +3011,16 @@ public partial class MainWindow : Window
             {
                 _ = ImportAssetFile(file);
             }
-            if (_project.Assets.Count != before)
+            var after = _project.Assets.Count;
+            var importedCount = after - before;
+            if (ShouldRefreshAssetsAfterImport(before, after))
             {
                 MarkDirty();
+                RefreshAssets(syncFromDisk: false);
             }
-            RefreshAssets(syncFromDisk: false);
-            StatusText.Text = $"Импортировано файлов: {dialog.FileNames.Length}";
+            StatusText.Text = importedCount > 0
+                ? $"Импортировано файлов: {importedCount}"
+                : "Новых ассетов не импортировано";
         }
         catch (Exception error) when (
             error is IOException
@@ -3764,6 +3768,11 @@ public partial class MainWindow : Window
         bool workspaceNeedsProjectFile,
         bool codeHasPendingChanges) =>
         !hasProjectPath || dirty || workspaceNeedsProjectFile || codeHasPendingChanges;
+
+    internal static bool ShouldRefreshAssetsAfterImport(
+        int assetCountBefore,
+        int assetCountAfter) =>
+        assetCountAfter != assetCountBefore;
 
     private bool SaveProjectAs()
     {

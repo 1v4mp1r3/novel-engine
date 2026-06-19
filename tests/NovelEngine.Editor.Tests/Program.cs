@@ -40,6 +40,7 @@ var tests = new (string Name, Action Run)[]
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
+    ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -1009,6 +1010,16 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
             source,
             @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
         "Editor-driven asset mutations should refresh known asset state without disk sync.");
+}
+
+static void AssetImportRefreshPolicySkipsUnchangedImports()
+{
+    Assert(
+        !MainWindow.ShouldRefreshAssetsAfterImport(3, 3),
+        "Asset import should skip refresh when no assets were added.");
+    Assert(
+        MainWindow.ShouldRefreshAssetsAfterImport(3, 4),
+        "Asset import should refresh after adding a new asset.");
 }
 
 static void DiagnosticPanelStampTracksVisibleDiagnostics()
