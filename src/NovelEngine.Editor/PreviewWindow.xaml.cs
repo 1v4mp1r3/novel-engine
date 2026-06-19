@@ -19,6 +19,7 @@ public partial class PreviewWindow : Window
 {
     private const int VoicePlayerPoolSize = 6;
     private const int MaxVoiceSoundPools = 32;
+    private const int MaxCachedPreviewBitmaps = 96;
     private static readonly JsonSerializerOptions SaveOptions = new()
     {
         WriteIndented = true,
@@ -35,7 +36,8 @@ public partial class PreviewWindow : Window
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _voicePlayerIndexes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, BitmapImage?> _bitmapCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedCache<string, BitmapImage?> _bitmapCache =
+        new(MaxCachedPreviewBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<string> _voicePoolLru = [];
     private readonly HashSet<MediaPlayer> _activeVoicePlayers = new();
     private readonly GameRuntimeSettings _settings = new();
@@ -547,7 +549,7 @@ public partial class PreviewWindow : Window
         }
 
         var image = LoadBitmap(path);
-        _bitmapCache[path] = image;
+        _bitmapCache.Set(path, image);
         return image;
     }
 
