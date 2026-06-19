@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private bool _codeRefreshPending = true;
     private bool _codeRefreshUseStoredSource = true;
     private bool _syncingFilesFromDisk;
+    private readonly DispatcherDebounceGate _filesRefreshDispatchGate = new();
     private readonly List<ProjectHistoryEntry> _projectHistory = [];
     private int _projectHistoryIndex = -1;
     private bool _restoringProjectHistory;
@@ -1497,10 +1498,22 @@ public partial class MainWindow : Window
 
     private void ScheduleFilesRefresh()
     {
+        if (!_filesRefreshDispatchGate.TryRequest())
+        {
+            return;
+        }
+
         _ = Dispatcher.BeginInvoke(() =>
         {
-            _filesRefreshTimer.Stop();
-            _filesRefreshTimer.Start();
+            try
+            {
+                _filesRefreshTimer.Stop();
+                _filesRefreshTimer.Start();
+            }
+            finally
+            {
+                _filesRefreshDispatchGate.Complete();
+            }
         });
     }
 

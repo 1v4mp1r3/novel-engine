@@ -29,6 +29,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
+    ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -697,6 +698,20 @@ static void AssetListFilterSearchesWithinSelectedFolder()
     Assert(result.FolderAssetCount == 2, "Asset folder count ignored the selected folder.");
     Assert(result.Assets.Count == 1, "Asset search did not filter the selected folder.");
     Assert(result.Assets[0].Id == "mount_fuji", "Asset search returned the wrong asset.");
+}
+
+static void DispatcherDebounceGateCollapsesPendingRequests()
+{
+    var gate = new DispatcherDebounceGate();
+
+    Assert(gate.TryRequest(), "First dispatcher refresh request should be queued.");
+    Assert(gate.IsPending, "Dispatcher refresh gate should report a pending request.");
+    Assert(!gate.TryRequest(), "Second pending dispatcher refresh request should be collapsed.");
+
+    gate.Complete();
+
+    Assert(!gate.IsPending, "Dispatcher refresh gate should clear its pending state.");
+    Assert(gate.TryRequest(), "Dispatcher refresh gate should allow a request after completion.");
 }
 
 static void BoundedCacheEvictsLeastRecentlyUsedEntries()
