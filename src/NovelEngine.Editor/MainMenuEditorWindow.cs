@@ -611,22 +611,68 @@ public sealed class MainMenuEditorWindow : Window
         {
             return;
         }
-        _selected.Text = _textBox.Text;
-        _selected.Image = _imageBox.Text.Trim();
-        if (_actionBox.SelectedItem is MainMenuAction action)
+        var text = _textBox.Text;
+        var image = _imageBox.Text.Trim();
+        var action = _actionBox.SelectedItem is MainMenuAction selectedAction
+            ? selectedAction
+            : _selected.Action;
+        var x = ParseDouble(_xBox.Text, _selected.X);
+        var y = ParseDouble(_yBox.Text, _selected.Y);
+        var width = Math.Max(8, ParseDouble(_widthBox.Text, _selected.Width));
+        var height = Math.Max(8, ParseDouble(_heightBox.Text, _selected.Height));
+        var fontSize = Math.Max(6, ParseDouble(_fontSizeBox.Text, _selected.FontSize));
+        var foreground = _foregroundBox.Text.Trim();
+        var background = _backgroundBox.Text.Trim();
+        var border = _borderBox.Text.Trim();
+        var customStyleCode = _styleCodeBox.Text;
+        if (!HasElementPropertyChanges(
+                _selected,
+                text,
+                image,
+                action,
+                x,
+                y,
+                width,
+                height,
+                fontSize,
+                foreground,
+                background,
+                border,
+                customStyleCode))
         {
-            _selected.Action = action;
+            return;
         }
-        _selected.X = ParseDouble(_xBox.Text, _selected.X);
-        _selected.Y = ParseDouble(_yBox.Text, _selected.Y);
-        _selected.Width = Math.Max(8, ParseDouble(_widthBox.Text, _selected.Width));
-        _selected.Height = Math.Max(8, ParseDouble(_heightBox.Text, _selected.Height));
-        _selected.FontSize = Math.Max(6, ParseDouble(_fontSizeBox.Text, _selected.FontSize));
-        _selected.Foreground = _foregroundBox.Text.Trim();
-        _selected.Background = _backgroundBox.Text.Trim();
-        _selected.Border = _borderBox.Text.Trim();
-        _selected.CustomStyleCode = _styleCodeBox.Text;
-        RefreshStage();
+
+        var refreshStage = HasRenderedElementPropertyChanges(
+            _selected,
+            text,
+            image,
+            x,
+            y,
+            width,
+            height,
+            fontSize,
+            foreground,
+            background,
+            border,
+            customStyleCode);
+
+        _selected.Text = text;
+        _selected.Image = image;
+        _selected.Action = action;
+        _selected.X = x;
+        _selected.Y = y;
+        _selected.Width = width;
+        _selected.Height = height;
+        _selected.FontSize = fontSize;
+        _selected.Foreground = foreground;
+        _selected.Background = background;
+        _selected.Border = border;
+        _selected.CustomStyleCode = customStyleCode;
+        if (refreshStage)
+        {
+            RefreshStage();
+        }
     }
 
     private void BrowseElementImage()
@@ -732,6 +778,60 @@ public sealed class MainMenuEditorWindow : Window
         Point nextPosition) =>
         Math.Abs(element.X - nextPosition.X) >= DragUpdateEpsilon
             || Math.Abs(element.Y - nextPosition.Y) >= DragUpdateEpsilon;
+
+    internal static bool HasElementPropertyChanges(
+        MainMenuElement element,
+        string text,
+        string image,
+        MainMenuAction action,
+        double x,
+        double y,
+        double width,
+        double height,
+        double fontSize,
+        string foreground,
+        string background,
+        string border,
+        string customStyleCode) =>
+        element.Action != action
+            || HasRenderedElementPropertyChanges(
+                element,
+                text,
+                image,
+                x,
+                y,
+                width,
+                height,
+                fontSize,
+                foreground,
+                background,
+                border,
+                customStyleCode);
+
+    internal static bool HasRenderedElementPropertyChanges(
+        MainMenuElement element,
+        string text,
+        string image,
+        double x,
+        double y,
+        double width,
+        double height,
+        double fontSize,
+        string foreground,
+        string background,
+        string border,
+        string customStyleCode) =>
+        !element.Text.Equals(text, StringComparison.Ordinal)
+            || !element.Image.Equals(image, StringComparison.Ordinal)
+            || element.X != x
+            || element.Y != y
+            || element.Width != width
+            || element.Height != height
+            || element.FontSize != fontSize
+            || !element.Foreground.Equals(foreground, StringComparison.Ordinal)
+            || !element.Background.Equals(background, StringComparison.Ordinal)
+            || !element.Border.Equals(border, StringComparison.Ordinal)
+            || !element.CustomStyleCode.Equals(customStyleCode, StringComparison.Ordinal);
 
     internal readonly record struct MainMenuElementListStamp(
         int Count,

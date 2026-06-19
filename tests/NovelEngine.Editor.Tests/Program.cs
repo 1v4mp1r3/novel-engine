@@ -41,6 +41,7 @@ var tests = new (string Name, Action Run)[]
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
+    ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
     ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
@@ -1093,6 +1094,89 @@ static void MainMenuDragPositionClampsAndSkipsMicroMoves()
 
     Assert(Math.Abs(clamped.X - 880) < 0.001, "Main menu drag X was not clamped.");
     Assert(Math.Abs(clamped.Y - 500) < 0.001, "Main menu drag Y was not clamped.");
+}
+
+static void MainMenuPropertyGuardSeparatesRenderedChanges()
+{
+    var element = new MainMenuElement
+    {
+        Id = "start",
+        Action = MainMenuAction.NewGame,
+        Text = "Start",
+        Image = "start.png",
+        X = 20,
+        Y = 30,
+        Width = 200,
+        Height = 50,
+        FontSize = 24,
+        Foreground = "#FFFFFF",
+        Background = "#222222",
+        Border = "#333333",
+        CustomStyleCode = "font-weight: bold",
+    };
+
+    Assert(
+        !MainMenuEditorWindow.HasElementPropertyChanges(
+            element,
+            element.Text,
+            element.Image,
+            element.Action,
+            element.X,
+            element.Y,
+            element.Width,
+            element.Height,
+            element.FontSize,
+            element.Foreground,
+            element.Background,
+            element.Border,
+            element.CustomStyleCode),
+        "Unchanged main menu element properties should be skipped.");
+    Assert(
+        MainMenuEditorWindow.HasElementPropertyChanges(
+            element,
+            element.Text,
+            element.Image,
+            MainMenuAction.LoadGame,
+            element.X,
+            element.Y,
+            element.Width,
+            element.Height,
+            element.FontSize,
+            element.Foreground,
+            element.Background,
+            element.Border,
+            element.CustomStyleCode),
+        "Action-only main menu changes should still update the model.");
+    Assert(
+        !MainMenuEditorWindow.HasRenderedElementPropertyChanges(
+            element,
+            element.Text,
+            element.Image,
+            element.X,
+            element.Y,
+            element.Width,
+            element.Height,
+            element.FontSize,
+            element.Foreground,
+            element.Background,
+            element.Border,
+            element.CustomStyleCode),
+        "Unchanged rendered main menu properties should not refresh the stage.");
+    Assert(
+        MainMenuEditorWindow.HasRenderedElementPropertyChanges(
+            element,
+            "Continue",
+            element.Image,
+            element.X,
+            element.Y,
+            element.Width,
+            element.Height,
+            element.FontSize,
+            element.Foreground,
+            element.Background,
+            element.Border,
+            element.CustomStyleCode),
+        "Rendered text changes should refresh the main menu stage.");
 }
 
 static void MainMenuElementListStampTracksVisibleRows()
