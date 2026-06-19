@@ -37,6 +37,7 @@ var tests = new (string Name, Action Run)[]
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
+    ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -921,6 +922,34 @@ static void NodePropertyGuardSkipsUnchangedApply()
             node.InheritCharacters,
             "set flag = false"),
         "Changed script should refresh node properties.");
+}
+
+static void ProjectExplorerStampTracksVisibleNodeFields()
+{
+    var project = NovelProject.CreateDefault();
+    var baseline = MainWindow.CreateProjectExplorerStamp(project, " scene ");
+
+    Assert(
+        baseline == MainWindow.CreateProjectExplorerStamp(project, "scene"),
+        "Project explorer stamp should normalize the search query.");
+
+    var changedTitleProject = NovelProject.CreateDefault();
+    changedTitleProject.Nodes[0].Title += " updated";
+    Assert(
+        baseline != MainWindow.CreateProjectExplorerStamp(changedTitleProject, "scene"),
+        "Project explorer stamp should change when a node title changes.");
+
+    var changedSearchProject = NovelProject.CreateDefault();
+    changedSearchProject.Nodes[0].Text += " extra";
+    Assert(
+        baseline != MainWindow.CreateProjectExplorerStamp(changedSearchProject, "scene"),
+        "Project explorer stamp should change when searchable node text changes.");
+
+    var changedPositionProject = NovelProject.CreateDefault();
+    changedPositionProject.Nodes[0].X += 10;
+    Assert(
+        baseline == MainWindow.CreateProjectExplorerStamp(changedPositionProject, "scene"),
+        "Project explorer stamp should ignore node position-only changes.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()

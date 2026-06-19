@@ -65,6 +65,10 @@ public partial class MainWindow : Window
         _nodeAssetChoicesCache = [];
     private AssetPickerCacheStamp? _assetPickerCacheStamp;
     private ProjectDiagnosticReport? _projectDiagnosticsCache;
+    private readonly Dictionary<string, TreeViewItem> _projectTreeItemsByNodeId =
+        new(StringComparer.OrdinalIgnoreCase);
+    private TreeViewItem? _selectedProjectTreeItem;
+    private ProjectExplorerStamp? _projectExplorerStamp;
 
     public MainWindow()
         : this(null)
@@ -304,6 +308,17 @@ public partial class MainWindow : Window
         try
         {
             var query = ProjectSearchBox.Text.Trim();
+            var stamp = CreateProjectExplorerStamp(_project, query);
+            if (_projectExplorerStamp == stamp && ProjectTree.Items.Count > 0)
+            {
+                SyncProjectTreeSelection(Graph.SelectedNodeId);
+                return;
+            }
+
+            _projectExplorerStamp = stamp;
+            _projectTreeItemsByNodeId.Clear();
+            _selectedProjectTreeItem = null;
+
             var matchedNodes = FilteredNodes(query).ToList();
             ProjectTree.Items.Clear();
             var root = new TreeViewItem
@@ -317,6 +332,7 @@ public partial class MainWindow : Window
             AddNodeGroup(root, "Старт", NodeKind.Start, query, matchedNodes);
             AddNodeGroup(root, "Сцены", NodeKind.Scene, query, matchedNodes);
             AddNodeGroup(root, "Диалоги", NodeKind.Dialogue, query, matchedNodes);
+            SyncProjectTreeSelection(Graph.SelectedNodeId);
         }
         finally
         {
@@ -346,10 +362,28 @@ public partial class MainWindow : Window
             {
                 Header = node.Title,
                 Tag = node.Id,
-                IsSelected = node.Id == Graph.SelectedNodeId,
             };
+            _projectTreeItemsByNodeId[node.Id] = item;
             group.Items.Add(item);
         }
+    }
+
+    private void SyncProjectTreeSelection(string? nodeId)
+    {
+        if (_selectedProjectTreeItem is not null)
+        {
+            _selectedProjectTreeItem.IsSelected = false;
+            _selectedProjectTreeItem = null;
+        }
+
+        if (nodeId is null
+            || !_projectTreeItemsByNodeId.TryGetValue(nodeId, out var item))
+        {
+            return;
+        }
+
+        item.IsSelected = true;
+        _selectedProjectTreeItem = item;
     }
 
     private IEnumerable<NovelNode> FilteredNodes(string query) =>
@@ -369,6 +403,27 @@ public partial class MainWindow : Window
 
     private static bool Contains(string value, string query) =>
         value.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+
+    internal static ProjectExplorerStamp CreateProjectExplorerStamp(
+        NovelProject project,
+        string query)
+    {
+        var hash = new HashCode();
+        hash.Add(project.Title, StringComparer.Ordinal);
+        foreach (var node in project.Nodes)
+        {
+            hash.Add(node.Id, StringComparer.Ordinal);
+            hash.Add(node.Kind);
+            hash.Add(node.Title, StringComparer.Ordinal);
+            hash.Add(node.Speaker, StringComparer.Ordinal);
+            hash.Add(node.Text, StringComparer.Ordinal);
+        }
+
+        return new ProjectExplorerStamp(
+            query.Trim(),
+            project.Nodes.Count,
+            hash.ToHashCode());
+    }
 
     private void RefreshProperties()
     {
@@ -5503,6 +5558,11 @@ public partial class MainWindow : Window
     private readonly record struct AssetPickerCacheStamp(
         int AssetCount,
         int FolderCount,
+        int Hash);
+
+    internal readonly record struct ProjectExplorerStamp(
+        string Query,
+        int NodeCount,
         int Hash);
 
     private sealed record ProjectHistoryEntry(string Snapshot, string? SelectedNodeId);
