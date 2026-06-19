@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         new(MaxCachedAssetPreviewImages, StringComparer.OrdinalIgnoreCase);
     private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
     private AssetListStamp? _assetListStamp;
+    private AssetFolderTreeStamp? _assetFolderTreeStamp;
     private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
@@ -278,6 +279,7 @@ public partial class MainWindow : Window
         _workspaceNeedsProjectFile = path is null && workspaceDirectory is not null;
         _dirty = false;
         _selectedAssetFolder = null;
+        _assetFolderTreeStamp = null;
         ClearProjectAnalysisCaches();
         var structureChanges = EnsureWorkspaceStructure();
         var filesChanged = SyncFilesFromDisk(refreshCode: false);
@@ -1806,6 +1808,16 @@ public partial class MainWindow : Window
 
     private void RefreshAssetFolders()
     {
+        var stamp = CreateAssetFolderTreeStamp(
+            _project.AssetFolders,
+            _project.Assets,
+            _selectedAssetFolder);
+        if (_assetFolderTreeStamp == stamp && AssetFoldersTree.Items.Count > 0)
+        {
+            return;
+        }
+
+        _assetFolderTreeStamp = stamp;
         _refreshingAssetFolders = true;
         try
         {
@@ -1874,6 +1886,47 @@ public partial class MainWindow : Window
         var hasFolder = _selectedAssetFolder is not null;
         RenameFolderButton.IsEnabled = hasFolder;
         DeleteFolderButton.IsEnabled = hasFolder;
+    }
+
+    internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(
+        IEnumerable<string> folders,
+        IEnumerable<NovelAsset> assets,
+        string? selectedFolder)
+    {
+        var normalizedSelectedFolder = selectedFolder is null
+            ? null
+            : ProjectAssets.NormalizeFolder(selectedFolder.Trim());
+        var normalizedFolders = folders
+            .Select(ProjectAssets.NormalizeFolder)
+            .Where(folder => folder.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(folder => folder, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var folderCounts = assets
+            .GroupBy(
+                asset => ProjectAssets.NormalizeFolder(asset.Folder),
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.OrdinalIgnoreCase);
+        var assetCount = 0;
+        var hash = new HashCode();
+        foreach (var folder in normalizedFolders)
+        {
+            hash.Add(folder, StringComparer.OrdinalIgnoreCase);
+            hash.Add(folderCounts.GetValueOrDefault(folder));
+        }
+        foreach (var count in folderCounts.Values)
+        {
+            assetCount += count;
+        }
+
+        return new AssetFolderTreeStamp(
+            normalizedSelectedFolder,
+            normalizedFolders.Length,
+            assetCount,
+            hash.ToHashCode());
     }
 
     private static StackPanel CreateFolderHeader(string title, int count) =>
@@ -5738,6 +5791,12 @@ public partial class MainWindow : Window
     internal readonly record struct AssetListStamp(
         string? Folder,
         string Query,
+        int AssetCount,
+        int Hash);
+
+    internal readonly record struct AssetFolderTreeStamp(
+        string? SelectedFolder,
+        int FolderCount,
         int AssetCount,
         int Hash);
 

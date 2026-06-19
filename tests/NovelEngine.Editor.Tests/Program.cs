@@ -32,6 +32,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
+    ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
@@ -757,6 +758,61 @@ static void AssetListStampTracksVisibleInputState()
     Assert(
         baseline != MainWindow.CreateAssetListStamp(assets, "backgrounds", "fuji"),
         "Asset list stamp should change when asset metadata changes.");
+}
+
+static void AssetFolderTreeStampTracksVisibleInputState()
+{
+    var folders = new[] { "backgrounds", "voices" };
+    var assets = new List<NovelAsset>
+    {
+        new()
+        {
+            Id = "fuji",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/fuji.jpg",
+        },
+        new()
+        {
+            Id = "voice_a",
+            Kind = AssetKind.Audio,
+            Folder = "voices",
+            Path = "files/voices/voice_a.wav",
+        },
+    };
+    var baseline = MainWindow.CreateAssetFolderTreeStamp(
+        folders,
+        assets,
+        " backgrounds ");
+
+    Assert(
+        baseline == MainWindow.CreateAssetFolderTreeStamp(folders, assets, "backgrounds"),
+        "Asset folder tree stamp should normalize selected folders.");
+    Assert(
+        baseline != MainWindow.CreateAssetFolderTreeStamp(folders, assets, "voices"),
+        "Asset folder tree stamp should track selected folders.");
+
+    assets[0].Path = "files/backgrounds/renamed.jpg";
+    Assert(
+        baseline == MainWindow.CreateAssetFolderTreeStamp(folders, assets, "backgrounds"),
+        "Asset folder tree stamp should ignore non-visible asset metadata.");
+
+    assets.Add(new NovelAsset
+    {
+        Id = "lake",
+        Kind = AssetKind.Image,
+        Folder = "backgrounds",
+        Path = "files/backgrounds/lake.jpg",
+    });
+    Assert(
+        baseline != MainWindow.CreateAssetFolderTreeStamp(folders, assets, "backgrounds"),
+        "Asset folder tree stamp should track folder counts.");
+    Assert(
+        baseline != MainWindow.CreateAssetFolderTreeStamp(
+            folders.Append("characters"),
+            assets,
+            "backgrounds"),
+        "Asset folder tree stamp should track empty folder rows.");
 }
 
 static void DispatcherDebounceGateCollapsesPendingRequests()
