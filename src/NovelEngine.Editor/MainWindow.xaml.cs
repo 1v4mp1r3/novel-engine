@@ -3731,6 +3731,16 @@ public partial class MainWindow : Window
 
     private bool SaveProject()
     {
+        if (!ShouldRunManualSave(
+                hasProjectPath: _projectPath is not null,
+                dirty: _dirty,
+                workspaceNeedsProjectFile: _workspaceNeedsProjectFile,
+                codeHasPendingChanges: _codeHasPendingChanges))
+        {
+            StatusText.Text = "Нет изменений для сохранения";
+            return true;
+        }
+
         if (!EnsureCodeApplied())
         {
             return false;
@@ -3747,6 +3757,13 @@ public partial class MainWindow : Window
         }
         return WriteProject(_projectPath);
     }
+
+    internal static bool ShouldRunManualSave(
+        bool hasProjectPath,
+        bool dirty,
+        bool workspaceNeedsProjectFile,
+        bool codeHasPendingChanges) =>
+        !hasProjectPath || dirty || workspaceNeedsProjectFile || codeHasPendingChanges;
 
     private bool SaveProjectAs()
     {

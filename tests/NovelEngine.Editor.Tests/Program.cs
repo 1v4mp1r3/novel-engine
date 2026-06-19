@@ -12,6 +12,7 @@ var tests = new (string Name, Action Run)[]
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
     ("workspace project can be resolved after creation", WorkspaceProjectCanBeResolvedAfterCreation),
     ("autosave policy skips unchanged saved projects", AutoSavePolicySkipsUnchangedSavedProjects),
+    ("manual save policy skips unchanged saved projects", ManualSavePolicySkipsUnchangedSavedProjects),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
@@ -214,6 +215,45 @@ static void AutoSavePolicySkipsUnchangedSavedProjects()
             workspaceNeedsProjectFile: true,
             codeHasPendingChanges: false),
         "Autosave should skip unsaved projects without a workspace directory.");
+}
+
+static void ManualSavePolicySkipsUnchangedSavedProjects()
+{
+    Assert(
+        !MainWindow.ShouldRunManualSave(
+            hasProjectPath: true,
+            dirty: false,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: false),
+        "Manual save should skip unchanged saved projects.");
+    Assert(
+        MainWindow.ShouldRunManualSave(
+            hasProjectPath: true,
+            dirty: true,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: false),
+        "Manual save should run for dirty saved projects.");
+    Assert(
+        MainWindow.ShouldRunManualSave(
+            hasProjectPath: true,
+            dirty: false,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: true),
+        "Manual save should apply pending code changes.");
+    Assert(
+        MainWindow.ShouldRunManualSave(
+            hasProjectPath: false,
+            dirty: false,
+            workspaceNeedsProjectFile: false,
+            codeHasPendingChanges: false),
+        "Manual save should prompt for unsaved project locations.");
+    Assert(
+        MainWindow.ShouldRunManualSave(
+            hasProjectPath: true,
+            dirty: false,
+            workspaceNeedsProjectFile: true,
+            codeHasPendingChanges: false),
+        "Manual save should create missing workspace project files.");
 }
 
 static void ProjectResolverOpensDirectProjectFile()
