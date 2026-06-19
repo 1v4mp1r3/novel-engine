@@ -30,6 +30,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
+    ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
@@ -704,6 +705,46 @@ static void AssetListFilterSearchesWithinSelectedFolder()
     Assert(result.FolderAssetCount == 2, "Asset folder count ignored the selected folder.");
     Assert(result.Assets.Count == 1, "Asset search did not filter the selected folder.");
     Assert(result.Assets[0].Id == "mount_fuji", "Asset search returned the wrong asset.");
+}
+
+static void AssetListStampTracksVisibleInputState()
+{
+    var assets = new[]
+    {
+        new NovelAsset
+        {
+            Id = "mount_fuji",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/MountFuji.jpg",
+        },
+        new NovelAsset
+        {
+            Id = "hero_voice",
+            Kind = AssetKind.Audio,
+            Folder = "voices",
+            Path = "files/voices/hero.wav",
+        },
+    };
+    var baseline = MainWindow.CreateAssetListStamp(
+        assets,
+        " backgrounds ",
+        " fuji ");
+
+    Assert(
+        baseline == MainWindow.CreateAssetListStamp(assets, "backgrounds", "fuji"),
+        "Asset list stamp should normalize folder and search query.");
+    Assert(
+        baseline != MainWindow.CreateAssetListStamp(assets, "voices", "fuji"),
+        "Asset list stamp should track the selected folder.");
+    Assert(
+        baseline != MainWindow.CreateAssetListStamp(assets, "backgrounds", "voice"),
+        "Asset list stamp should track the search query.");
+
+    assets[0].Path = "files/backgrounds/MountFujiLarge.jpg";
+    Assert(
+        baseline != MainWindow.CreateAssetListStamp(assets, "backgrounds", "fuji"),
+        "Asset list stamp should change when asset metadata changes.");
 }
 
 static void DispatcherDebounceGateCollapsesPendingRequests()

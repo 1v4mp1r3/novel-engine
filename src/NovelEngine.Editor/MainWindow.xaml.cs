@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private readonly BoundedCache<string, BitmapImage?> _assetPreviewImageCache =
         new(MaxCachedAssetPreviewImages, StringComparer.OrdinalIgnoreCase);
     private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
+    private AssetListStamp? _assetListStamp;
     private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
@@ -1304,6 +1305,7 @@ public partial class MainWindow : Window
         _assetSizeCache.Clear();
         _assetPreviewImageCache.Clear();
         _assetUsageCountCache = null;
+        _assetListStamp = null;
         _projectDiagnosticsCache = null;
         ClearNodeAssetPickerCaches();
     }
@@ -1316,6 +1318,7 @@ public partial class MainWindow : Window
     private void ClearProjectAnalysisCaches()
     {
         _assetUsageCountCache = null;
+        _assetListStamp = null;
         _projectDiagnosticsCache = null;
     }
 
@@ -1625,6 +1628,16 @@ public partial class MainWindow : Window
     private void RefreshAssetList()
     {
         var selectedId = (AssetsGrid.SelectedItem as AssetView)?.Id;
+        var stamp = CreateAssetListStamp(
+            _project.Assets,
+            _selectedAssetFolder,
+            AssetSearchBox.Text);
+        if (_assetListStamp == stamp && AssetsGrid.ItemsSource is not null)
+        {
+            return;
+        }
+
+        _assetListStamp = stamp;
         var filtered = AssetListFilter.Apply(
             _project.Assets,
             _selectedAssetFolder,
@@ -1651,6 +1664,32 @@ public partial class MainWindow : Window
                         StringComparison.OrdinalIgnoreCase));
         }
         RefreshAssetPreview();
+    }
+
+    internal static AssetListStamp CreateAssetListStamp(
+        IEnumerable<NovelAsset> assets,
+        string? selectedFolder,
+        string query)
+    {
+        var normalizedFolder = selectedFolder is null
+            ? null
+            : ProjectAssets.NormalizeFolder(selectedFolder.Trim());
+        var hash = new HashCode();
+        var count = 0;
+        foreach (var asset in assets)
+        {
+            count++;
+            hash.Add(asset.Id, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Path, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Folder, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Kind);
+        }
+
+        return new AssetListStamp(
+            normalizedFolder,
+            query.Trim(),
+            count,
+            hash.ToHashCode());
     }
 
     private IReadOnlyDictionary<string, int> GetAssetUsageCounts() =>
@@ -5558,6 +5597,12 @@ public partial class MainWindow : Window
     private readonly record struct AssetPickerCacheStamp(
         int AssetCount,
         int FolderCount,
+        int Hash);
+
+    internal readonly record struct AssetListStamp(
+        string? Folder,
+        string Query,
+        int AssetCount,
         int Hash);
 
     internal readonly record struct ProjectExplorerStamp(
