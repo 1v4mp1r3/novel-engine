@@ -28,6 +28,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
+    ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
@@ -656,6 +657,41 @@ static void RecentProjectsKeepOnlyNewestEntries()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void AssetListFilterSearchesWithinSelectedFolder()
+{
+    var assets = new[]
+    {
+        new NovelAsset
+        {
+            Id = "mount_fuji",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/MountFuji.jpg",
+        },
+        new NovelAsset
+        {
+            Id = "forest",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/Forest.png",
+        },
+        new NovelAsset
+        {
+            Id = "hero_voice",
+            Kind = AssetKind.Audio,
+            Folder = "voices",
+            Path = "files/voices/hero.wav",
+        },
+    };
+
+    var result = AssetListFilter.Apply(assets, "backgrounds", "картинка mount");
+
+    Assert(result.Query == "картинка mount", "Asset search query was not normalized.");
+    Assert(result.FolderAssetCount == 2, "Asset folder count ignored the selected folder.");
+    Assert(result.Assets.Count == 1, "Asset search did not filter the selected folder.");
+    Assert(result.Assets[0].Id == "mount_fuji", "Asset search returned the wrong asset.");
 }
 
 static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()

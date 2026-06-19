@@ -1506,23 +1506,12 @@ public partial class MainWindow : Window
     private void RefreshAssetList()
     {
         var selectedId = (AssetsGrid.SelectedItem as AssetView)?.Id;
-        var assets = _selectedAssetFolder is null
-            ? _project.Assets
-            : _project.Assets.Where(
-                asset => asset.Folder.Equals(
-                    _selectedAssetFolder,
-                    StringComparison.OrdinalIgnoreCase));
-        var folderAssetCount = assets.Count();
-        var query = AssetSearchBox.Text.Trim();
-        if (query.Length > 0)
-        {
-            assets = assets.Where(asset => AssetMatchesSearch(asset, query));
-        }
-
+        var filtered = AssetListFilter.Apply(
+            _project.Assets,
+            _selectedAssetFolder,
+            AssetSearchBox.Text);
         var usageCounts = GetAssetUsageCounts();
-        var assetViews = assets
-            .OrderBy(asset => asset.Kind)
-            .ThenBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
+        var assetViews = filtered.Assets
             .Select(
                 asset => new AssetView(
                     asset,
@@ -1530,9 +1519,9 @@ public partial class MainWindow : Window
                     AssetSize(asset)))
             .ToList();
         AssetsGrid.ItemsSource = assetViews;
-        AssetSearchSummaryText.Text = query.Length == 0
+        AssetSearchSummaryText.Text = filtered.Query.Length == 0
             ? string.Empty
-            : $"Найдено {assetViews.Count} из {folderAssetCount}";
+            : $"Найдено {assetViews.Count} из {filtered.FolderAssetCount}";
         if (selectedId is not null)
         {
             AssetsGrid.SelectedItem = AssetsGrid.Items
@@ -1547,30 +1536,6 @@ public partial class MainWindow : Window
 
     private IReadOnlyDictionary<string, int> GetAssetUsageCounts() =>
         _assetUsageCountCache ??= _project.CountAssetReferencesById();
-
-    private static bool AssetMatchesSearch(NovelAsset asset, string query)
-    {
-        var tokens = query
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return tokens.Length == 0 || tokens.All(token =>
-            ContainsSearchToken(asset.Id, token)
-            || ContainsSearchToken(asset.Path, token)
-            || ContainsSearchToken(asset.Folder, token)
-            || ContainsSearchToken(Path.GetFileName(asset.Path), token)
-            || ContainsSearchToken(asset.Kind.ToString(), token)
-            || ContainsSearchToken(AssetKindLabel(asset.Kind), token));
-    }
-
-    private static bool ContainsSearchToken(string value, string token) =>
-        value.Contains(token, StringComparison.CurrentCultureIgnoreCase);
-
-    private static string AssetKindLabel(AssetKind kind) =>
-        kind switch
-        {
-            AssetKind.Image => "изображение картинка image",
-            AssetKind.Audio => "аудио музыка звук audio",
-            _ => "файл file",
-        };
 
     private void RefreshAssetFolders()
     {
