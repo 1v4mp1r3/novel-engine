@@ -32,6 +32,7 @@ var tests = new (string Name, Action Run)[]
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
+    ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
@@ -802,6 +803,74 @@ static void MainMenuDragPositionClampsAndSkipsMicroMoves()
 
     Assert(Math.Abs(clamped.X - 880) < 0.001, "Main menu drag X was not clamped.");
     Assert(Math.Abs(clamped.Y - 500) < 0.001, "Main menu drag Y was not clamped.");
+}
+
+static void SceneEditorTransformClampsAndSkipsMicroMoves()
+{
+    var moved = SceneEditorWindow.CalculateMovedCharacterPosition(
+        10,
+        20,
+        new Point(2, 3),
+        new Point(5, 8));
+
+    Assert(Math.Abs(moved.X - 13) < 0.001, "Scene character drag X was not calculated.");
+    Assert(Math.Abs(moved.Y - 25) < 0.001, "Scene character drag Y was not calculated.");
+
+    var clamped = SceneEditorWindow.CalculateMovedCharacterPosition(
+        1_910,
+        1_070,
+        new Point(0, 0),
+        new Point(100, 100));
+
+    Assert(
+        Math.Abs(clamped.X - CharacterLayout.StageWidth) < 0.001,
+        "Scene character drag X was not clamped.");
+    Assert(
+        Math.Abs(clamped.Y - CharacterLayout.StageHeight) < 0.001,
+        "Scene character drag Y was not clamped.");
+
+    var character = new CharacterPlacement
+    {
+        Id = "hero",
+        HasCustomTransform = true,
+        X = moved.X,
+        Y = moved.Y,
+        Scale = 1,
+        Rotation = 0,
+    };
+
+    Assert(
+        !SceneEditorWindow.HasMeaningfulTransformChange(
+            character,
+            character.X + 0.1,
+            character.Y + 0.1,
+            character.Scale + 0.0001,
+            character.Rotation + 0.05),
+        "Micro scene transform movement should not refresh the selected visual.");
+    Assert(
+        SceneEditorWindow.HasMeaningfulTransformChange(
+            character,
+            character.X + 1,
+            character.Y,
+            character.Scale,
+            character.Rotation),
+        "Visible scene transform movement was skipped.");
+    Assert(
+        SceneEditorWindow.HasMeaningfulTransformChange(
+            character,
+            character.X,
+            character.Y,
+            character.Scale + 0.01,
+            character.Rotation),
+        "Visible scene transform scale was skipped.");
+    Assert(
+        SceneEditorWindow.HasMeaningfulTransformChange(
+            character,
+            character.X,
+            character.Y,
+            character.Scale,
+            character.Rotation + 0.2),
+        "Visible scene transform rotation was skipped.");
 }
 
 static void GraphConnectionCurveBoundsIncludeControlPoints()

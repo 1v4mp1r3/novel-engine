@@ -14,6 +14,9 @@ public partial class SceneEditorWindow : Window
 {
     private const double MinimumScale = 0.1;
     private const double MaximumScale = 5;
+    private const double TransformUpdateEpsilon = 0.5;
+    private const double ScaleUpdateEpsilon = 0.001;
+    private const double RotationUpdateEpsilon = 0.1;
     private const int MaxCachedSceneBitmaps = 64;
 
     private readonly NovelProject _project;
@@ -303,17 +306,25 @@ public partial class SceneEditorWindow : Window
         }
 
         var point = e.GetPosition(StageCanvas);
+        var nextX = _selectedCharacter.X;
+        var nextY = _selectedCharacter.Y;
+        var nextScale = _selectedCharacter.Scale;
+        var nextRotation = _selectedCharacter.Rotation;
         if (_operation == TransformOperation.Move)
         {
-            var delta = point - _operationStart;
-            _selectedCharacter.X = Math.Clamp(_startX + delta.X, 0, CharacterLayout.StageWidth);
-            _selectedCharacter.Y = Math.Clamp(_startY + delta.Y, 0, CharacterLayout.StageHeight);
+            var nextPosition = CalculateMovedCharacterPosition(
+                _startX,
+                _startY,
+                _operationStart,
+                point);
+            nextX = nextPosition.X;
+            nextY = nextPosition.Y;
         }
         else if (_operation == TransformOperation.Scale)
         {
             var distance = Distance(point, new Point(_startX, _startY));
             var factor = _startDistance < 1 ? 1 : distance / _startDistance;
-            _selectedCharacter.Scale = Math.Clamp(
+            nextScale = Math.Clamp(
                 _startScale * factor,
                 MinimumScale,
                 MaximumScale);
@@ -321,10 +332,23 @@ public partial class SceneEditorWindow : Window
         else if (_operation == TransformOperation.Rotate)
         {
             var angle = Angle(point, new Point(_startX, _startY));
-            _selectedCharacter.Rotation = NormalizeAngle(
-                _startRotation + angle - _startAngle);
+            nextRotation = NormalizeAngle(_startRotation + angle - _startAngle);
         }
 
+        if (!HasMeaningfulTransformChange(
+                _selectedCharacter,
+                nextX,
+                nextY,
+                nextScale,
+                nextRotation))
+        {
+            return;
+        }
+
+        _selectedCharacter.X = nextX;
+        _selectedCharacter.Y = nextY;
+        _selectedCharacter.Scale = nextScale;
+        _selectedCharacter.Rotation = nextRotation;
         UpdateSelectedVisual();
     }
 
@@ -519,16 +543,29 @@ public partial class SceneEditorWindow : Window
 
         EnsureCustomTransform(_selectedCharacter);
         var step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 10 : 1;
-        _selectedCharacter.X = Math.Clamp(
+        var nextX = Math.Clamp(
             _selectedCharacter.X
                 + (e.Key == Key.Left ? -step : e.Key == Key.Right ? step : 0),
             0,
             CharacterLayout.StageWidth);
-        _selectedCharacter.Y = Math.Clamp(
+        var nextY = Math.Clamp(
             _selectedCharacter.Y
                 + (e.Key == Key.Up ? -step : e.Key == Key.Down ? step : 0),
             0,
             CharacterLayout.StageHeight);
+        if (!HasMeaningfulTransformChange(
+                _selectedCharacter,
+                nextX,
+                nextY,
+                _selectedCharacter.Scale,
+                _selectedCharacter.Rotation))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        _selectedCharacter.X = nextX;
+        _selectedCharacter.Y = nextY;
         UpdateSelectedVisual();
         e.Handled = true;
     }
@@ -669,6 +706,30 @@ public partial class SceneEditorWindow : Window
         angle %= 360;
         return angle > 180 ? angle - 360 : angle < -180 ? angle + 360 : angle;
     }
+
+    internal static Point CalculateMovedCharacterPosition(
+        double startX,
+        double startY,
+        Point operationStart,
+        Point cursorPosition)
+    {
+        var delta = cursorPosition - operationStart;
+        return new Point(
+            Math.Clamp(startX + delta.X, 0, CharacterLayout.StageWidth),
+            Math.Clamp(startY + delta.Y, 0, CharacterLayout.StageHeight));
+    }
+
+    internal static bool HasMeaningfulTransformChange(
+        CharacterPlacement character,
+        double nextX,
+        double nextY,
+        double nextScale,
+        double nextRotation) =>
+        Math.Abs(character.X - nextX) >= TransformUpdateEpsilon
+            || Math.Abs(character.Y - nextY) >= TransformUpdateEpsilon
+            || Math.Abs(character.Scale - nextScale) >= ScaleUpdateEpsilon
+            || Math.Abs(NormalizeAngle(character.Rotation - nextRotation))
+                >= RotationUpdateEpsilon;
 
     private sealed record CharacterVisual(
         CharacterPlacement Character,
