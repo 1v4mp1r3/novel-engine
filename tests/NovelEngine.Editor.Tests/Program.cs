@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
+    ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -1127,6 +1128,51 @@ static void MainMenuElementListStampTracksVisibleRows()
     Assert(
         baseline != MainMenuEditorWindow.CreateElementListStamp(elements),
         "Main menu element list stamp should track added rows.");
+}
+
+static void MainMenuStageStampTracksRenderedState()
+{
+    var design = new MainMenuDesign();
+    design.Elements.Clear();
+    var element = new MainMenuElement
+    {
+        Id = "start",
+        Kind = MainMenuElementKind.Button,
+        Action = MainMenuAction.NewGame,
+        Text = "Start",
+        X = 20,
+        Y = 30,
+        Width = 200,
+        Height = 50,
+    };
+    design.Elements.Add(element);
+    var baseline = MainMenuEditorWindow.CreateStageStamp(design, "start");
+
+    element.Action = MainMenuAction.LoadGame;
+    Assert(
+        baseline == MainMenuEditorWindow.CreateStageStamp(design, "start"),
+        "Main menu stage stamp should ignore non-rendered action changes.");
+
+    Assert(
+        baseline != MainMenuEditorWindow.CreateStageStamp(design, null),
+        "Main menu stage stamp should track selected element highlight.");
+
+    element.X += 12;
+    Assert(
+        baseline != MainMenuEditorWindow.CreateStageStamp(design, "start"),
+        "Main menu stage stamp should track rendered layout changes.");
+
+    element.X -= 12;
+    element.Text = "Continue";
+    Assert(
+        baseline != MainMenuEditorWindow.CreateStageStamp(design, "start"),
+        "Main menu stage stamp should track rendered text changes.");
+
+    element.Text = "Start";
+    design.Background = "@main_menu_bg";
+    Assert(
+        baseline != MainMenuEditorWindow.CreateStageStamp(design, "start"),
+        "Main menu stage stamp should track background changes.");
 }
 
 static void SceneEditorTransformClampsAndSkipsMicroMoves()

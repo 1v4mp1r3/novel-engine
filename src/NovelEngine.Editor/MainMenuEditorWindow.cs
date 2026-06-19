@@ -49,6 +49,7 @@ public sealed class MainMenuEditorWindow : Window
     private bool _refreshingProperties;
     private bool _refreshingElementList;
     private MainMenuElementListStamp? _elementListStamp;
+    private MainMenuStageStamp? _stageStamp;
 
     public MainMenuEditorWindow(
         NovelProject project,
@@ -327,6 +328,14 @@ public sealed class MainMenuEditorWindow : Window
 
     private void RefreshStage()
     {
+        var stamp = CreateStageStamp(_design, _selected?.Id);
+        if (_stageStamp == stamp && _stage.Children.Count > 0)
+        {
+            RefreshElementList();
+            return;
+        }
+
+        _stageStamp = stamp;
         _stage.Children.Clear();
         var background = ResolveAsset(_design.Background);
         if (background.Length > 0 && File.Exists(background))
@@ -352,6 +361,36 @@ public sealed class MainMenuEditorWindow : Window
             _stage.Children.Add(visual);
         }
         RefreshElementList();
+    }
+
+    internal static MainMenuStageStamp CreateStageStamp(
+        MainMenuDesign design,
+        string? selectedElementId)
+    {
+        var hash = new HashCode();
+        hash.Add(design.Background, StringComparer.Ordinal);
+        hash.Add(selectedElementId, StringComparer.Ordinal);
+        foreach (var element in design.Elements)
+        {
+            hash.Add(element.Id, StringComparer.Ordinal);
+            hash.Add(element.Kind);
+            hash.Add(element.Text, StringComparer.Ordinal);
+            hash.Add(element.Image, StringComparer.Ordinal);
+            hash.Add(element.X);
+            hash.Add(element.Y);
+            hash.Add(element.Width);
+            hash.Add(element.Height);
+            hash.Add(element.FontFamily, StringComparer.Ordinal);
+            hash.Add(element.FontSize);
+            hash.Add(element.Foreground, StringComparer.Ordinal);
+            hash.Add(element.Background, StringComparer.Ordinal);
+            hash.Add(element.Border, StringComparer.Ordinal);
+            hash.Add(element.CustomStyleCode, StringComparer.Ordinal);
+        }
+        return new MainMenuStageStamp(
+            selectedElementId,
+            design.Elements.Count,
+            hash.ToHashCode());
     }
 
     private void RefreshElementList()
@@ -696,5 +735,10 @@ public sealed class MainMenuEditorWindow : Window
 
     internal readonly record struct MainMenuElementListStamp(
         int Count,
+        int Hash);
+
+    internal readonly record struct MainMenuStageStamp(
+        string? SelectedElementId,
+        int ElementCount,
         int Hash);
 }
