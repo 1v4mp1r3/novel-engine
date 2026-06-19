@@ -14,9 +14,12 @@ public partial class SceneEditorWindow : Window
 {
     private const double MinimumScale = 0.1;
     private const double MaximumScale = 5;
+    private const int MaxCachedSceneBitmaps = 64;
 
     private readonly NovelProject _project;
     private readonly string _assetDirectory;
+    private readonly BoundedCache<string, BitmapImage?> _bitmapCache =
+        new(MaxCachedSceneBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CharacterVisual> _visuals = [];
     private CharacterPlacement? _selectedCharacter;
     private TransformOperation _operation;
@@ -44,7 +47,7 @@ public partial class SceneEditorWindow : Window
         _characters = player.State.CurrentCharacters
             .Select(character => character.Clone())
             .ToList();
-        BackgroundImage.Source = LoadBitmap(ResolveAsset(player.State.CurrentBackground));
+        BackgroundImage.Source = LoadBitmapCached(ResolveAsset(player.State.CurrentBackground));
 
         if (node.InheritCharacters && Characters.Count > 0)
         {
@@ -96,7 +99,7 @@ public partial class SceneEditorWindow : Window
             Tag = character,
         };
 
-        var image = LoadBitmap(ResolveAsset(character.Sprite));
+        var image = LoadBitmapCached(ResolveAsset(character.Sprite));
         if (image is not null)
         {
             root.Children.Add(
@@ -615,6 +618,22 @@ public partial class SceneEditorWindow : Window
             return path;
         }
         return IOPath.GetFullPath(IOPath.Combine(_assetDirectory, path));
+    }
+
+    private BitmapImage? LoadBitmapCached(string path)
+    {
+        if (path.Length == 0)
+        {
+            return null;
+        }
+        if (_bitmapCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var image = LoadBitmap(path);
+        _bitmapCache.Set(path, image);
+        return image;
     }
 
     private static BitmapImage? LoadBitmap(string path)
