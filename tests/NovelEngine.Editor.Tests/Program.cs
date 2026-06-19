@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Xml.Linq;
 using System.Windows;
 using NovelEngine.Core;
 using NovelEngine.Editor;
@@ -31,6 +32,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
+    ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -734,6 +736,36 @@ static void AssetFileCachesClearOnlyAfterDiskChanges()
         "Disk sync project changes should clear file caches.");
 }
 
+static void AppCollectionStylesEnableVirtualization()
+{
+    var appXaml = XDocument.Load(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "App.xaml"));
+
+    AssertStyleSetters(
+        appXaml,
+        "DataGrid",
+        "EnableRowVirtualization",
+        "EnableColumnVirtualization",
+        "VirtualizingPanel.IsVirtualizing",
+        "VirtualizingPanel.VirtualizationMode",
+        "ScrollViewer.CanContentScroll");
+    AssertStyleSetters(
+        appXaml,
+        "TreeView",
+        "VirtualizingPanel.IsVirtualizing",
+        "VirtualizingPanel.VirtualizationMode",
+        "ScrollViewer.CanContentScroll");
+    AssertStyleSetters(
+        appXaml,
+        "ListBox",
+        "VirtualizingPanel.IsVirtualizing",
+        "VirtualizingPanel.VirtualizationMode",
+        "ScrollViewer.CanContentScroll");
+}
+
 static void BoundedCacheEvictsLeastRecentlyUsedEntries()
 {
     var cache = new BoundedCache<string, int>(2, StringComparer.OrdinalIgnoreCase);
@@ -1121,6 +1153,43 @@ static string CreateTempDirectory()
         Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(directory);
     return directory;
+}
+
+static string FindRepositoryRoot()
+{
+    var directory = Directory.GetCurrentDirectory();
+    while (!File.Exists(Path.Combine(directory, "NovelEngine.sln")))
+    {
+        directory = Directory.GetParent(directory)?.FullName
+            ?? throw new DirectoryNotFoundException("NovelEngine.sln was not found.");
+    }
+    return directory;
+}
+
+static void AssertStyleSetters(
+    XDocument document,
+    string targetType,
+    params string[] expectedProperties)
+{
+    var presentation = (XNamespace)"http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+    var style = document
+        .Descendants(presentation + "Style")
+        .FirstOrDefault(candidate =>
+            candidate.Attribute("TargetType")?.Value == targetType);
+
+    Assert(style is not null, $"App style was not found: {targetType}.");
+
+    var properties = style!
+        .Elements(presentation + "Setter")
+        .Select(setter => setter.Attribute("Property")?.Value)
+        .Where(property => property is not null)
+        .ToHashSet(StringComparer.Ordinal);
+    foreach (var expected in expectedProperties)
+    {
+        Assert(
+            properties.Contains(expected),
+            $"App style {targetType} is missing setter {expected}.");
+    }
 }
 
 static void Assert(bool condition, string message)
