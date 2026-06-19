@@ -29,6 +29,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
+    ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
@@ -692,6 +693,25 @@ static void AssetListFilterSearchesWithinSelectedFolder()
     Assert(result.FolderAssetCount == 2, "Asset folder count ignored the selected folder.");
     Assert(result.Assets.Count == 1, "Asset search did not filter the selected folder.");
     Assert(result.Assets[0].Id == "mount_fuji", "Asset search returned the wrong asset.");
+}
+
+static void BoundedCacheEvictsLeastRecentlyUsedEntries()
+{
+    var cache = new BoundedCache<string, int>(2, StringComparer.OrdinalIgnoreCase);
+    cache.Set("first", 1);
+    cache.Set("second", 2);
+
+    Assert(cache.TryGetValue("FIRST", out var first) && first == 1, "Cache lookup should refresh recency.");
+
+    cache.Set("third", 3);
+
+    Assert(cache.Count == 2, "Cache exceeded its configured capacity.");
+    Assert(cache.TryGetValue("first", out first) && first == 1, "Recently used entry was evicted.");
+    Assert(!cache.TryGetValue("second", out _), "Least recently used entry was not evicted.");
+    Assert(cache.TryGetValue("third", out var third) && third == 3, "Newest entry was not cached.");
+
+    cache.Clear();
+    Assert(cache.Count == 0, "Cache did not clear entries.");
 }
 
 static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()

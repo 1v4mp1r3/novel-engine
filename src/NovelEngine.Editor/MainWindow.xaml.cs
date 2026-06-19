@@ -15,6 +15,7 @@ namespace NovelEngine.Editor;
 public partial class MainWindow : Window
 {
     private const int MaxProjectHistoryEntries = 100;
+    private const int MaxCachedAssetPreviewImages = 48;
 
     private NovelProject _project = NovelProject.CreateDefault();
     private string? _projectPath;
@@ -54,8 +55,8 @@ public partial class MainWindow : Window
     private string? _assetPreviewAudioPath;
     private readonly Dictionary<string, string> _assetSizeCache =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, BitmapImage?> _assetPreviewImageCache =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly BoundedCache<string, BitmapImage?> _assetPreviewImageCache =
+        new(MaxCachedAssetPreviewImages, StringComparer.OrdinalIgnoreCase);
     private IReadOnlyDictionary<string, int>? _assetUsageCountCache;
     private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
         _nodeAssetFolderOptionsCache = [];
@@ -1817,7 +1818,7 @@ public partial class MainWindow : Window
             image = null;
         }
 
-        _assetPreviewImageCache[path] = image;
+        _assetPreviewImageCache.Set(path, image);
         return image;
     }
 
