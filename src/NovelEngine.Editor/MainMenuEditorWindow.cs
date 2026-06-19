@@ -14,6 +14,7 @@ public sealed class MainMenuEditorWindow : Window
 {
     private const double StageWidth = 960;
     private const double StageHeight = 540;
+    private const double DragUpdateEpsilon = 0.5;
     private const int MaxCachedMainMenuBitmaps = 48;
 
     private readonly NovelProject _project;
@@ -453,14 +454,18 @@ public sealed class MainMenuEditorWindow : Window
             return;
         }
         var position = e.GetPosition(_stage);
-        element.X = Math.Clamp(
-            _dragElementStartX + position.X - _dragStart.X,
-            0,
-            StageWidth - element.Width);
-        element.Y = Math.Clamp(
-            _dragElementStartY + position.Y - _dragStart.Y,
-            0,
-            StageHeight - element.Height);
+        var nextPosition = CalculateDraggedElementPosition(
+            element,
+            _dragStart,
+            new Point(_dragElementStartX, _dragElementStartY),
+            position);
+        if (!HasMeaningfulPositionChange(element, nextPosition))
+        {
+            return;
+        }
+
+        element.X = nextPosition.X;
+        element.Y = nextPosition.Y;
         Canvas.SetLeft(_dragVisual, element.X);
         Canvas.SetTop(_dragVisual, element.Y);
         RefreshProperties();
@@ -634,4 +639,25 @@ public sealed class MainMenuEditorWindow : Window
 
     private static string Number(double value) =>
         value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    internal static Point CalculateDraggedElementPosition(
+        MainMenuElement element,
+        Point dragStart,
+        Point elementStart,
+        Point cursorPosition) =>
+        new(
+            Math.Clamp(
+                elementStart.X + cursorPosition.X - dragStart.X,
+                0,
+                StageWidth - element.Width),
+            Math.Clamp(
+                elementStart.Y + cursorPosition.Y - dragStart.Y,
+                0,
+                StageHeight - element.Height));
+
+    internal static bool HasMeaningfulPositionChange(
+        MainMenuElement element,
+        Point nextPosition) =>
+        Math.Abs(element.X - nextPosition.X) >= DragUpdateEpsilon
+            || Math.Abs(element.Y - nextPosition.Y) >= DragUpdateEpsilon;
 }

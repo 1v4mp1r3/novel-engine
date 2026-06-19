@@ -31,6 +31,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
+    ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
@@ -760,6 +761,47 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(historyLimit + 1),
         "Undo history should stop copying oversized documents.");
+}
+
+static void MainMenuDragPositionClampsAndSkipsMicroMoves()
+{
+    var element = new MainMenuElement
+    {
+        Id = "start-button",
+        X = 10,
+        Y = 20,
+        Width = 80,
+        Height = 40,
+    };
+
+    var dragged = MainMenuEditorWindow.CalculateDraggedElementPosition(
+        element,
+        new Point(2, 3),
+        new Point(element.X, element.Y),
+        new Point(5, 8));
+
+    Assert(Math.Abs(dragged.X - 13) < 0.001, "Main menu drag X was not calculated.");
+    Assert(Math.Abs(dragged.Y - 25) < 0.001, "Main menu drag Y was not calculated.");
+    Assert(
+        MainMenuEditorWindow.HasMeaningfulPositionChange(element, dragged),
+        "Visible main menu drag movement was skipped.");
+
+    element.X = dragged.X;
+    element.Y = dragged.Y;
+    Assert(
+        !MainMenuEditorWindow.HasMeaningfulPositionChange(
+            element,
+            new Point(element.X + 0.1, element.Y + 0.1)),
+        "Micro main menu drag movement should not refresh the properties panel.");
+
+    var clamped = MainMenuEditorWindow.CalculateDraggedElementPosition(
+        element,
+        new Point(0, 0),
+        new Point(940, 530),
+        new Point(200, 200));
+
+    Assert(Math.Abs(clamped.X - 880) < 0.001, "Main menu drag X was not clamped.");
+    Assert(Math.Abs(clamped.Y - 500) < 0.001, "Main menu drag Y was not clamped.");
 }
 
 static void GraphConnectionCurveBoundsIncludeControlPoints()
