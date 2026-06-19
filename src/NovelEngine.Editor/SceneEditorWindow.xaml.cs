@@ -35,6 +35,7 @@ public partial class SceneEditorWindow : Window
     private double _startAngle;
     private bool _transformMode;
     private readonly List<CharacterPlacement> _characters;
+    private CharacterListStamp? _characterListStamp;
 
     public SceneEditorWindow(
         NovelProject project,
@@ -502,10 +503,36 @@ public partial class SceneEditorWindow : Window
 
     private void RefreshCharacterList()
     {
-        CharacterList.ItemsSource = null;
-        CharacterList.ItemsSource = _characters;
+        var stamp = CreateCharacterListStamp(_characters);
+        if (_characterListStamp != stamp
+            || !ReferenceEquals(CharacterList.ItemsSource, _characters))
+        {
+            if (ReferenceEquals(CharacterList.ItemsSource, _characters))
+            {
+                CharacterList.Items.Refresh();
+            }
+            else
+            {
+                CharacterList.ItemsSource = _characters;
+            }
+            _characterListStamp = stamp;
+        }
         RefreshEmptyState();
         UpdateCharacterButtons();
+    }
+
+    internal static CharacterListStamp CreateCharacterListStamp(
+        IEnumerable<CharacterPlacement> characters)
+    {
+        var hash = new HashCode();
+        var count = 0;
+        foreach (var character in characters)
+        {
+            count++;
+            hash.Add(character.Id, StringComparer.Ordinal);
+            hash.Add(character.Name, StringComparer.Ordinal);
+        }
+        return new CharacterListStamp(count, hash.ToHashCode());
     }
 
     private void RefreshEmptyState()
@@ -736,6 +763,10 @@ public partial class SceneEditorWindow : Window
         Grid Root,
         Border Outline,
         Canvas Chrome);
+
+    internal readonly record struct CharacterListStamp(
+        int Count,
+        int Hash);
 
     private enum TransformOperation
     {

@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
+    ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
@@ -1158,6 +1159,42 @@ static void SceneEditorTransformClampsAndSkipsMicroMoves()
             character.Scale,
             character.Rotation + 0.2),
         "Visible scene transform rotation was skipped.");
+}
+
+static void SceneEditorCharacterListStampTracksVisibleRows()
+{
+    var characters = new List<CharacterPlacement>
+    {
+        new()
+        {
+            Id = "hero",
+            Name = "Hero",
+            HasCustomTransform = true,
+            X = 100,
+            Y = 200,
+            Scale = 1,
+            Rotation = 0,
+        },
+    };
+    var baseline = SceneEditorWindow.CreateCharacterListStamp(characters);
+
+    characters[0].X += 40;
+    characters[0].Y += 20;
+    characters[0].Scale = 1.2;
+    characters[0].Rotation = 15;
+    Assert(
+        baseline == SceneEditorWindow.CreateCharacterListStamp(characters),
+        "Scene character list stamp should ignore transform-only changes.");
+
+    characters[0].Name = "Hero Updated";
+    Assert(
+        baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
+        "Scene character list stamp should track visible names.");
+
+    characters.Add(new CharacterPlacement { Id = "sidekick", Name = "Sidekick" });
+    Assert(
+        baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
+        "Scene character list stamp should track added rows.");
 }
 
 static void GraphConnectionCurveBoundsIncludeControlPoints()
