@@ -6,6 +6,7 @@ internal static class CodeEditorPerformancePolicy
     public const int MaxAutomaticCompletionSourceLength = 60_000;
     public const int MaxTrackedCaretSourceLength = 60_000;
     public const int MaxLiveCodeAnalysisLength = 80_000;
+    public const int MaxHistorySnapshotSourceLength = 80_000;
     public const int MaxHighlightedSyntaxSpans = 2_500;
 
     public static bool ShouldTrackCursorPosition(int sourceLength) =>
@@ -19,6 +20,9 @@ internal static class CodeEditorPerformancePolicy
 
     public static bool ShouldTrackLiveCaret(int sourceLength) =>
         sourceLength <= MaxTrackedCaretSourceLength;
+
+    public static bool ShouldRecordHistorySnapshot(int sourceLength) =>
+        sourceLength <= MaxHistorySnapshotSourceLength;
 
     public static bool ShouldApplyFullSyntaxHighlighting(int sourceLength) =>
         sourceLength <= MaxHighlightedCodeLength;

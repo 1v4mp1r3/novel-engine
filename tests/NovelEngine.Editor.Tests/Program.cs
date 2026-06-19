@@ -665,6 +665,7 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
         CodeEditorPerformancePolicy.MaxAutomaticCompletionSourceLength;
     var trackedCaretLimit = CodeEditorPerformancePolicy.MaxTrackedCaretSourceLength;
     var liveAnalysisLimit = CodeEditorPerformancePolicy.MaxLiveCodeAnalysisLength;
+    var historyLimit = CodeEditorPerformancePolicy.MaxHistorySnapshotSourceLength;
 
     Assert(
         CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(highlightedLimit),
@@ -696,6 +697,12 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(liveAnalysisLimit + 1),
         "Live analysis should stop beyond the boundary length.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(historyLimit),
+        "Undo history should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(historyLimit + 1),
+        "Undo history should stop copying oversized documents.");
 }
 
 static void GraphHitTestCachePrefersTopmostNode()

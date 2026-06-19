@@ -54,6 +54,7 @@ public sealed class CodeEditorControl : RichTextBox
     private bool _updatingDocument;
     private bool _restoringHistory;
     private bool _historyRecordingPending;
+    private bool _historySuspendedForSize;
     private int? _caretOffsetCache;
     private TextPointer? _caretPointerCache;
     private int _estimatedSourceLength;
@@ -242,7 +243,7 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
         if (!CodeEditorPerformancePolicy.ShouldTrackLiveCaret(
-                _currentSnapshot.Source.Length))
+                _estimatedSourceLength))
         {
             _caretOffsetCache = null;
             _caretPointerCache = null;
@@ -472,7 +473,27 @@ public sealed class CodeEditorControl : RichTextBox
         {
             return;
         }
+        if (!CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(
+                _estimatedSourceLength))
+        {
+            SuspendHistoryForOversizedDocument();
+            return;
+        }
+
         var source = SourceText;
+        if (!CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(
+                source.Length))
+        {
+            SuspendHistoryForOversizedDocument();
+            return;
+        }
+
+        if (_historySuspendedForSize)
+        {
+            ResetHistory(source, Math.Clamp(SourceCaretOffset, 0, source.Length));
+            return;
+        }
+
         if (source == _currentSnapshot.Source)
         {
             return;
@@ -512,8 +533,15 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void ApplyUserSnapshot(EditorSnapshot snapshot)
     {
-        PushHistory(_undoHistory, CaptureSnapshot());
-        _redoHistory.Clear();
+        if (CanRecordHistoryForSnapshot(snapshot))
+        {
+            PushHistory(_undoHistory, CaptureSnapshot());
+            _redoHistory.Clear();
+        }
+        else
+        {
+            SuspendHistoryForOversizedDocument();
+        }
         RestoreSnapshot(snapshot);
     }
 
@@ -549,12 +577,35 @@ public sealed class CodeEditorControl : RichTextBox
         _currentSnapshot = new EditorSnapshot(
             source,
             Math.Clamp(caretOffset, 0, source.Length));
+        _historySuspendedForSize =
+            !CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(source.Length);
+    }
+
+    private bool CanRecordHistoryForSnapshot(EditorSnapshot snapshot) =>
+        CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(
+            _estimatedSourceLength)
+        && CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(
+            snapshot.Source.Length);
+
+    private void SuspendHistoryForOversizedDocument()
+    {
+        _undoHistory.Clear();
+        _redoHistory.Clear();
+        _historySuspendedForSize = true;
+        _currentSnapshot = new EditorSnapshot(string.Empty, 0);
     }
 
     private static void PushHistory(
         List<EditorSnapshot> history,
         EditorSnapshot snapshot)
     {
+        if (!CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(
+                snapshot.Source.Length))
+        {
+            history.Clear();
+            return;
+        }
+
         if (history.Count > 0 && history[^1] == snapshot)
         {
             return;
