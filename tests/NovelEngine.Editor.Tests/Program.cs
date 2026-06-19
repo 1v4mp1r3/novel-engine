@@ -34,6 +34,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
+    ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
     ("graph hit test cache crosses spatial cells", GraphHitTestCacheCrossesSpatialCells),
@@ -902,6 +903,47 @@ static void GraphConnectionCurveBoundsIncludeControlPoints()
         longBounds,
         new Point(longEnd.X - distance, longEnd.Y),
         "Long connection bounds did not include the target control point.");
+}
+
+static void GraphWorldHitAreasIgnoreViewportOffset()
+{
+    var node = new NovelNode
+    {
+        Id = "dialogue",
+        Kind = NodeKind.Dialogue,
+        X = 120,
+        Y = 80,
+    };
+    var output = new NodeOutput { Id = "next" };
+    node.Outputs.Add(output);
+
+    var bounds = GraphSurface.GetWorldNodeRectangle(node);
+    var viewOffset = new Vector(320, -48);
+    var worldPoint = new Point(bounds.Left + 12, bounds.Top + 16);
+    var screenPoint = worldPoint + viewOffset;
+
+    Assert(
+        GraphSurface.ScreenToWorld(screenPoint, viewOffset) == worldPoint,
+        "Graph screen point did not map back to world coordinates.");
+    AssertRectContains(
+        bounds,
+        worldPoint,
+        "Graph world node bounds did not include its world point.");
+
+    var input = GraphSurface.GetWorldInputPortHitArea(node);
+    var outputHitArea = GraphSurface.GetWorldOutputPortHitArea(node, output, 0);
+
+    Assert(
+        Math.Abs(input.Center.X - bounds.Left) < 0.001,
+        "Graph input hit area was not anchored in world coordinates.");
+    Assert(
+        Math.Abs(outputHitArea.Center.X - bounds.Right) < 0.001,
+        "Graph output hit area was not anchored in world coordinates.");
+    AssertRectContains(input.HitArea, input.Center, "Graph input hit area missed its center.");
+    AssertRectContains(
+        outputHitArea.HitArea,
+        outputHitArea.Center,
+        "Graph output hit area missed its center.");
 }
 
 static void GraphHitTestCachePrefersTopmostNode()

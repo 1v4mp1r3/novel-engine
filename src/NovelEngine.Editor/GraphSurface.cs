@@ -90,10 +90,8 @@ public sealed class GraphSurface : FrameworkElement
         Project = project;
         SelectedNodeId = null;
         _needsInitialCenter = true;
-        _hitTestCache.Clear();
-        _hitTestCacheDirty = true;
         RebuildNodeLookup();
-        RequestRender();
+        RequestRender(invalidateHitTests: true);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -141,7 +139,7 @@ public sealed class GraphSurface : FrameworkElement
 
         SelectedNodeId = null;
         RebuildNodeLookup();
-        RequestRender();
+        RequestRender(invalidateHitTests: true);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -159,7 +157,7 @@ public sealed class GraphSurface : FrameworkElement
             var duplicate = Project.DuplicateNode(SelectedNodeId);
             SelectedNodeId = duplicate.Id;
             RebuildNodeLookup();
-            RequestRender();
+            RequestRender(invalidateHitTests: true);
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             ProjectChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -172,7 +170,7 @@ public sealed class GraphSurface : FrameworkElement
     public void RefreshGraph()
     {
         RebuildNodeLookup();
-        RequestRender();
+        RequestRender(invalidateHitTests: true);
     }
 
     public void CenterGraph()
@@ -190,6 +188,7 @@ public sealed class GraphSurface : FrameworkElement
             ActualWidth / 2 - (left + right) / 2,
             ActualHeight / 2 - (top + bottom) / 2);
         _needsInitialCenter = false;
+        ResetHoverHitCache();
         RequestRender();
     }
 
@@ -353,7 +352,7 @@ public sealed class GraphSurface : FrameworkElement
         node.X = nextX;
         node.Y = nextY;
         _dragMoved = node.X != _dragNodeStart.X || node.Y != _dragNodeStart.Y;
-        RequestRender();
+        RequestRender(invalidateHitTests: true);
     }
 
     protected override void OnMouseUp(MouseButtonEventArgs e)
@@ -497,7 +496,7 @@ public sealed class GraphSurface : FrameworkElement
     {
         SelectedNodeId = node.Id;
         RebuildNodeLookup();
-        RequestRender();
+        RequestRender(invalidateHitTests: true);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
         ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -832,9 +831,12 @@ public sealed class GraphSurface : FrameworkElement
         RequestRender();
     }
 
-    private void RequestRender()
+    private void RequestRender(bool invalidateHitTests = false)
     {
-        InvalidateHitTestCache();
+        if (invalidateHitTests)
+        {
+            InvalidateHitTestCache();
+        }
         if (_renderQueued)
         {
             return;
@@ -866,16 +868,16 @@ public sealed class GraphSurface : FrameworkElement
         _hitTestCache.Clear();
         foreach (var node in Project.Nodes)
         {
-            var bounds = GetNodeRectangle(node);
+            var bounds = GetWorldNodeRectangle(node);
             _hitTestCache.AddNode(new GraphNodeHitArea(node, bounds));
             if (node.Kind != NodeKind.Start)
             {
-                _hitTestCache.AddInputPort(GetInputPort(node));
+                _hitTestCache.AddInputPort(GetWorldInputPortHitArea(node));
             }
             for (var index = 0; index < node.Outputs.Count; index++)
             {
                 _hitTestCache.AddOutputPort(
-                    GetOutputPort(node, node.Outputs[index], index));
+                    GetWorldOutputPortHitArea(node, node.Outputs[index], index));
             }
         }
         _hitTestCacheDirty = false;
@@ -1233,19 +1235,19 @@ public sealed class GraphSurface : FrameworkElement
     private NovelNode? HitNode(Point point)
     {
         EnsureHitTestCache();
-        return _hitTestCache.HitNode(point);
+        return _hitTestCache.HitNode(ScreenToWorld(point));
     }
 
     private NovelNode? HitInputPort(Point point)
     {
         EnsureHitTestCache();
-        return _hitTestCache.HitInputPort(point);
+        return _hitTestCache.HitInputPort(ScreenToWorld(point));
     }
 
     private GraphOutputPortHitArea? HitOutputPort(Point point)
     {
         EnsureHitTestCache();
-        return _hitTestCache.HitOutputPort(point);
+        return _hitTestCache.HitOutputPort(ScreenToWorld(point));
     }
 
     private GraphOutputPortHitArea? GetOutputPort(string nodeId, string outputId)
@@ -1275,6 +1277,21 @@ public sealed class GraphSurface : FrameworkElement
         return new GraphInputPortHitArea(node, center, MakeHitArea(center));
     }
 
+    internal static GraphOutputPortHitArea GetWorldOutputPortHitArea(
+        NovelNode node,
+        NodeOutput output,
+        int index)
+    {
+        var center = GetWorldOutputCenter(node, index);
+        return new GraphOutputPortHitArea(node.Id, output.Id, center, MakeHitArea(center));
+    }
+
+    internal static GraphInputPortHitArea GetWorldInputPortHitArea(NovelNode node)
+    {
+        var center = GetWorldInputCenter(node);
+        return new GraphInputPortHitArea(node, center, MakeHitArea(center));
+    }
+
     private static Point GetWorldOutputCenter(NovelNode node, int index) =>
         new(
             node.X + NodeWidth,
@@ -1283,12 +1300,18 @@ public sealed class GraphSurface : FrameworkElement
     private static Point GetWorldInputCenter(NovelNode node) =>
         new(node.X, node.Y + HeaderHeight + 20);
 
+    internal static Rect GetWorldNodeRectangle(NovelNode node) =>
+        new(node.X, node.Y, NodeWidth, GetNodeHeight(node));
+
     private Rect GetNodeRectangle(NovelNode node) =>
+        OffsetRectangle(GetWorldNodeRectangle(node), _viewOffset);
+
+    private static Rect OffsetRectangle(Rect rectangle, Vector offset) =>
         new(
-            node.X + _viewOffset.X,
-            node.Y + _viewOffset.Y,
-            NodeWidth,
-            GetNodeHeight(node));
+            rectangle.X + offset.X,
+            rectangle.Y + offset.Y,
+            rectangle.Width,
+            rectangle.Height);
 
     private static double GetNodeHeight(NovelNode node) =>
         HeaderHeight + 74 + Math.Max(1, node.Outputs.Count) * OutputRowHeight + 12;
@@ -1309,8 +1332,11 @@ public sealed class GraphSurface : FrameworkElement
     private static double Round(double value) =>
         Math.Round(value, 2);
 
+    internal static Point ScreenToWorld(Point point, Vector viewOffset) =>
+        point - viewOffset;
+
     private Point ScreenToWorld(Point point) =>
-        point - _viewOffset;
+        ScreenToWorld(point, _viewOffset);
 
     private static string KindName(NodeKind kind) =>
         kind switch
