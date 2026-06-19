@@ -31,6 +31,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
+    ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph hit test cache prefers topmost node", GraphHitTestCachePrefersTopmostNode),
     ("graph hit test cache returns ports", GraphHitTestCacheReturnsPorts),
     ("graph hit test cache crosses spatial cells", GraphHitTestCacheCrossesSpatialCells),
@@ -761,6 +762,37 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
         "Undo history should stop copying oversized documents.");
 }
 
+static void GraphConnectionCurveBoundsIncludeControlPoints()
+{
+    var start = new Point(100, 40);
+    var end = new Point(260, 140);
+    var minimumBounds = GraphSurface.GetConnectionCurveBounds(start, end);
+
+    AssertRectContains(minimumBounds, start, "Connection bounds did not include the start point.");
+    AssertRectContains(minimumBounds, end, "Connection bounds did not include the end point.");
+    AssertRectContains(
+        minimumBounds,
+        new Point(start.X + 80, start.Y),
+        "Connection bounds did not include the minimum-distance source control point.");
+    AssertRectContains(
+        minimumBounds,
+        new Point(end.X - 80, end.Y),
+        "Connection bounds did not include the minimum-distance target control point.");
+
+    var longEnd = new Point(700, -20);
+    var distance = Math.Max(80, Math.Abs(longEnd.X - start.X) * 0.45);
+    var longBounds = GraphSurface.GetConnectionCurveBounds(start, longEnd);
+
+    AssertRectContains(
+        longBounds,
+        new Point(start.X + distance, start.Y),
+        "Long connection bounds did not include the source control point.");
+    AssertRectContains(
+        longBounds,
+        new Point(longEnd.X - distance, longEnd.Y),
+        "Long connection bounds did not include the target control point.");
+}
+
 static void GraphHitTestCachePrefersTopmostNode()
 {
     var bottom = new NovelNode { Id = "bottom", Kind = NodeKind.Scene };
@@ -897,4 +929,14 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static void AssertRectContains(Rect rect, Point point, string message)
+{
+    Assert(
+        point.X >= rect.Left
+            && point.X <= rect.Right
+            && point.Y >= rect.Top
+            && point.Y <= rect.Bottom,
+        message);
 }

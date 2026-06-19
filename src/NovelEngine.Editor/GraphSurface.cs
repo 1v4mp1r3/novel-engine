@@ -954,16 +954,19 @@ public sealed class GraphSurface : FrameworkElement
 
                     var source = GetWorldOutputCenter(node, outputIndex);
                     var targetPoint = GetWorldInputCenter(target);
+                    if (!IntersectsViewport(
+                            GetConnectionCurveBounds(source, targetPoint),
+                            worldViewport))
+                    {
+                        continue;
+                    }
+
                     var geometry = GetConnectionGeometry(
                         node.Id,
                         output.Id,
                         output.TargetNodeId,
                         source,
                         targetPoint);
-                    if (!IntersectsViewport(geometry.Bounds, worldViewport))
-                    {
-                        continue;
-                    }
                     drawingContext.DrawGeometry(null, ConnectionPen, geometry);
                     _connections.Add(new ConnectionVisual(node.Id, output.Id, geometry));
                 }
@@ -1003,7 +1006,7 @@ public sealed class GraphSurface : FrameworkElement
 
     private static StreamGeometry CreateCurveGeometry(Point start, Point end)
     {
-        var distance = Math.Max(80, Math.Abs(end.X - start.X) * 0.45);
+        var distance = GetConnectionControlDistance(start, end);
         var geometry = new StreamGeometry();
         using (var context = geometry.Open())
         {
@@ -1018,6 +1021,21 @@ public sealed class GraphSurface : FrameworkElement
         geometry.Freeze();
         return geometry;
     }
+
+    internal static Rect GetConnectionCurveBounds(Point start, Point end)
+    {
+        var distance = GetConnectionControlDistance(start, end);
+        var firstControl = new Point(start.X + distance, start.Y);
+        var secondControl = new Point(end.X - distance, end.Y);
+        var left = Math.Min(Math.Min(start.X, end.X), Math.Min(firstControl.X, secondControl.X));
+        var right = Math.Max(Math.Max(start.X, end.X), Math.Max(firstControl.X, secondControl.X));
+        var top = Math.Min(Math.Min(start.Y, end.Y), Math.Min(firstControl.Y, secondControl.Y));
+        var bottom = Math.Max(Math.Max(start.Y, end.Y), Math.Max(firstControl.Y, secondControl.Y));
+        return new Rect(new Point(left, top), new Point(right, bottom));
+    }
+
+    private static double GetConnectionControlDistance(Point start, Point end) =>
+        Math.Max(80, Math.Abs(end.X - start.X) * 0.45);
 
     private StreamGeometry GetConnectionGeometry(
         string sourceNodeId,
