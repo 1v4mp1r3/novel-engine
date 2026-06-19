@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Windows;
 using NovelEngine.Core;
@@ -34,6 +35,7 @@ var tests = new (string Name, Action Run)[]
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
+    ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
@@ -813,6 +815,24 @@ static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()
     Assert(
         !body.Contains("RequestDiagnosticsRefresh(", StringComparison.Ordinal),
         "Asset binding post-refresh should not duplicate MarkDirty diagnostics refresh.");
+}
+
+static void EditorAssetMutationsSkipDiskSyncRefreshes()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+
+    Assert(
+        !Regex.IsMatch(source, @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(\);"),
+        "Editor-driven asset mutations should not immediately rescan files from disk.");
+    Assert(
+        Regex.IsMatch(
+            source,
+            @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
+        "Editor-driven asset mutations should refresh known asset state without disk sync.");
 }
 
 static void AppCollectionStylesEnableVirtualization()

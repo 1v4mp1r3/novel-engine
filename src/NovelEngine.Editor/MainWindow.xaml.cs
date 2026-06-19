@@ -2934,7 +2934,7 @@ public partial class MainWindow : Window
             {
                 MarkDirty();
             }
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
             StatusText.Text = $"Импортировано файлов: {dialog.FileNames.Length}";
         }
         catch (Exception error) when (
@@ -3021,7 +3021,7 @@ public partial class MainWindow : Window
                             Path.DirectorySeparatorChar)));
             }
             MarkDirty();
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
         }
         catch (InvalidDataException error)
         {
@@ -3066,7 +3066,7 @@ public partial class MainWindow : Window
                 ? dialog.FolderName
                 : $"{parent}/{dialog.FolderName}";
             MarkDirty();
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
             error is IOException
@@ -3106,7 +3106,7 @@ public partial class MainWindow : Window
                 _selectedAssetFolder);
             _selectedAssetFolder = null;
             MarkDirty();
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
             error is IOException
@@ -3149,7 +3149,7 @@ public partial class MainWindow : Window
                 dialog.SelectedFolder);
             _selectedAssetFolder = dialog.SelectedFolder;
             MarkDirty();
-            RefreshAssets();
+            RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
             error is IOException
@@ -3210,7 +3210,7 @@ public partial class MainWindow : Window
             AssetReference.Create(dialog.AssetId));
         asset.Id = dialog.AssetId;
         MarkDirty();
-        RefreshAssets();
+        RefreshAssets(syncFromDisk: false);
         AssetsGrid.SelectedItem = AssetsGrid.Items
             .OfType<AssetView>()
             .FirstOrDefault(view => view.Id == dialog.AssetId);
@@ -3288,7 +3288,7 @@ public partial class MainWindow : Window
             }
         }
         MarkDirty();
-        RefreshAssets();
+        RefreshAssets(syncFromDisk: false);
     }
 
     private void DeleteManagedAssetFile(NovelAsset asset)
@@ -3975,7 +3975,7 @@ public partial class MainWindow : Window
             if (_project.Assets.Count != count)
             {
                 MarkDirty();
-                RefreshAssets();
+                RefreshAssets(syncFromDisk: false);
             }
             return reference;
         }
