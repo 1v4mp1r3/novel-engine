@@ -39,6 +39,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
+    ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -991,6 +992,63 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
     Assert(
         baseline == MainWindow.CreateProjectExplorerStamp(changedPositionProject, "scene"),
         "Project explorer stamp should ignore node position-only changes.");
+}
+
+static void NodePropertyPanelStampTracksVisibleState()
+{
+    var baselineProject = NovelProject.CreateDefault();
+    var baselineNode = baselineProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Default scene node was not found.");
+    var baseline = MainWindow.CreateNodePropertyPanelStamp(
+        baselineProject,
+        baselineNode);
+
+    var movedProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
+    var movedNode = movedProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Moved scene node was not found.");
+    movedNode.X += 120;
+    movedNode.Y += 80;
+    Assert(
+        baseline == MainWindow.CreateNodePropertyPanelStamp(movedProject, movedNode),
+        "Node property panel stamp should ignore position-only changes.");
+
+    var changedNodeProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
+    var changedNode = changedNodeProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Changed scene node was not found.");
+    changedNode.Title += " updated";
+    Assert(
+        baseline != MainWindow.CreateNodePropertyPanelStamp(
+            changedNodeProject,
+            changedNode),
+        "Node property panel stamp should track selected node text fields.");
+
+    var changedTargetProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
+    var changedTargetScene = changedTargetProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Scene target source was not found.");
+    var changedTarget = changedTargetProject.FindNode("dialogue-1")
+        ?? throw new InvalidOperationException("Dialogue target was not found.");
+    changedTarget.Title += " updated";
+    Assert(
+        baseline != MainWindow.CreateNodePropertyPanelStamp(
+            changedTargetProject,
+            changedTargetScene),
+        "Node property panel stamp should track output target titles.");
+
+    var changedAssetsProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
+    var changedAssetsNode = changedAssetsProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Asset scene node was not found.");
+    changedAssetsProject.Assets.Add(new NovelAsset
+    {
+        Id = "mount_fuji",
+        Kind = AssetKind.Image,
+        Folder = "backgrounds",
+        Path = "files/backgrounds/MountFuji.jpg",
+    });
+    Assert(
+        baseline != MainWindow.CreateNodePropertyPanelStamp(
+            changedAssetsProject,
+            changedAssetsNode),
+        "Node property panel stamp should track asset picker inputs.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()

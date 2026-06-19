@@ -70,6 +70,7 @@ public partial class MainWindow : Window
         new(StringComparer.OrdinalIgnoreCase);
     private TreeViewItem? _selectedProjectTreeItem;
     private ProjectExplorerStamp? _projectExplorerStamp;
+    private NodePropertyPanelStamp? _nodePropertyPanelStamp;
 
     public MainWindow()
         : this(null)
@@ -265,6 +266,7 @@ public partial class MainWindow : Window
         bool saveStructureChanges = true)
     {
         _project = project;
+        _nodePropertyPanelStamp = null;
         _projectPath = path;
         _workspaceDirectory = NormalizeWorkspaceDirectory(
             workspaceDirectory
@@ -428,10 +430,17 @@ public partial class MainWindow : Window
 
     private void RefreshProperties()
     {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var stamp = CreateNodePropertyPanelStamp(_project, node);
+        if (_nodePropertyPanelStamp == stamp)
+        {
+            return;
+        }
+
+        _nodePropertyPanelStamp = stamp;
         _refreshingProperties = true;
         try
         {
-            var node = _project.FindNode(Graph.SelectedNodeId);
             var enabled = node is not null;
             foreach (var control in PropertyControls())
             {
@@ -725,6 +734,69 @@ public partial class MainWindow : Window
             || node.InheritCharacters != inheritCharacters
             || !node.Script.Equals(script, StringComparison.Ordinal);
 
+    internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp(
+        NovelProject project,
+        NovelNode? node)
+    {
+        var hash = new HashCode();
+        hash.Add(project.Characters.Count);
+        foreach (var folder in project.AssetFolders)
+        {
+            hash.Add(ProjectAssets.NormalizeFolder(folder), StringComparer.OrdinalIgnoreCase);
+        }
+        foreach (var asset in project.Assets)
+        {
+            hash.Add(asset.Id, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Path, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Folder, StringComparer.OrdinalIgnoreCase);
+            hash.Add(asset.Kind);
+        }
+
+        if (node is null)
+        {
+            return new NodePropertyPanelStamp(null, hash.ToHashCode());
+        }
+
+        hash.Add(node.Id, StringComparer.Ordinal);
+        hash.Add(node.Kind);
+        hash.Add(node.Title, StringComparer.Ordinal);
+        hash.Add(node.Speaker, StringComparer.Ordinal);
+        hash.Add(node.Text, StringComparer.Ordinal);
+        hash.Add(node.Background, StringComparer.Ordinal);
+        hash.Add(node.InheritBackground);
+        hash.Add(node.Music, StringComparer.Ordinal);
+        hash.Add(node.InheritMusic);
+        hash.Add(node.InheritCharacters);
+        hash.Add(node.Script, StringComparer.Ordinal);
+        hash.Add(node.ScriptBlocks.Count);
+        foreach (var character in node.Characters)
+        {
+            hash.Add(character.Id, StringComparer.Ordinal);
+            hash.Add(character.Name, StringComparer.Ordinal);
+            hash.Add(character.Position);
+            hash.Add(character.Sprite, StringComparer.Ordinal);
+            var voices = CharacterVoiceReferences(character);
+            hash.Add(voices.Count);
+            foreach (var voice in voices)
+            {
+                hash.Add(voice, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        foreach (var output in node.Outputs)
+        {
+            hash.Add(output.Id, StringComparer.Ordinal);
+            hash.Add(output.Label, StringComparer.Ordinal);
+            hash.Add(output.Condition, StringComparer.Ordinal);
+            hash.Add(output.TargetNodeId, StringComparer.Ordinal);
+            hash.Add(
+                project.FindNode(output.TargetNodeId)?.Title ?? string.Empty,
+                StringComparer.Ordinal);
+            hash.Add(output.ScriptBlocks.Count);
+        }
+
+        return new NodePropertyPanelStamp(node.Id, hash.ToHashCode());
+    }
+
     private void MarkDirty()
     {
         if (!_codeHasPendingChanges)
@@ -837,6 +909,7 @@ public partial class MainWindow : Window
         {
             var entry = _projectHistory[historyIndex];
             _project = ProjectSerializer.FromJson(entry.Snapshot);
+            _nodePropertyPanelStamp = null;
             _projectHistoryIndex = historyIndex;
             _codeHasPendingChanges = false;
             ClearProjectAnalysisCaches();
@@ -934,6 +1007,7 @@ public partial class MainWindow : Window
             VisualScriptBlockPreserver.PreserveFrom(_project, compiled);
 
             _project = compiled;
+            _nodePropertyPanelStamp = null;
             _project.SourceCode = source;
             SetCodeCursorCache(source);
             _codeHasPendingChanges = false;
@@ -5608,6 +5682,10 @@ public partial class MainWindow : Window
     internal readonly record struct ProjectExplorerStamp(
         string Query,
         int NodeCount,
+        int Hash);
+
+    internal readonly record struct NodePropertyPanelStamp(
+        string? NodeId,
         int Hash);
 
     private sealed record ProjectHistoryEntry(string Snapshot, string? SelectedNodeId);
