@@ -14,10 +14,13 @@ public sealed class MainMenuEditorWindow : Window
 {
     private const double StageWidth = 960;
     private const double StageHeight = 540;
+    private const int MaxCachedMainMenuBitmaps = 48;
 
     private readonly NovelProject _project;
     private readonly string _assetDirectory;
     private readonly MainMenuDesign _design;
+    private readonly BoundedCache<string, ImageSource?> _bitmapCache =
+        new(MaxCachedMainMenuBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly Canvas _stage = new()
     {
         Width = StageWidth,
@@ -326,7 +329,7 @@ public sealed class MainMenuEditorWindow : Window
         var background = ResolveAsset(_design.Background);
         if (background.Length > 0 && File.Exists(background))
         {
-            _stage.Background = new ImageBrush(LoadBitmap(background))
+            _stage.Background = new ImageBrush(LoadBitmapCached(background))
             {
                 Stretch = Stretch.UniformToFill,
             };
@@ -419,7 +422,7 @@ public sealed class MainMenuEditorWindow : Window
             grid.Children.Add(
                 new Image
                 {
-                    Source = LoadBitmap(imagePath),
+                    Source = LoadBitmapCached(imagePath),
                     Stretch = Stretch.UniformToFill,
                 });
         }
@@ -584,6 +587,22 @@ public sealed class MainMenuEditorWindow : Window
             return path;
         }
         return Path.GetFullPath(Path.Combine(_assetDirectory, path));
+    }
+
+    private ImageSource? LoadBitmapCached(string path)
+    {
+        if (path.Length == 0)
+        {
+            return null;
+        }
+        if (_bitmapCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var image = LoadBitmap(path);
+        _bitmapCache.Set(path, image);
+        return image;
     }
 
     private static ImageSource? LoadBitmap(string path)
