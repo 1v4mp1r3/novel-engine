@@ -45,8 +45,8 @@ public sealed class GraphSurface : FrameworkElement
     private readonly List<ConnectionVisual> _connections = [];
     private readonly GraphHitTestCache _hitTestCache = new();
     private readonly Dictionary<string, NovelNode> _nodesById = [];
-    private readonly Dictionary<ConnectionGeometryKey, StreamGeometry>
-        _connectionGeometryCache = [];
+    private readonly BoundedCache<ConnectionGeometryKey, StreamGeometry>
+        _connectionGeometryCache = new(ConnectionGeometryCacheLimit);
     private Vector _viewOffset = new(80, 80);
     private string? _dragNodeId;
     private Point _dragStart;
@@ -63,7 +63,8 @@ public sealed class GraphSurface : FrameworkElement
     private Cursor? _lastHoverCursor;
     private double _pixelsPerDip = 1;
     private bool _hitTestCacheDirty = true;
-    private readonly Dictionary<TextLayoutKey, FormattedText> _textLayoutCache = [];
+    private readonly BoundedCache<TextLayoutKey, FormattedText> _textLayoutCache =
+        new(TextLayoutCacheLimit);
 
     public GraphSurface()
     {
@@ -1038,13 +1039,8 @@ public sealed class GraphSurface : FrameworkElement
             return geometry;
         }
 
-        if (_connectionGeometryCache.Count >= ConnectionGeometryCacheLimit)
-        {
-            _connectionGeometryCache.Clear();
-        }
-
         geometry = CreateCurveGeometry(start, end);
-        _connectionGeometryCache[key] = geometry;
+        _connectionGeometryCache.Set(key, geometry);
         return geometry;
     }
 
@@ -1155,11 +1151,6 @@ public sealed class GraphSurface : FrameworkElement
             CultureInfo.CurrentCulture.Name);
         if (!_textLayoutCache.TryGetValue(key, out var formatted))
         {
-            if (_textLayoutCache.Count >= TextLayoutCacheLimit)
-            {
-                _textLayoutCache.Clear();
-            }
-
             formatted = new FormattedText(
                 text,
                 CultureInfo.CurrentCulture,
@@ -1175,7 +1166,7 @@ public sealed class GraphSurface : FrameworkElement
                 TextAlignment = alignment,
             };
             formatted.SetFontWeight(weight);
-            _textLayoutCache[key] = formatted;
+            _textLayoutCache.Set(key, formatted);
         }
         drawingContext.DrawText(formatted, origin);
     }
