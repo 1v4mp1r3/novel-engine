@@ -230,9 +230,25 @@ public sealed class CodeEditorControl : RichTextBox
         _caretOffsetCache = null;
         _caretPointerCache = null;
         InvalidateRenderedSyntax();
-        ScheduleUserChangeRecord();
-        _completionTimer.Stop();
-        _completionTimer.Start();
+        if (ShouldScheduleHistoryRecord(_estimatedSourceLength))
+        {
+            ScheduleUserChangeRecord();
+        }
+        else
+        {
+            ClearPendingUserChange();
+            SuspendHistoryForOversizedDocument();
+        }
+
+        if (ShouldScheduleAutomaticCompletion(_estimatedSourceLength))
+        {
+            _completionTimer.Stop();
+            _completionTimer.Start();
+        }
+        else
+        {
+            CloseCompletions();
+        }
     }
 
     protected override void OnSelectionChanged(RoutedEventArgs e)
@@ -436,6 +452,12 @@ public sealed class CodeEditorControl : RichTextBox
 
     private static bool IsSyntaxIdentifierPart(char character) =>
         character is '_' or '-' || char.IsLetterOrDigit(character);
+
+    internal static bool ShouldScheduleAutomaticCompletion(int estimatedSourceLength) =>
+        CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(estimatedSourceLength);
+
+    internal static bool ShouldScheduleHistoryRecord(int estimatedSourceLength) =>
+        CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(estimatedSourceLength);
 
     private void ScheduleUserChangeRecord()
     {

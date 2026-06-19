@@ -763,6 +763,18 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(historyLimit + 1),
         "Undo history should stop copying oversized documents.");
+    Assert(
+        CodeEditorControl.ShouldScheduleAutomaticCompletion(automaticCompletionLimit),
+        "Automatic completion timer should run at the configured boundary length.");
+    Assert(
+        !CodeEditorControl.ShouldScheduleAutomaticCompletion(automaticCompletionLimit + 1),
+        "Automatic completion timer should not run for oversized documents.");
+    Assert(
+        CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit),
+        "History timer should run at the configured boundary length.");
+    Assert(
+        !CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit + 1),
+        "History timer should not run for oversized documents.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()
