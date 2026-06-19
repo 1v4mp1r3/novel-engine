@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         _nodeAssetChoicesCache = [];
     private AssetPickerCacheStamp? _assetPickerCacheStamp;
     private ProjectDiagnosticReport? _projectDiagnosticsCache;
+    private DiagnosticPanelStamp? _diagnosticsPanelStamp;
     private readonly Dictionary<string, TreeViewItem> _projectTreeItemsByNodeId =
         new(StringComparer.OrdinalIgnoreCase);
     private TreeViewItem? _selectedProjectTreeItem;
@@ -1427,6 +1428,7 @@ public partial class MainWindow : Window
         _assetUsageCountCache = null;
         _assetListStamp = null;
         _projectDiagnosticsCache = null;
+        _diagnosticsPanelStamp = null;
     }
 
     private void RefreshNodeAssetPickers(NovelNode? node)
@@ -5423,6 +5425,13 @@ public partial class MainWindow : Window
     private ProjectDiagnosticReport RefreshProjectDiagnostics(bool showPanel)
     {
         var report = GetProjectDiagnostics();
+        var stamp = CreateDiagnosticPanelStamp(report, showPanel);
+        if (_diagnosticsPanelStamp == stamp && DiagnosticsGrid.ItemsSource is not null)
+        {
+            return report;
+        }
+
+        _diagnosticsPanelStamp = stamp;
         var diagnostics = report.Diagnostics
             .Select(diagnostic => new DiagnosticView(diagnostic))
             .ToList();
@@ -5465,8 +5474,32 @@ public partial class MainWindow : Window
     private ProjectDiagnosticReport GetProjectDiagnostics() =>
         _projectDiagnosticsCache ??= ProjectDiagnostics.Analyze(_project, _projectPath);
 
-    private void HideDiagnostics_Click(object sender, RoutedEventArgs e) =>
+    internal static DiagnosticPanelStamp CreateDiagnosticPanelStamp(
+        ProjectDiagnosticReport report,
+        bool showPanel)
+    {
+        var hash = new HashCode();
+        foreach (var diagnostic in report.Diagnostics)
+        {
+            hash.Add(diagnostic.Severity);
+            hash.Add(diagnostic.Location, StringComparer.Ordinal);
+            hash.Add(diagnostic.Message, StringComparer.Ordinal);
+        }
+
+        return new DiagnosticPanelStamp(
+            showPanel,
+            report.ErrorCount,
+            report.WarningCount,
+            report.InfoCount,
+            report.Diagnostics.Count,
+            hash.ToHashCode());
+    }
+
+    private void HideDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        _diagnosticsPanelStamp = null;
         DiagnosticsPanel.Visibility = Visibility.Collapsed;
+    }
 
     private void DiagnosticsGrid_MouseDoubleClick(
         object sender,
@@ -5715,6 +5748,14 @@ public partial class MainWindow : Window
 
     internal readonly record struct NodePropertyPanelStamp(
         string? NodeId,
+        int Hash);
+
+    internal readonly record struct DiagnosticPanelStamp(
+        bool ShowPanel,
+        int ErrorCount,
+        int WarningCount,
+        int InfoCount,
+        int DiagnosticCount,
         int Hash);
 
     private sealed record ProjectHistoryEntry(string Snapshot, string? SelectedNodeId);

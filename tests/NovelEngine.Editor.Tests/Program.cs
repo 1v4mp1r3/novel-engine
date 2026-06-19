@@ -36,6 +36,7 @@ var tests = new (string Name, Action Run)[]
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
+    ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
@@ -833,6 +834,35 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
             source,
             @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
         "Editor-driven asset mutations should refresh known asset state without disk sync.");
+}
+
+static void DiagnosticPanelStampTracksVisibleDiagnostics()
+{
+    var diagnostics = new[]
+    {
+        new ProjectDiagnostic(
+            ProjectDiagnosticSeverity.Error,
+            "Нода «start»",
+            "Нет выхода."),
+        new ProjectDiagnostic(
+            ProjectDiagnosticSeverity.Warning,
+            "Ассет @bg",
+            "Ассет пока нигде не используется."),
+    };
+    var report = new ProjectDiagnosticReport(diagnostics);
+    var baseline = MainWindow.CreateDiagnosticPanelStamp(report, showPanel: false);
+
+    Assert(
+        baseline == MainWindow.CreateDiagnosticPanelStamp(report, showPanel: false),
+        "Diagnostic panel stamp should remain stable for identical diagnostics.");
+    Assert(
+        baseline != MainWindow.CreateDiagnosticPanelStamp(report, showPanel: true),
+        "Diagnostic panel stamp should track explicit panel visibility requests.");
+    Assert(
+        baseline != MainWindow.CreateDiagnosticPanelStamp(
+            new ProjectDiagnosticReport(diagnostics[..1]),
+            showPanel: false),
+        "Diagnostic panel stamp should track changed diagnostics.");
 }
 
 static void AppCollectionStylesEnableVirtualization()
