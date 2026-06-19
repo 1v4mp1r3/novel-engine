@@ -197,13 +197,45 @@ public static class ProjectAssets
                 ?.Replace('\\', '/')
                 ?? string.Empty;
             var before = project.Assets.Count;
-            var imported = Import(project, projectPath, file, relativeFolder);
+            var imported = RegisterManagedFile(
+                project,
+                fullPath,
+                relativeProjectPath,
+                relativeFolder);
             knownRelativePaths.Add(imported.Path);
             knownFullPaths.Add(ResolvePath(projectPath, imported));
             changes += project.Assets.Count - before;
         }
 
         return changes;
+    }
+
+    private static NovelAsset RegisterManagedFile(
+        NovelProject project,
+        string fullPath,
+        string relativeProjectPath,
+        string relativeFolder)
+    {
+        var folder = NormalizeFolder(relativeFolder);
+        EnsureFolder(project, folder);
+
+        var baseId = MakeId(Path.GetFileNameWithoutExtension(fullPath));
+        var id = baseId;
+        var suffix = 2;
+        while (project.FindAsset(id) is not null)
+        {
+            id = $"{baseId}_{suffix++}";
+        }
+
+        var asset = new NovelAsset
+        {
+            Id = id,
+            Kind = AssetReference.GuessKind(fullPath),
+            Folder = folder,
+            Path = relativeProjectPath,
+        };
+        project.Assets.Add(asset);
+        return asset;
     }
 
     public static void CreateFolder(NovelProject project, string folder)

@@ -51,6 +51,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
     ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
+    ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
@@ -2077,6 +2078,54 @@ static void ProjectAssetSyncDiscoversFilesFromDisk()
         Assert(
             Directory.GetFiles(voiceFolder, "hero-blip-*.wav").Length == 0,
             "Sync created duplicate physical voice files.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectAssetSyncPreservesManagedFilePaths()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-sync-paths-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var backgroundFolder = Path.Combine(directory, "files", "backgrounds");
+        var characterFolder = Path.Combine(directory, "files", "characters");
+        Directory.CreateDirectory(backgroundFolder);
+        Directory.CreateDirectory(characterFolder);
+        File.WriteAllBytes(Path.Combine(backgroundFolder, "hero.png"), [137, 80, 78, 71]);
+        File.WriteAllBytes(Path.Combine(characterFolder, "hero.png"), [137, 80, 78, 71, 2]);
+        var project = NovelProject.CreateDefault();
+
+        var changes = ProjectAssets.SyncFromDisk(project, projectPath);
+
+        Assert(changes >= 4, "Sync did not report discovered folders and files.");
+        Assert(project.Assets.Count == 2, "Sync did not register both managed files.");
+        Assert(
+            project.Assets.Select(asset => asset.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2,
+            "Sync reused the same asset id for files with matching names.");
+        Assert(
+            project.Assets.Any(asset =>
+                asset.Folder == "backgrounds"
+                && asset.Path == "files/backgrounds/hero.png"),
+            "Sync changed the managed background file path.");
+        Assert(
+            project.Assets.Any(asset =>
+                asset.Folder == "characters"
+                && asset.Path == "files/characters/hero.png"),
+            "Sync changed the managed character file path.");
+        Assert(
+            Directory.GetFiles(backgroundFolder, "hero-*.png").Length == 0
+                && Directory.GetFiles(characterFolder, "hero-*.png").Length == 0,
+            "Sync copied managed files instead of registering them in place.");
+        Assert(
+            ProjectAssets.SyncFromDisk(project, projectPath) == 0,
+            "Second sync duplicated managed files.");
     }
     finally
     {
