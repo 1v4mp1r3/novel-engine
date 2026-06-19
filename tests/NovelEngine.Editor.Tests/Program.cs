@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
+    ("main menu property panel stamp tracks fields", MainMenuPropertyPanelStampTracksFields),
     ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
@@ -1177,6 +1178,48 @@ static void MainMenuPropertyGuardSeparatesRenderedChanges()
             element.Border,
             element.CustomStyleCode),
         "Rendered text changes should refresh the main menu stage.");
+}
+
+static void MainMenuPropertyPanelStampTracksFields()
+{
+    var element = new MainMenuElement
+    {
+        Id = "start",
+        Action = MainMenuAction.NewGame,
+        Text = "Start",
+        Image = "start.png",
+        X = 20,
+        Y = 30,
+        Width = 200,
+        Height = 50,
+        FontSize = 24,
+        Foreground = "#FFFFFF",
+        Background = "#222222",
+        Border = "#333333",
+        CustomStyleCode = "font-weight: bold",
+    };
+    var baseline = MainMenuEditorWindow.CreatePropertyPanelStamp(element);
+
+    Assert(
+        baseline == MainMenuEditorWindow.CreatePropertyPanelStamp(element.Clone()),
+        "Main menu property panel stamp should be stable for identical fields.");
+
+    var moved = element.Clone();
+    moved.X += 10;
+    Assert(
+        baseline != MainMenuEditorWindow.CreatePropertyPanelStamp(moved),
+        "Main menu property panel stamp should track coordinate fields.");
+
+    var actionChanged = element.Clone();
+    actionChanged.Action = MainMenuAction.LoadGame;
+    Assert(
+        baseline != MainMenuEditorWindow.CreatePropertyPanelStamp(actionChanged),
+        "Main menu property panel stamp should track action fields.");
+
+    Assert(
+        MainMenuEditorWindow.CreatePropertyPanelStamp(null)
+            == MainMenuEditorWindow.CreatePropertyPanelStamp(null),
+        "Empty main menu property panel stamp should be stable.");
 }
 
 static void MainMenuElementListStampTracksVisibleRows()

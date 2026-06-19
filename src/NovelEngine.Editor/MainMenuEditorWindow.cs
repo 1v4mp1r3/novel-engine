@@ -50,6 +50,7 @@ public sealed class MainMenuEditorWindow : Window
     private bool _refreshingElementList;
     private MainMenuElementListStamp? _elementListStamp;
     private MainMenuStageStamp? _stageStamp;
+    private MainMenuPropertyPanelStamp? _propertyPanelStamp;
 
     public MainMenuEditorWindow(
         NovelProject project,
@@ -559,6 +560,13 @@ public sealed class MainMenuEditorWindow : Window
 
     private void RefreshProperties()
     {
+        var stamp = CreatePropertyPanelStamp(_selected);
+        if (_propertyPanelStamp == stamp)
+        {
+            return;
+        }
+
+        _propertyPanelStamp = stamp;
         _refreshingProperties = true;
         try
         {
@@ -669,6 +677,7 @@ public sealed class MainMenuEditorWindow : Window
         _selected.Background = background;
         _selected.Border = border;
         _selected.CustomStyleCode = customStyleCode;
+        _propertyPanelStamp = CreatePropertyPanelStamp(_selected);
         if (refreshStage)
         {
             RefreshStage();
@@ -833,6 +842,31 @@ public sealed class MainMenuEditorWindow : Window
             || !element.Border.Equals(border, StringComparison.Ordinal)
             || !element.CustomStyleCode.Equals(customStyleCode, StringComparison.Ordinal);
 
+    internal static MainMenuPropertyPanelStamp CreatePropertyPanelStamp(
+        MainMenuElement? element)
+    {
+        if (element is null)
+        {
+            return new MainMenuPropertyPanelStamp(null, 0);
+        }
+
+        var hash = new HashCode();
+        hash.Add(element.Id, StringComparer.Ordinal);
+        hash.Add(element.Text, StringComparer.Ordinal);
+        hash.Add(element.Image, StringComparer.Ordinal);
+        hash.Add(element.Action);
+        hash.Add(element.X);
+        hash.Add(element.Y);
+        hash.Add(element.Width);
+        hash.Add(element.Height);
+        hash.Add(element.FontSize);
+        hash.Add(element.Foreground, StringComparer.Ordinal);
+        hash.Add(element.Background, StringComparer.Ordinal);
+        hash.Add(element.Border, StringComparer.Ordinal);
+        hash.Add(element.CustomStyleCode, StringComparer.Ordinal);
+        return new MainMenuPropertyPanelStamp(element.Id, hash.ToHashCode());
+    }
+
     internal readonly record struct MainMenuElementListStamp(
         int Count,
         int Hash);
@@ -840,5 +874,9 @@ public sealed class MainMenuEditorWindow : Window
     internal readonly record struct MainMenuStageStamp(
         string? SelectedElementId,
         int ElementCount,
+        int Hash);
+
+    internal readonly record struct MainMenuPropertyPanelStamp(
+        string? SelectedElementId,
         int Hash);
 }
