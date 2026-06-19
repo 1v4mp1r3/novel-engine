@@ -48,6 +48,7 @@ public sealed class MainMenuEditorWindow : Window
     private double _dragElementStartY;
     private bool _refreshingProperties;
     private bool _refreshingElementList;
+    private MainMenuElementListStamp? _elementListStamp;
 
     public MainMenuEditorWindow(
         NovelProject project,
@@ -350,12 +351,30 @@ public sealed class MainMenuEditorWindow : Window
             Canvas.SetTop(visual, element.Y);
             _stage.Children.Add(visual);
         }
+        RefreshElementList();
+    }
+
+    private void RefreshElementList()
+    {
+        var stamp = CreateElementListStamp(_design.Elements);
         _refreshingElementList = true;
         try
         {
-            _elementList.ItemsSource = null;
-            _elementList.DisplayMemberPath = nameof(MainMenuElement.Text);
-            _elementList.ItemsSource = _design.Elements;
+            if (_elementListStamp != stamp
+                || !ReferenceEquals(_elementList.ItemsSource, _design.Elements))
+            {
+                if (ReferenceEquals(_elementList.ItemsSource, _design.Elements))
+                {
+                    _elementList.Items.Refresh();
+                }
+                else
+                {
+                    _elementList.DisplayMemberPath = nameof(MainMenuElement.Text);
+                    _elementList.ItemsSource = _design.Elements;
+                }
+                _elementListStamp = stamp;
+            }
+
             if (_selected is not null)
             {
                 _elementList.SelectedItem = _selected;
@@ -365,6 +384,20 @@ public sealed class MainMenuEditorWindow : Window
         {
             _refreshingElementList = false;
         }
+    }
+
+    internal static MainMenuElementListStamp CreateElementListStamp(
+        IEnumerable<MainMenuElement> elements)
+    {
+        var hash = new HashCode();
+        var count = 0;
+        foreach (var element in elements)
+        {
+            count++;
+            hash.Add(element.Id, StringComparer.Ordinal);
+            hash.Add(element.Text, StringComparer.Ordinal);
+        }
+        return new MainMenuElementListStamp(count, hash.ToHashCode());
     }
 
     private FrameworkElement CreateElementVisual(MainMenuElement element)
@@ -660,4 +693,8 @@ public sealed class MainMenuEditorWindow : Window
         Point nextPosition) =>
         Math.Abs(element.X - nextPosition.X) >= DragUpdateEpsilon
             || Math.Abs(element.Y - nextPosition.Y) >= DragUpdateEpsilon;
+
+    internal readonly record struct MainMenuElementListStamp(
+        int Count,
+        int Hash);
 }

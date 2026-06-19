@@ -41,6 +41,7 @@ var tests = new (string Name, Action Run)[]
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
+    ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -1091,6 +1092,41 @@ static void MainMenuDragPositionClampsAndSkipsMicroMoves()
 
     Assert(Math.Abs(clamped.X - 880) < 0.001, "Main menu drag X was not clamped.");
     Assert(Math.Abs(clamped.Y - 500) < 0.001, "Main menu drag Y was not clamped.");
+}
+
+static void MainMenuElementListStampTracksVisibleRows()
+{
+    var elements = new List<MainMenuElement>
+    {
+        new()
+        {
+            Id = "start",
+            Text = "Start",
+            X = 20,
+            Y = 30,
+            Width = 200,
+            Height = 50,
+        },
+    };
+    var baseline = MainMenuEditorWindow.CreateElementListStamp(elements);
+
+    elements[0].X += 40;
+    elements[0].Y += 20;
+    elements[0].Width += 10;
+    elements[0].Height += 5;
+    Assert(
+        baseline == MainMenuEditorWindow.CreateElementListStamp(elements),
+        "Main menu element list stamp should ignore layout-only changes.");
+
+    elements[0].Text = "Continue";
+    Assert(
+        baseline != MainMenuEditorWindow.CreateElementListStamp(elements),
+        "Main menu element list stamp should track visible text.");
+
+    elements.Add(new MainMenuElement { Id = "load", Text = "Load" });
+    Assert(
+        baseline != MainMenuEditorWindow.CreateElementListStamp(elements),
+        "Main menu element list stamp should track added rows.");
 }
 
 static void SceneEditorTransformClampsAndSkipsMicroMoves()
