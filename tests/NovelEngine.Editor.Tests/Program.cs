@@ -33,6 +33,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
+    ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
@@ -786,6 +787,32 @@ static void AssetFileCachesClearOnlyAfterDiskChanges()
             externalFileEvent: false,
             diskSyncChangedProject: true),
         "Disk sync project changes should clear file caches.");
+}
+
+static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private void RefreshAssetUsageAfterBinding");
+
+    Assert(
+        body.Contains("RefreshAssets(syncFromDisk: false);", StringComparison.Ordinal),
+        "Asset binding should still refresh asset usage state.");
+    Assert(
+        !body.Contains("Graph.RefreshGraph(", StringComparison.Ordinal),
+        "Asset binding post-refresh should not duplicate MarkDirty graph refresh.");
+    Assert(
+        !body.Contains("RefreshProperties(", StringComparison.Ordinal),
+        "Asset binding post-refresh should not duplicate MarkDirty property refresh.");
+    Assert(
+        !body.Contains("RequestCodeRefresh(", StringComparison.Ordinal),
+        "Asset binding post-refresh should not duplicate MarkDirty code refresh.");
+    Assert(
+        !body.Contains("RequestDiagnosticsRefresh(", StringComparison.Ordinal),
+        "Asset binding post-refresh should not duplicate MarkDirty diagnostics refresh.");
 }
 
 static void AppCollectionStylesEnableVirtualization()
@@ -1668,6 +1695,34 @@ static void AssertStyleSetters(
             properties.Contains(expected),
             $"App style {targetType} is missing setter {expected}.");
     }
+}
+
+static string ExtractMethodBody(string source, string methodName)
+{
+    var methodIndex = source.IndexOf(methodName, StringComparison.Ordinal);
+    Assert(methodIndex >= 0, $"Method was not found: {methodName}.");
+
+    var openBrace = source.IndexOf('{', methodIndex);
+    Assert(openBrace >= 0, $"Method body was not found: {methodName}.");
+
+    var depth = 0;
+    for (var index = openBrace; index < source.Length; index++)
+    {
+        if (source[index] == '{')
+        {
+            depth++;
+        }
+        else if (source[index] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                return source[(openBrace + 1)..index];
+            }
+        }
+    }
+
+    throw new InvalidOperationException($"Method body was not closed: {methodName}.");
 }
 
 static void Assert(bool condition, string message)

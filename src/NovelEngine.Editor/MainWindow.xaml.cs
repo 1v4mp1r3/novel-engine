@@ -664,7 +664,6 @@ public partial class MainWindow : Window
             }
         }
         MarkDirty();
-        RefreshProperties();
         StatusText.Text =
             dialog.ClearImportedScript
                 ? $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}, текстовый скрипт очищен"
@@ -694,7 +693,6 @@ public partial class MainWindow : Window
             output.Script = string.Empty;
         }
         MarkDirty();
-        RefreshProperties();
         StatusText.Text =
             dialog.ClearImportedScript
                 ? $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
@@ -2514,7 +2512,7 @@ public partial class MainWindow : Window
         node.InheritBackground = false;
         node.Background = reference;
         MarkDirty();
-        RefreshAfterAssetBinding();
+        RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Фон ноды «{node.Title}»: {reference}";
     }
 
@@ -2532,7 +2530,7 @@ public partial class MainWindow : Window
         node.InheritMusic = false;
         node.Music = reference;
         MarkDirty();
-        RefreshAfterAssetBinding();
+        RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
 
@@ -2648,7 +2646,7 @@ public partial class MainWindow : Window
         }
 
         MarkDirty();
-        RefreshAfterAssetBinding();
+        RefreshAssetUsageAfterBinding();
         StatusText.Text =
             $"Voice-блипы персонажа «{character.Name}»: {character.VoiceSounds.Count}";
     }
@@ -2678,18 +2676,14 @@ public partial class MainWindow : Window
         character.SetVoiceSounds(voices);
 
         MarkDirty();
-        RefreshAfterAssetBinding();
+        RefreshAssetUsageAfterBinding();
         StatusText.Text =
             $"Voice-блипы библиотечного персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";
     }
 
-    private void RefreshAfterAssetBinding()
+    private void RefreshAssetUsageAfterBinding()
     {
-        Graph.RefreshGraph();
-        RefreshProperties();
         RefreshAssets(syncFromDisk: false);
-        RequestCodeRefresh(useStoredSource: false);
-        RequestDiagnosticsRefresh();
     }
 
     private static bool IsInAssetFolder(NovelAsset asset, string folder)
