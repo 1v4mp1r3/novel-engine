@@ -12,8 +12,6 @@ namespace NovelEngine.Editor;
 public sealed class CodeEditorControl : RichTextBox
 {
     private const int HistoryLimit = 200;
-    private const int MaxAutomaticCompletionSourceLength = 60_000;
-    private const int MaxTrackedCaretSourceLength = 60_000;
 
     private static readonly IReadOnlyDictionary<ProjectLanguageSyntaxKind, Brush>
         SyntaxBrushes = new Dictionary<ProjectLanguageSyntaxKind, Brush>
@@ -58,6 +56,7 @@ public sealed class CodeEditorControl : RichTextBox
     private bool _historyRecordingPending;
     private int? _caretOffsetCache;
     private TextPointer? _caretPointerCache;
+    private int _estimatedSourceLength;
 
     private static Brush CreateFrozenBrush(byte red, byte green, byte blue) =>
         CreateFrozenBrush(255, red, green, blue);
@@ -166,7 +165,15 @@ public sealed class CodeEditorControl : RichTextBox
 
     public string SourceText
     {
-        get => _sourceTextCache ??= ReadSourceText();
+        get
+        {
+            if (_sourceTextCache is null)
+            {
+                _sourceTextCache = ReadSourceText();
+                _estimatedSourceLength = _sourceTextCache.Length;
+            }
+            return _sourceTextCache;
+        }
         set
         {
             CloseCompletions();
@@ -218,6 +225,7 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
         _sourceTextCache = null;
+        UpdateEstimatedSourceLength(e);
         _caretOffsetCache = null;
         _caretPointerCache = null;
         InvalidateRenderedSyntax();
@@ -233,7 +241,8 @@ public sealed class CodeEditorControl : RichTextBox
             base.OnSelectionChanged(e);
             return;
         }
-        if (_currentSnapshot.Source.Length > MaxTrackedCaretSourceLength)
+        if (!CodeEditorPerformancePolicy.ShouldTrackLiveCaret(
+                _currentSnapshot.Source.Length))
         {
             _caretOffsetCache = null;
             _caretPointerCache = null;
@@ -318,13 +327,24 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
 
-        var source = SourceText;
-        var caretOffset = Math.Clamp(SourceCaretOffset, 0, source.Length);
-        if (!force && source.Length > MaxAutomaticCompletionSourceLength)
+        if (!force
+            && !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(
+                _estimatedSourceLength))
         {
             CloseCompletions();
             return;
         }
+
+        var source = SourceText;
+        if (!force
+            && !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(
+                source.Length))
+        {
+            CloseCompletions();
+            return;
+        }
+
+        var caretOffset = Math.Clamp(SourceCaretOffset, 0, source.Length);
         if (!force && !ShouldAutoComplete(source, caretOffset))
         {
             CloseCompletions();
@@ -390,6 +410,16 @@ public sealed class CodeEditorControl : RichTextBox
         _completionPopup.IsOpen = false;
         _completionList.ItemsSource = null;
         _completionContext = null;
+    }
+
+    private void UpdateEstimatedSourceLength(TextChangedEventArgs e)
+    {
+        var length = _sourceTextCache?.Length ?? _estimatedSourceLength;
+        foreach (var change in e.Changes)
+        {
+            length += change.AddedLength - change.RemovedLength;
+        }
+        _estimatedSourceLength = Math.Max(0, length);
     }
 
     private static bool ShouldAutoComplete(string source, int caretOffset)
@@ -616,6 +646,7 @@ public sealed class CodeEditorControl : RichTextBox
             }
             Document.PageWidth = 100_000;
             _sourceTextCache = source;
+            _estimatedSourceLength = source.Length;
             _caretPointerCache = null;
             _renderedSource = source;
             _renderedSpans = spans.ToArray();

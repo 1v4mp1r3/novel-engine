@@ -661,6 +661,9 @@ static void RecentProjectsKeepOnlyNewestEntries()
 static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
 {
     var highlightedLimit = CodeEditorPerformancePolicy.MaxHighlightedCodeLength;
+    var automaticCompletionLimit =
+        CodeEditorPerformancePolicy.MaxAutomaticCompletionSourceLength;
+    var trackedCaretLimit = CodeEditorPerformancePolicy.MaxTrackedCaretSourceLength;
     var liveAnalysisLimit = CodeEditorPerformancePolicy.MaxLiveCodeAnalysisLength;
 
     Assert(
@@ -675,6 +678,18 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorPerformancePolicy.ShouldTrackCursorPosition(highlightedLimit + 1),
         "Cursor tracking should not scan large code documents.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(automaticCompletionLimit),
+        "Automatic completions should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(automaticCompletionLimit + 1),
+        "Automatic completions should stop before reading oversized documents.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldTrackLiveCaret(trackedCaretLimit),
+        "Live caret tracking should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldTrackLiveCaret(trackedCaretLimit + 1),
+        "Live caret tracking should stop beyond the boundary length.");
     Assert(
         CodeEditorPerformancePolicy.ShouldRunLiveAnalysis(liveAnalysisLimit),
         "Live analysis should include the configured boundary length.");
