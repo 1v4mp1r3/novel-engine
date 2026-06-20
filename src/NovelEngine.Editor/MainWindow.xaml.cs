@@ -1128,7 +1128,10 @@ public partial class MainWindow : Window
         _syncingCode = true;
         try
         {
-            CodeEditor.SourceText = code;
+            if (!CodeEditor.HasCachedSourceText(code))
+            {
+                CodeEditor.SourceText = code;
+            }
             SetCodeCursorCache(code);
             _codeRefreshPending = false;
             _codeRefreshUseStoredSource = true;

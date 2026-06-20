@@ -190,6 +190,10 @@ public sealed class CodeEditorControl : RichTextBox
 
     public int EstimatedSourceLength => _estimatedSourceLength;
 
+    internal bool HasCachedSourceText(string source) =>
+        _sourceTextCache is not null
+        && _sourceTextCache.Equals(source, StringComparison.Ordinal);
+
     public void ApplySyntax(
         IReadOnlyList<ProjectLanguageSyntaxSpan> spans,
         int? errorStart = null,

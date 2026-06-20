@@ -65,6 +65,7 @@ var tests = new (string Name, Action Run)[]
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
+    ("code refresh skips unchanged rich text reset", CodeRefreshSkipsUnchangedRichTextReset),
     ("code highlighting skips span overflow repaint", CodeHighlightingSkipsSpanOverflowRepaint),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
@@ -1858,6 +1859,42 @@ static void CodeCursorCacheSkipsOversizedLineScans()
     Assert(
         body.Contains("_codeCursorCacheDirty = false;", StringComparison.Ordinal),
         "Oversized code cursor cache should avoid repeated scan attempts until the source changes.");
+}
+
+static void CodeRefreshSkipsUnchangedRichTextReset()
+{
+    var editorSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "CodeEditorControl.cs"));
+    var windowSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var refreshBody = ExtractMethodBody(
+        windowSource,
+        "private void RefreshCodeFromProject");
+    var guardIndex = refreshBody.IndexOf(
+        "CodeEditor.HasCachedSourceText(code)",
+        StringComparison.Ordinal);
+    var assignIndex = refreshBody.IndexOf(
+        "CodeEditor.SourceText = code;",
+        StringComparison.Ordinal);
+
+    Assert(
+        editorSource.Contains("internal bool HasCachedSourceText", StringComparison.Ordinal),
+        "Code editor should expose a cheap cached-source check.");
+    Assert(
+        guardIndex >= 0,
+        "Code refresh should check whether the RichTextBox already has the requested source.");
+    Assert(
+        assignIndex >= 0,
+        "Code refresh should still update the RichTextBox when the source changed.");
+    Assert(
+        guardIndex < assignIndex,
+        "Code refresh should guard unchanged source before resetting the RichTextBox document.");
 }
 
 static void CodeHighlightingSkipsSpanOverflowRepaint()
