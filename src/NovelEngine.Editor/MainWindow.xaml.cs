@@ -5926,7 +5926,7 @@ public partial class MainWindow : Window
             node.PropertyOverrides.Add("inheritCharacters");
             node.PropertyOverrides.Add("characters");
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text = $"Сцена «{node.Title}» обновлена";
     }
 
@@ -5996,7 +5996,7 @@ public partial class MainWindow : Window
         _project.MainMenu.Elements.Clear();
         _project.MainMenu.Elements.AddRange(
             editor.Design.Elements.Select(element => element.Clone()));
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text = "Главное меню обновлено";
     }
 

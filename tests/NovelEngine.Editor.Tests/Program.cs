@@ -89,6 +89,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
+    ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
@@ -3017,6 +3018,28 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void ModalEditorsSkipHiddenGraphRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var hiddenModalEditorMethods = new[]
+    {
+        "private void EditNodeScene",
+        "private void EditMainMenu",
+    };
+
+    foreach (var method in hiddenModalEditorMethods)
+    {
+        var body = ExtractMethodBody(source, method);
+        Assert(
+            body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+            $"{method} should dirty modal editor changes without refreshing the graph.");
+    }
 }
 
 static void GraphInheritanceMenuSkipsUnchangedApply()
