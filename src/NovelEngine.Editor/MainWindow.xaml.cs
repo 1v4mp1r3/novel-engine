@@ -679,7 +679,7 @@ public partial class MainWindow : Window
     {
         var dialog = new VisualScriptBlocksWindow(
             output.ScriptBlocks,
-            $"Блоки скрипта варианта «{output.Label}»",
+            $"Блоки скрипта выхода «{output.Label}»",
             ProjectScriptVariables.Collect(_project),
             output.Script)
         {
@@ -700,8 +700,8 @@ public partial class MainWindow : Window
         MarkDirty();
         StatusText.Text =
             dialog.ClearImportedScript
-                ? $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
-                : $"Блоки скрипта выбора «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
+                ? $"Блоки скрипта выхода «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
+                : $"Блоки скрипта выхода «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
     }
 
     private static void MarkOverrideIfChanged<T>(
@@ -4978,6 +4978,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (IsOutputScriptBlocksShortcut(e.Key, Keyboard.Modifiers))
+        {
+            EditSelectedOutputScriptBlocks();
+            e.Handled = true;
+            return;
+        }
+
         if (IsOutputTransitionEditShortcut(e.Key, Keyboard.Modifiers))
         {
             EditSelectedOutputTransition();
@@ -5074,6 +5081,11 @@ public partial class MainWindow : Window
     private void EditSelectedOutputTransition_Click(object sender, RoutedEventArgs e) =>
         EditSelectedOutputTransition();
 
+    internal static bool IsOutputScriptBlocksShortcut(
+        Key key,
+        ModifierKeys modifiers) =>
+        key == Key.B && modifiers == ModifierKeys.Control;
+
     internal static bool IsOutputTransitionEditShortcut(
         Key key,
         ModifierKeys modifiers) =>
@@ -5090,6 +5102,18 @@ public partial class MainWindow : Window
         node is not null
         && output is not null
         && node.Outputs.Any(candidate => candidate.Id == output.Id);
+
+    private void EditSelectedOutputScriptBlocks()
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        if (!CanEditOutputDetails(node, output))
+        {
+            return;
+        }
+
+        EditOutputScriptBlocks(node!, output!);
+    }
 
     private void EditSelectedOutputTransition()
     {

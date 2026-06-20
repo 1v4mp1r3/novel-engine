@@ -91,9 +91,10 @@ currently installed on this workstation.
   its script blocks, or configure/reset its transition.
 - Dialogue choices in the outputs table can also be duplicated, reordered, or
   deleted.
-- In the outputs table, `Enter`, `Ctrl+D`, `Delete`, `Backspace`, `Ctrl+T`,
-  `Ctrl+R`, and `Alt+Up/Down` provide edit, duplicate, delete, disconnect,
-  transition edit/reset, and reorder actions from the keyboard.
+- In the outputs table, `Enter`, `Ctrl+D`, `Delete`, `Backspace`, `Ctrl+B`,
+  `Ctrl+T`, `Ctrl+R`, and `Alt+Up/Down` provide edit, duplicate, delete,
+  disconnect, script blocks, transition edit/reset, and reorder actions from
+  the keyboard.
 - A node may inherit or replace the current background and character set.
 - The node context menu can enable inherited background, music, or characters
   and shows what will be inherited when the player enters from each linked node.

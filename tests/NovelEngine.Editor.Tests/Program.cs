@@ -47,6 +47,7 @@ var tests = new (string Name, Action Run)[]
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
+    ("output script block shortcut uses ctrl b", OutputScriptBlockShortcutUsesCtrlB),
     ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
@@ -1169,6 +1170,19 @@ static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
     Assert(
         !MainWindow.CanEditSelectedOutputTransition(scene, foreignOutput),
         "Transition editing should reject outputs from a different node.");
+}
+
+static void OutputScriptBlockShortcutUsesCtrlB()
+{
+    Assert(
+        MainWindow.IsOutputScriptBlocksShortcut(Key.B, ModifierKeys.Control),
+        "Ctrl+B should open selected output script blocks.");
+    Assert(
+        !MainWindow.IsOutputScriptBlocksShortcut(Key.B, ModifierKeys.None),
+        "Output script block shortcut should require Ctrl.");
+    Assert(
+        !MainWindow.IsOutputScriptBlocksShortcut(Key.T, ModifierKeys.Control),
+        "Ctrl+T should not open output script blocks.");
 }
 
 static void OutputTransitionKeyboardShortcutsUseCtrlCombos()
