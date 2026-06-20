@@ -64,6 +64,7 @@ var tests = new (string Name, Action Run)[]
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
+    ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
@@ -1797,6 +1798,41 @@ static void VisualScriptFilterKeepsPreviewCache()
             blocksChanged: false,
             currentPreview: "set flag = true"),
         "Visual script filter changes should keep the compiled preview cache.");
+}
+
+static void VisualScriptFilterUsesDebouncedRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "VisualScriptBlocksWindow.cs"));
+    var scheduleBody = ExtractMethodBody(
+        source,
+        "private void ScheduleFilterRefresh");
+
+    Assert(
+        source.Contains(
+            "_filterBox.TextChanged += (_, _) => ScheduleFilterRefresh();",
+            StringComparison.Ordinal),
+        "Visual script filter text changes should schedule a debounced refresh.");
+    Assert(
+        !source.Contains(
+            "_filterBox.TextChanged += (_, _) =>\r\n            RefreshList",
+            StringComparison.Ordinal)
+            && !source.Contains(
+                "_filterBox.TextChanged += (_, _) =>\n            RefreshList",
+                StringComparison.Ordinal),
+        "Visual script filter text changes should not refresh immediately.");
+    Assert(
+        scheduleBody.Contains("_filterRefreshTimer.Stop();", StringComparison.Ordinal)
+            && scheduleBody.Contains("_filterRefreshTimer.Start();", StringComparison.Ordinal),
+        "Visual script filter refresh should restart its debounce timer.");
+    Assert(
+        source.Contains(
+            "RefreshList(GetSelectedBlockIndex(), blocksChanged: false);",
+            StringComparison.Ordinal),
+        "Visual script filter refresh should keep the compiled preview cache.");
 }
 
 static void ScriptBlockDialogGuardSkipsUnchangedApply()

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
@@ -25,6 +26,7 @@ public sealed class VisualScriptBlocksWindow : Window
     private readonly Button _deleteButton;
     private readonly Button _moveUpButton;
     private readonly Button _moveDownButton;
+    private readonly DispatcherTimer _filterRefreshTimer;
     private bool _clearImportedScript;
 
     public VisualScriptBlocksWindow(
@@ -50,8 +52,7 @@ public sealed class VisualScriptBlocksWindow : Window
         };
         _filterBox = DialogUi.TextBox(string.Empty);
         _filterBox.Margin = new Thickness(0, 4, 0, 10);
-        _filterBox.TextChanged += (_, _) =>
-            RefreshList(GetSelectedBlockIndex(), blocksChanged: false);
+        _filterBox.TextChanged += (_, _) => ScheduleFilterRefresh();
         _blockList = new ListBox
         {
             Height = 220,
@@ -77,6 +78,15 @@ public sealed class VisualScriptBlocksWindow : Window
         _moveUpButton = CreateButton("Выше", () => MoveSelectedBlock(-1));
         _moveDownButton = CreateButton("Ниже", () => MoveSelectedBlock(1));
         KeyDown += (_, e) => HandleKeyboard(e);
+        _filterRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+        };
+        _filterRefreshTimer.Tick += (_, _) =>
+        {
+            _filterRefreshTimer.Stop();
+            RefreshList(GetSelectedBlockIndex(), blocksChanged: false);
+        };
 
         Content = CreateContent();
         RefreshList();
@@ -424,6 +434,12 @@ public sealed class VisualScriptBlocksWindow : Window
             UpdatePreview();
         }
         UpdateButtons();
+    }
+
+    private void ScheduleFilterRefresh()
+    {
+        _filterRefreshTimer.Stop();
+        _filterRefreshTimer.Start();
     }
 
     private int GetSelectedBlockIndex() =>
