@@ -845,11 +845,21 @@ public sealed class GraphSurface : FrameworkElement
                 throw new ArgumentOutOfRangeException(nameof(resource), resource, null);
         }
 
+        var shouldRenderSelection =
+            ShouldRenderAfterHiddenInheritanceApply(SelectedNodeId, node.Id);
         SelectedNodeId = node.Id;
         ProjectChanged?.Invoke(this, EventArgs.Empty);
         SelectionChanged?.Invoke(this, EventArgs.Empty);
-        RequestRender();
+        if (shouldRenderSelection)
+        {
+            RequestRender();
+        }
     }
+
+    internal static bool ShouldRenderAfterHiddenInheritanceApply(
+        string? selectedNodeId,
+        string nodeId) =>
+        !string.Equals(selectedNodeId, nodeId, StringComparison.Ordinal);
 
     private void RequestRender(bool invalidateHitTests = false)
     {

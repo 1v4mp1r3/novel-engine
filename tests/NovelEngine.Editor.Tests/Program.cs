@@ -93,6 +93,7 @@ var tests = new (string Name, Action Run)[]
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
+    ("graph inheritance render skips selected node", GraphInheritanceRenderSkipsSelectedNode),
     ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
@@ -3066,6 +3067,31 @@ static void GraphInheritanceMenuSkipsUnchangedApply()
     Assert(
         projectChangedIndex >= 0 && noChangeIndex < projectChangedIndex,
         "Unchanged inheritance should return before dirtying the project.");
+}
+
+static void GraphInheritanceRenderSkipsSelectedNode()
+{
+    Assert(
+        !GraphSurface.ShouldRenderAfterHiddenInheritanceApply("scene", "scene"),
+        "Applying hidden inheritance to the selected node should not repaint the graph.");
+    Assert(
+        GraphSurface.ShouldRenderAfterHiddenInheritanceApply(null, "scene"),
+        "Applying hidden inheritance should render when it selects a node.");
+    Assert(
+        GraphSurface.ShouldRenderAfterHiddenInheritanceApply("other", "scene"),
+        "Applying hidden inheritance should render when selection changes.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var body = ExtractMethodBody(source, "private void ApplyInheritance");
+    Assert(
+        body.Contains(
+            "ShouldRenderAfterHiddenInheritanceApply(SelectedNodeId, node.Id)",
+            StringComparison.Ordinal),
+        "ApplyInheritance should avoid repainting already selected hidden changes.");
 }
 
 static void DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges()
