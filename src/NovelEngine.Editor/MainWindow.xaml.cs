@@ -658,6 +658,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!HasScriptBlockDialogChanges(
+                node.ScriptBlocks,
+                dialog.Blocks,
+                dialog.ClearImportedScript,
+                node.Script))
+        {
+            return;
+        }
+
         node.ScriptBlocks.Clear();
         node.ScriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
         if (dialog.ClearImportedScript)
@@ -690,6 +699,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!HasScriptBlockDialogChanges(
+                output.ScriptBlocks,
+                dialog.Blocks,
+                dialog.ClearImportedScript,
+                output.Script))
+        {
+            return;
+        }
+
         output.ScriptBlocks.Clear();
         output.ScriptBlocks.AddRange(
             dialog.Blocks.Select(block => block.Clone()));
@@ -703,6 +721,14 @@ public partial class MainWindow : Window
                 ? $"Блоки скрипта выхода «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
                 : $"Блоки скрипта выхода «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}";
     }
+
+    internal static bool HasScriptBlockDialogChanges(
+        IReadOnlyList<VisualScriptBlock> currentBlocks,
+        IReadOnlyList<VisualScriptBlock> dialogBlocks,
+        bool clearImportedScript,
+        string textScript) =>
+        !VisualScriptBlocksEqual(currentBlocks, dialogBlocks)
+        || (clearImportedScript && textScript.Length > 0);
 
     private static void MarkOverrideIfChanged<T>(
         NovelNode node,

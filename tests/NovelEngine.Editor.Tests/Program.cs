@@ -56,6 +56,7 @@ var tests = new (string Name, Action Run)[]
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
+    ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
@@ -1421,6 +1422,55 @@ static void VisualScriptFilterKeepsPreviewCache()
             blocksChanged: false,
             currentPreview: "set flag = true"),
         "Visual script filter changes should keep the compiled preview cache.");
+}
+
+static void ScriptBlockDialogGuardSkipsUnchangedApply()
+{
+    var block = new VisualScriptBlock
+    {
+        Id = "block-1",
+        Kind = VisualScriptBlockKind.SetVariable,
+        VariableName = "score",
+        Value = "1",
+    };
+    var blocks = new[] { block };
+
+    Assert(
+        !MainWindow.HasScriptBlockDialogChanges(
+            blocks,
+            blocks.Select(item => item.Clone()).ToList(),
+            clearImportedScript: false,
+            textScript: "add score 1"),
+        "Unchanged script block dialog values should not dirty the project.");
+    Assert(
+        MainWindow.HasScriptBlockDialogChanges(
+            blocks,
+            [
+                new VisualScriptBlock
+                {
+                    Id = "block-1",
+                    Kind = VisualScriptBlockKind.SetVariable,
+                    VariableName = "score",
+                    Value = "2",
+                },
+            ],
+            clearImportedScript: false,
+            textScript: "add score 1"),
+        "Changed script blocks should dirty the project.");
+    Assert(
+        MainWindow.HasScriptBlockDialogChanges(
+            blocks,
+            blocks.Select(item => item.Clone()).ToList(),
+            clearImportedScript: true,
+            textScript: "add score 1"),
+        "Clearing an existing text script should dirty the project.");
+    Assert(
+        !MainWindow.HasScriptBlockDialogChanges(
+            blocks,
+            blocks.Select(item => item.Clone()).ToList(),
+            clearImportedScript: true,
+            textScript: string.Empty),
+        "Clearing an already empty text script should not dirty the project.");
 }
 
 static void NodePropertyGuardSkipsUnchangedApply()
