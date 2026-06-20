@@ -77,6 +77,7 @@ public partial class MainWindow : Window
     private AssetListStamp? _assetListStamp;
     private AssetFolderTreeStamp? _assetFolderTreeStamp;
     private AssetPreviewStamp? _assetPreviewStamp;
+    private int _assetCatalogRevision;
     private readonly Dictionary<AssetKind, List<NodeAssetFolderOption>>
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
@@ -1812,6 +1813,10 @@ public partial class MainWindow : Window
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
         _nodeAssetPickerCachesDirty = true;
+        unchecked
+        {
+            _assetCatalogRevision++;
+        }
         _nodePropertyPanelStamp = null;
     }
 
@@ -1912,7 +1917,8 @@ public partial class MainWindow : Window
     {
         var selectedId = (AssetsGrid.SelectedItem as AssetView)?.Id;
         var stamp = CreateAssetListStamp(
-            _project.Assets,
+            _project.Assets.Count,
+            _assetCatalogRevision,
             _selectedAssetFolder,
             AssetSearchBox.Text);
         if (_assetListStamp == stamp && AssetsGrid.ItemsSource is not null)
@@ -1950,6 +1956,22 @@ public partial class MainWindow : Window
     }
 
     internal static AssetListStamp CreateAssetListStamp(
+        int assetCount,
+        int assetCatalogRevision,
+        string? selectedFolder,
+        string query)
+    {
+        var normalizedFolder = selectedFolder is null
+            ? null
+            : ProjectAssets.NormalizeFolder(selectedFolder.Trim());
+        return new AssetListStamp(
+            normalizedFolder,
+            query.Trim(),
+            assetCount,
+            assetCatalogRevision);
+    }
+
+    internal static AssetListStamp CreateAssetListStamp(
         IEnumerable<NovelAsset> assets,
         string? selectedFolder,
         string query)
@@ -1981,8 +2003,9 @@ public partial class MainWindow : Window
     private void RefreshAssetFolders()
     {
         var stamp = CreateAssetFolderTreeStamp(
-            _project.AssetFolders,
-            _project.Assets,
+            _project.AssetFolders.Count,
+            _project.Assets.Count,
+            _assetCatalogRevision,
             _selectedAssetFolder);
         if (_assetFolderTreeStamp == stamp && AssetFoldersTree.Items.Count > 0)
         {
@@ -2058,6 +2081,22 @@ public partial class MainWindow : Window
         var hasFolder = _selectedAssetFolder is not null;
         RenameFolderButton.IsEnabled = hasFolder;
         DeleteFolderButton.IsEnabled = hasFolder;
+    }
+
+    internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(
+        int folderCount,
+        int assetCount,
+        int assetCatalogRevision,
+        string? selectedFolder)
+    {
+        var normalizedSelectedFolder = selectedFolder is null
+            ? null
+            : ProjectAssets.NormalizeFolder(selectedFolder.Trim());
+        return new AssetFolderTreeStamp(
+            normalizedSelectedFolder,
+            folderCount,
+            assetCount,
+            assetCatalogRevision);
     }
 
     internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(

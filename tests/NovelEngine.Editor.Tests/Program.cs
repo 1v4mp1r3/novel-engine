@@ -38,6 +38,7 @@ var tests = new (string Name, Action Run)[]
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
+    ("asset catalog runtime stamps avoid full scans", AssetCatalogRuntimeStampsAvoidFullScans),
     ("asset preview stamp tracks visible input state", AssetPreviewStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
@@ -1006,6 +1007,49 @@ static void AssetFolderTreeStampTracksVisibleInputState()
             assets,
             "backgrounds"),
         "Asset folder tree stamp should track empty folder rows.");
+}
+
+static void AssetCatalogRuntimeStampsAvoidFullScans()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var listBody = ExtractMethodBody(source, "private void RefreshAssetList");
+    var folderBody = ExtractMethodBody(source, "private void RefreshAssetFolders");
+    var clearPickerBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
+    var listStampIndex = listBody.IndexOf(
+        "var stamp = CreateAssetListStamp(",
+        StringComparison.Ordinal);
+    var listFilterIndex = listBody.IndexOf(
+        "AssetListFilter.Apply(",
+        StringComparison.Ordinal);
+    var folderStampIndex = folderBody.IndexOf(
+        "var stamp = CreateAssetFolderTreeStamp(",
+        StringComparison.Ordinal);
+    var folderGroupIndex = folderBody.IndexOf(
+        "var folderCounts = _project.Assets",
+        StringComparison.Ordinal);
+
+    Assert(
+        listStampIndex >= 0 && listFilterIndex > listStampIndex,
+        "Asset list should check a cheap stamp before filtering assets.");
+    Assert(
+        folderStampIndex >= 0 && folderGroupIndex > folderStampIndex,
+        "Asset folders should check a cheap stamp before grouping assets.");
+    Assert(
+        listBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
+            && listBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
+        "Asset list runtime stamp should use catalog counts and revision.");
+    Assert(
+        folderBody.Contains("_project.AssetFolders.Count", StringComparison.Ordinal)
+            && folderBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
+            && folderBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
+        "Asset folder runtime stamp should use catalog counts and revision.");
+    Assert(
+        clearPickerBody.Contains("_assetCatalogRevision++", StringComparison.Ordinal),
+        "Asset catalog invalidation should advance runtime stamp revision.");
 }
 
 static void AssetPreviewStampTracksVisibleInputState()
