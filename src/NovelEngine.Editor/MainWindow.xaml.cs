@@ -1211,6 +1211,16 @@ public partial class MainWindow : Window
 
     private void SetCodeCursorCache(string source)
     {
+        if (!ShouldReadCodeCursorSource(source.Length))
+        {
+            _codeCursorSource = string.Empty;
+            _codeLineStarts = [0];
+            _lastCodeCursorOffset = -2;
+            _codeCursorCacheDirty = false;
+            CodeCursorText.Text = "Большой файл: позиция курсора отключена";
+            return;
+        }
+
         if (!_codeCursorCacheDirty
             && _codeCursorSource.Equals(source, StringComparison.Ordinal))
         {

@@ -56,6 +56,7 @@ var tests = new (string Name, Action Run)[]
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
+    ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
@@ -1445,6 +1446,38 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !MainWindow.ShouldScheduleLiveCodeAnalysis(liveAnalysisLimit + 1),
         "Live code analysis timer should not read oversized documents after typing.");
+}
+
+static void CodeCursorCacheSkipsOversizedLineScans()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private void SetCodeCursorCache");
+    var guardIndex = body.IndexOf(
+        "ShouldReadCodeCursorSource(source.Length)",
+        StringComparison.Ordinal);
+    var buildIndex = body.IndexOf(
+        "BuildLineStarts(source)",
+        StringComparison.Ordinal);
+
+    Assert(
+        guardIndex >= 0,
+        "Code cursor cache should guard oversized sources before scanning lines.");
+    Assert(
+        buildIndex >= 0,
+        "Code cursor cache should still build line starts for normal sources.");
+    Assert(
+        guardIndex < buildIndex,
+        "Code cursor cache should not build line starts before the oversized-source guard.");
+    Assert(
+        body.Contains("_codeLineStarts = [0];", StringComparison.Ordinal),
+        "Oversized code cursor cache should clear stale line starts.");
+    Assert(
+        body.Contains("_codeCursorCacheDirty = false;", StringComparison.Ordinal),
+        "Oversized code cursor cache should avoid repeated scan attempts until the source changes.");
 }
 
 static void VisualScriptFilterKeepsPreviewCache()

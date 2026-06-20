@@ -180,6 +180,8 @@ currently installed on this workstation.
   cannot freeze the editor by forcing a full completion pass.
 - The code editor tracks caret movement from a cached pointer when possible, so
   line/column updates avoid rereading the whole document on every cursor move.
+  Oversized files skip that line cache entirely until the source becomes small
+  enough again.
 - The top-right IDE controls compile the current project, launch the compiled
   game, launch it with runtime diagnostics, or stop the separate player process.
 - Build and run commands perform project diagnostics first: errors block the
