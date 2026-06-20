@@ -73,6 +73,7 @@ var tests = new (string Name, Action Run)[]
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("node rendered property guard skips hidden graph refresh", NodeRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
+    ("node character actions skip hidden graph refresh", NodeCharacterActionsSkipHiddenGraphRefresh),
     ("node voice binding materializes inherited characters", NodeVoiceBindingMaterializesInheritedCharacters),
     ("node voice binding skips missing inherited character", NodeVoiceBindingSkipsMissingInheritedCharacter),
     ("node voice binding skips duplicate inherited voice", NodeVoiceBindingSkipsDuplicateInheritedVoice),
@@ -2161,6 +2162,34 @@ static void NodeCharacterEditingPolicyRespectsInheritance()
     Assert(
         !MainWindow.CanEditNodeCharacters(null, inheritCharactersChecked: false),
         "Character editing should require a selected node.");
+}
+
+static void NodeCharacterActionsSkipHiddenGraphRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var hiddenCharacterMethods = new[]
+    {
+        "private void AddCharacter_Click",
+        "private void AddLibraryCharacter_Click",
+        "private void SaveCharacterToLibrary_Click",
+        "private void EditCharacter_Click",
+        "private void DeleteCharacter_Click",
+        "private void DuplicateCharacter_Click",
+        "private void MoveSelectedCharacter",
+        "private void SetSelectedCharacterPosition",
+    };
+
+    foreach (var method in hiddenCharacterMethods)
+    {
+        var body = ExtractMethodBody(source, method);
+        Assert(
+            body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+            $"{method} should dirty character data without refreshing the graph.");
+    }
 }
 
 static void NodeVoiceBindingMaterializesInheritedCharacters()

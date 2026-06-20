@@ -4465,7 +4465,7 @@ public partial class MainWindow : Window
         }
 
         AddCharacterToNodeFromDialog(node!, dialog);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
     }
 
     private void AddLibraryCharacter_Click(object sender, RoutedEventArgs e)
@@ -4503,7 +4503,7 @@ public partial class MainWindow : Window
         }
         InheritCharactersCheck.IsChecked = false;
         _project.AddCharacterClone(node.Id, dialog.SelectedCharacter);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text = $"Персонаж «{CharacterLabel(dialog.SelectedCharacter)}» добавлен из библиотеки";
     }
 
@@ -4532,7 +4532,7 @@ public partial class MainWindow : Window
             CopyCharacterValues(character, existing);
             StatusText.Text = $"Персонаж «{CharacterLabel(character)}» обновлён в библиотеке";
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
     }
 
     private void EditCharacter_Click(object sender, RoutedEventArgs e)
@@ -4578,7 +4578,7 @@ public partial class MainWindow : Window
         {
             node.PropertyOverrides.Add("characters");
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
     }
 
     private List<string> NormalizeVoiceReferences(IEnumerable<string> references) =>
@@ -4698,7 +4698,7 @@ public partial class MainWindow : Window
         {
             node.PropertyOverrides.Add("characters");
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
     }
 
     private void DuplicateCharacter_Click(object sender, RoutedEventArgs e)
@@ -4711,7 +4711,7 @@ public partial class MainWindow : Window
         }
 
         var duplicate = _project.DuplicateCharacter(node!.Id, character.Id);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         SelectCharacterView(duplicate.Id);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» продублирован";
     }
@@ -4750,7 +4750,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         SelectCharacterView(character.Id);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён в списке";
     }
@@ -4772,7 +4772,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         SelectCharacterView(characterId);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» перемещён: {CharacterPositionLabel(position)}";
     }
