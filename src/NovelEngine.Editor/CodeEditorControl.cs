@@ -430,6 +430,14 @@ public sealed class CodeEditorControl : RichTextBox
     private void CloseCompletions()
     {
         _completionTimer.Stop();
+        if (!ShouldResetCompletionPopup(
+                _completionPopup.IsOpen,
+                _completionContext is not null,
+                _completionList.ItemsSource is not null))
+        {
+            return;
+        }
+
         _completionPopup.IsOpen = false;
         _completionList.ItemsSource = null;
         _completionContext = null;
@@ -464,6 +472,12 @@ public sealed class CodeEditorControl : RichTextBox
 
     internal static bool ShouldScheduleHistoryRecord(int estimatedSourceLength) =>
         CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(estimatedSourceLength);
+
+    internal static bool ShouldResetCompletionPopup(
+        bool isOpen,
+        bool hasContext,
+        bool hasItemsSource) =>
+        isOpen || hasContext || hasItemsSource;
 
     private void ScheduleUserChangeRecord()
     {

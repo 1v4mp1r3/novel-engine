@@ -1816,6 +1816,30 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
         !CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit + 1),
         "History timer should not run for oversized documents.");
     Assert(
+        !CodeEditorControl.ShouldResetCompletionPopup(
+            isOpen: false,
+            hasContext: false,
+            hasItemsSource: false),
+        "Already closed completion popup should not reset WPF popup state.");
+    Assert(
+        CodeEditorControl.ShouldResetCompletionPopup(
+            isOpen: true,
+            hasContext: false,
+            hasItemsSource: false),
+        "Open completion popup should be reset.");
+    Assert(
+        CodeEditorControl.ShouldResetCompletionPopup(
+            isOpen: false,
+            hasContext: true,
+            hasItemsSource: false),
+        "Completion context should be cleared.");
+    Assert(
+        CodeEditorControl.ShouldResetCompletionPopup(
+            isOpen: false,
+            hasContext: false,
+            hasItemsSource: true),
+        "Completion item source should be cleared.");
+    Assert(
         MainWindow.ShouldReadCodeCursorSource(highlightedLimit),
         "Cursor source reads should include the configured boundary length.");
     Assert(
