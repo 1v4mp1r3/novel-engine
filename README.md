@@ -176,6 +176,8 @@ currently installed on this workstation.
 - The code editor avoids persistent block guide overlays so large scripts stay
   responsive while scrolling and typing, and batches undo snapshots while the
   user is actively typing.
+- Manual `Ctrl+Space` completions are also size-limited, so oversized DSL files
+  cannot freeze the editor by forcing a full completion pass.
 - The code editor tracks caret movement from a cached pointer when possible, so
   line/column updates avoid rereading the whole document on every cursor move.
 - The top-right IDE controls compile the current project, launch the compiled

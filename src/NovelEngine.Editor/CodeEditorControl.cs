@@ -346,18 +346,18 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
 
-        if (!force
-            && !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(
-                _estimatedSourceLength))
+        if (!CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+                _estimatedSourceLength,
+                force))
         {
             CloseCompletions();
             return;
         }
 
         var source = SourceText;
-        if (!force
-            && !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(
-                source.Length))
+        if (!CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+                source.Length,
+                force))
         {
             CloseCompletions();
             return;

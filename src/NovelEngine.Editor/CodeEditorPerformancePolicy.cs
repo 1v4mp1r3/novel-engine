@@ -4,6 +4,7 @@ internal static class CodeEditorPerformancePolicy
 {
     public const int MaxHighlightedCodeLength = 40_000;
     public const int MaxAutomaticCompletionSourceLength = 60_000;
+    public const int MaxManualCompletionSourceLength = 80_000;
     public const int MaxTrackedCaretSourceLength = 60_000;
     public const int MaxLiveCodeAnalysisLength = 80_000;
     public const int MaxHistorySnapshotSourceLength = 80_000;
@@ -17,6 +18,13 @@ internal static class CodeEditorPerformancePolicy
 
     public static bool ShouldRunAutomaticCompletions(int sourceLength) =>
         sourceLength <= MaxAutomaticCompletionSourceLength;
+
+    public static bool ShouldRunCompletionLookup(
+        int sourceLength,
+        bool force) =>
+        force
+            ? sourceLength <= MaxManualCompletionSourceLength
+            : ShouldRunAutomaticCompletions(sourceLength);
 
     public static bool ShouldTrackLiveCaret(int sourceLength) =>
         sourceLength <= MaxTrackedCaretSourceLength;

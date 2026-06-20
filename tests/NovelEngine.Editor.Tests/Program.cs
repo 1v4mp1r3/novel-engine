@@ -1359,6 +1359,8 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     var highlightedLimit = CodeEditorPerformancePolicy.MaxHighlightedCodeLength;
     var automaticCompletionLimit =
         CodeEditorPerformancePolicy.MaxAutomaticCompletionSourceLength;
+    var manualCompletionLimit =
+        CodeEditorPerformancePolicy.MaxManualCompletionSourceLength;
     var trackedCaretLimit = CodeEditorPerformancePolicy.MaxTrackedCaretSourceLength;
     var liveAnalysisLimit = CodeEditorPerformancePolicy.MaxLiveCodeAnalysisLength;
     var historyLimit = CodeEditorPerformancePolicy.MaxHistorySnapshotSourceLength;
@@ -1381,6 +1383,26 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(automaticCompletionLimit + 1),
         "Automatic completions should stop before reading oversized documents.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+            automaticCompletionLimit + 1,
+            force: true),
+        "Manual completions should still work past the automatic completion boundary.");
+    Assert(
+        CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+            manualCompletionLimit,
+            force: true),
+        "Manual completions should include the configured boundary length.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+            manualCompletionLimit + 1,
+            force: true),
+        "Manual completions should not force lookup for oversized documents.");
+    Assert(
+        !CodeEditorPerformancePolicy.ShouldRunCompletionLookup(
+            automaticCompletionLimit + 1,
+            force: false),
+        "Non-forced completion lookup should use the automatic completion boundary.");
     Assert(
         CodeEditorPerformancePolicy.ShouldTrackLiveCaret(trackedCaretLimit),
         "Live caret tracking should include the configured boundary length.");
