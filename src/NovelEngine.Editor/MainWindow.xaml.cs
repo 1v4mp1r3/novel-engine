@@ -4752,6 +4752,17 @@ public partial class MainWindow : Window
         {
             return;
         }
+        if (!HasOutputEditorChanges(
+                output,
+                dialog.OutputLabel,
+                dialog.Condition,
+                dialog.ConditionExpression,
+                dialog.Script,
+                dialog.ScriptBlocks))
+        {
+            return;
+        }
+
         dialog.ApplyTo(output);
         MarkDirty();
     }
@@ -4798,6 +4809,61 @@ public partial class MainWindow : Window
         {
             MarkDirty();
         }
+    }
+
+    internal static bool HasOutputEditorChanges(
+        NodeOutput output,
+        string label,
+        string condition,
+        VisualConditionExpression? conditionExpression,
+        string script,
+        IReadOnlyList<VisualScriptBlock> scriptBlocks)
+    {
+        if (!output.Label.Equals(label, StringComparison.Ordinal)
+            || !output.Condition.Equals(condition, StringComparison.Ordinal)
+            || !output.Script.Equals(script, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var currentCondition = output.ConditionExpression is null
+            ? string.Empty
+            : VisualConditionCompiler.Compile(output.ConditionExpression);
+        var nextCondition = conditionExpression is null
+            ? string.Empty
+            : VisualConditionCompiler.Compile(conditionExpression);
+        if (!currentCondition.Equals(nextCondition, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return !VisualScriptBlocksEqual(output.ScriptBlocks, scriptBlocks);
+    }
+
+    private static bool VisualScriptBlocksEqual(
+        IReadOnlyList<VisualScriptBlock> first,
+        IReadOnlyList<VisualScriptBlock> second)
+    {
+        if (first.Count != second.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < first.Count; index++)
+        {
+            var left = first[index];
+            var right = second[index];
+            if (!left.Id.Equals(right.Id, StringComparison.Ordinal)
+                || left.Kind != right.Kind
+                || !left.VariableName.Equals(right.VariableName, StringComparison.Ordinal)
+                || !left.Value.Equals(right.Value, StringComparison.Ordinal)
+                || !left.Text.Equals(right.Text, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void DuplicateOutput_Click(object sender, RoutedEventArgs e)

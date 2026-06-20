@@ -57,6 +57,7 @@ var tests = new (string Name, Action Run)[]
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
+    ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -1478,6 +1479,70 @@ static void NodePropertyGuardSkipsUnchangedApply()
             node.InheritCharacters,
             "set flag = false"),
         "Changed script should refresh node properties.");
+}
+
+static void OutputEditorGuardSkipsUnchangedApply()
+{
+    var block = new VisualScriptBlock
+    {
+        Id = "block-1",
+        Kind = VisualScriptBlockKind.SetVariable,
+        VariableName = "score",
+        Value = "1",
+    };
+    var output = new NodeOutput
+    {
+        Id = "next",
+        Label = "Дальше",
+        Condition = "score >= 1",
+        Script = "add score 1",
+        ScriptBlocks = { block },
+    };
+
+    Assert(
+        !MainWindow.HasOutputEditorChanges(
+            output,
+            output.Label,
+            output.Condition,
+            output.ConditionExpression,
+            output.Script,
+            output.ScriptBlocks.Select(item => item.Clone()).ToList()),
+        "Unchanged output editor values should not dirty the project.");
+    Assert(
+        MainWindow.HasOutputEditorChanges(
+            output,
+            "Продолжить",
+            output.Condition,
+            output.ConditionExpression,
+            output.Script,
+            output.ScriptBlocks),
+        "Changed output label should dirty the project.");
+    Assert(
+        MainWindow.HasOutputEditorChanges(
+            output,
+            output.Label,
+            output.Condition,
+            output.ConditionExpression,
+            "set visited = true",
+            output.ScriptBlocks),
+        "Changed output script should dirty the project.");
+    Assert(
+        MainWindow.HasOutputEditorChanges(
+            output,
+            output.Label,
+            output.Condition,
+            output.ConditionExpression,
+            output.Script,
+            [
+                new VisualScriptBlock
+                {
+                    Id = "block-1",
+                    Kind = VisualScriptBlockKind.SetVariable,
+                    VariableName = "score",
+                    Value = "2",
+                },
+            ]),
+        "Changed output script blocks should dirty the project.");
 }
 
 static void ProjectExplorerStampTracksVisibleNodeFields()
