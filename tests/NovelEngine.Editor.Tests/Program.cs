@@ -50,6 +50,7 @@ var tests = new (string Name, Action Run)[]
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("output script block shortcut uses ctrl b", OutputScriptBlockShortcutUsesCtrlB),
     ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
+    ("output list shortcuts require dialogue nodes", OutputListShortcutsRequireDialogueNodes),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
     ("graph editing shortcuts require graph focus", GraphEditingShortcutsRequireGraphFocus),
@@ -1230,6 +1231,71 @@ static void OutputTransitionKeyboardShortcutsUseCtrlCombos()
     Assert(
         !MainWindow.IsOutputTransitionResetShortcut(Key.T, ModifierKeys.Control),
         "Ctrl+T should not reset transition settings.");
+}
+
+static void OutputListShortcutsRequireDialogueNodes()
+{
+    var scene = new NovelNode { Id = "scene", Kind = NodeKind.Scene };
+    var dialogue = new NovelNode { Id = "dialogue", Kind = NodeKind.Dialogue };
+
+    Assert(
+        !MainWindow.CanEditOutputList(scene),
+        "Scene next output should not expose dialogue choice list editing.");
+    Assert(
+        MainWindow.CanEditOutputList(dialogue),
+        "Dialogue outputs should expose choice list editing.");
+    Assert(
+        !MainWindow.CanEditOutputList(null),
+        "Output list editing should require a selected node.");
+
+    Assert(
+        MainWindow.IsOutputListDuplicateShortcut(
+            Key.D,
+            ModifierKeys.Control,
+            canEditOutputList: true),
+        "Ctrl+D should duplicate a dialogue choice when choice list editing is available.");
+    Assert(
+        !MainWindow.IsOutputListDuplicateShortcut(
+            Key.D,
+            ModifierKeys.Control,
+            canEditOutputList: false),
+        "Ctrl+D should not be consumed by scene output rows.");
+    Assert(
+        MainWindow.IsOutputListDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.None,
+            canEditOutputList: true),
+        "Delete should remove a dialogue choice when choice list editing is available.");
+    Assert(
+        !MainWindow.IsOutputListDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.None,
+            canEditOutputList: false),
+        "Delete should not be consumed by scene output rows.");
+    Assert(
+        MainWindow.IsOutputListMoveUpShortcut(
+            Key.Up,
+            ModifierKeys.Alt,
+            canEditOutputList: true),
+        "Alt+Up should reorder dialogue choices.");
+    Assert(
+        !MainWindow.IsOutputListMoveUpShortcut(
+            Key.Up,
+            ModifierKeys.Alt,
+            canEditOutputList: false),
+        "Alt+Up should not be consumed by scene output rows.");
+    Assert(
+        MainWindow.IsOutputListMoveDownShortcut(
+            Key.Down,
+            ModifierKeys.Alt,
+            canEditOutputList: true),
+        "Alt+Down should reorder dialogue choices.");
+    Assert(
+        !MainWindow.IsOutputListMoveDownShortcut(
+            Key.Down,
+            ModifierKeys.Alt,
+            canEditOutputList: false),
+        "Alt+Down should not be consumed by scene output rows.");
 }
 
 static void OutputTransitionResetAppearsOnlyForCustomizedTransitions()

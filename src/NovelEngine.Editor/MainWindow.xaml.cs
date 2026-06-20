@@ -5070,7 +5070,7 @@ public partial class MainWindow : Window
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var output = SelectedOutput();
-        var canEditChoices = node?.Kind == NodeKind.Dialogue;
+        var canEditChoices = CanEditOutputList(node);
         var menu = OutputsGrid.ContextMenu ?? new ContextMenu();
         OutputsGrid.ContextMenu = menu;
         menu.Items.Clear();
@@ -5145,6 +5145,8 @@ public partial class MainWindow : Window
 
     private void OutputsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var canEditOutputList = CanEditOutputList(node);
         if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
         {
             EditOutput_Click(this, new RoutedEventArgs());
@@ -5152,14 +5154,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+        if (IsOutputListDuplicateShortcut(
+            e.Key,
+            Keyboard.Modifiers,
+            canEditOutputList))
         {
             DuplicateOutput_Click(this, new RoutedEventArgs());
             e.Handled = true;
             return;
         }
 
-        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        if (IsOutputListDeleteShortcut(
+            e.Key,
+            Keyboard.Modifiers,
+            canEditOutputList))
         {
             DeleteOutput_Click(this, new RoutedEventArgs());
             e.Handled = true;
@@ -5194,17 +5202,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (Keyboard.Modifiers != ModifierKeys.Alt)
+        if (Keyboard.Modifiers != ModifierKeys.Alt || !canEditOutputList)
         {
             return;
         }
 
-        if (e.Key == Key.Up)
+        if (IsOutputListMoveUpShortcut(
+            e.Key,
+            Keyboard.Modifiers,
+            canEditOutputList))
         {
             MoveSelectedOutput(-1);
             e.Handled = true;
         }
-        else if (e.Key == Key.Down)
+        else if (IsOutputListMoveDownShortcut(
+            e.Key,
+            Keyboard.Modifiers,
+            canEditOutputList))
         {
             MoveSelectedOutput(1);
             e.Handled = true;
@@ -5275,6 +5289,41 @@ public partial class MainWindow : Window
 
     private void EditSelectedOutputTransition_Click(object sender, RoutedEventArgs e) =>
         EditSelectedOutputTransition();
+
+    internal static bool CanEditOutputList(NovelNode? node) =>
+        node?.Kind == NodeKind.Dialogue;
+
+    internal static bool IsOutputListDuplicateShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool canEditOutputList) =>
+        canEditOutputList
+        && key == Key.D
+        && modifiers == ModifierKeys.Control;
+
+    internal static bool IsOutputListDeleteShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool canEditOutputList) =>
+        canEditOutputList
+        && key == Key.Delete
+        && modifiers == ModifierKeys.None;
+
+    internal static bool IsOutputListMoveUpShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool canEditOutputList) =>
+        canEditOutputList
+        && key == Key.Up
+        && modifiers == ModifierKeys.Alt;
+
+    internal static bool IsOutputListMoveDownShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool canEditOutputList) =>
+        canEditOutputList
+        && key == Key.Down
+        && modifiers == ModifierKeys.Alt;
 
     internal static bool IsOutputScriptBlocksShortcut(
         Key key,
