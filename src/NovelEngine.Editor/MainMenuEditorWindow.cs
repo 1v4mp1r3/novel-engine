@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using NovelEngine.Core;
 
@@ -51,6 +52,7 @@ public sealed class MainMenuEditorWindow : Window
     private MainMenuElementListStamp? _elementListStamp;
     private MainMenuStageStamp? _stageStamp;
     private MainMenuPropertyPanelStamp? _propertyPanelStamp;
+    private readonly DispatcherTimer _propertyApplyTimer;
 
     public MainMenuEditorWindow(
         NovelProject project,
@@ -68,6 +70,15 @@ public sealed class MainMenuEditorWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = (Brush)Application.Current.Resources["WindowBrush"];
         Foreground = (Brush)Application.Current.Resources["TextBrush"];
+        _propertyApplyTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+        };
+        _propertyApplyTimer.Tick += (_, _) =>
+        {
+            _propertyApplyTimer.Stop();
+            ApplyProperties();
+        };
 
         Content = BuildLayout();
         RefreshStage();
@@ -138,6 +149,7 @@ public sealed class MainMenuEditorWindow : Window
             });
         ((Button)footer.Children[^1]).Click += (_, _) =>
         {
+            FlushPendingPropertyChanges();
             DialogResult = true;
             Close();
         };
@@ -250,9 +262,9 @@ public sealed class MainMenuEditorWindow : Window
             _styleCodeBox,
         })
         {
-            textBox.TextChanged += (_, _) => ApplyProperties();
+            textBox.TextChanged += (_, _) => ScheduleApplyProperties();
         }
-        _actionBox.SelectionChanged += (_, _) => ApplyProperties();
+        _actionBox.SelectionChanged += (_, _) => FlushPendingPropertyChanges();
 
         return scroll;
     }
@@ -322,6 +334,7 @@ public sealed class MainMenuEditorWindow : Window
         {
             return;
         }
+        _propertyApplyTimer.Stop();
         _design.Elements.Remove(_selected);
         RefreshStage();
         SelectElement(_design.Elements.FirstOrDefault());
@@ -552,10 +565,32 @@ public sealed class MainMenuEditorWindow : Window
 
     private void SelectElement(MainMenuElement? element)
     {
+        if (!ReferenceEquals(_selected, element))
+        {
+            FlushPendingPropertyChanges();
+        }
+
         _selected = element;
         _elementList.SelectedItem = element;
         RefreshStage();
         RefreshProperties();
+    }
+
+    private void ScheduleApplyProperties()
+    {
+        if (_refreshingProperties)
+        {
+            return;
+        }
+
+        _propertyApplyTimer.Stop();
+        _propertyApplyTimer.Start();
+    }
+
+    private void FlushPendingPropertyChanges()
+    {
+        _propertyApplyTimer.Stop();
+        ApplyProperties();
     }
 
     private void RefreshProperties()

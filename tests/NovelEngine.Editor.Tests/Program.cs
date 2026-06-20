@@ -76,6 +76,7 @@ var tests = new (string Name, Action Run)[]
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
+    ("main menu text properties use debounced apply", MainMenuTextPropertiesUseDebouncedApply),
     ("main menu property panel stamp tracks fields", MainMenuPropertyPanelStampTracksFields),
     ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
@@ -2408,6 +2409,49 @@ static void MainMenuPropertyGuardSeparatesRenderedChanges()
             element.Border,
             element.CustomStyleCode),
         "Rendered text changes should refresh the main menu stage.");
+}
+
+static void MainMenuTextPropertiesUseDebouncedApply()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainMenuEditorWindow.cs"));
+    var buildProperties = ExtractMethodBody(source, "private UIElement BuildProperties");
+    var scheduleBody = ExtractMethodBody(source, "private void ScheduleApplyProperties");
+    var buildFooter = ExtractMethodBody(source, "private UIElement BuildFooter");
+    var selectElement = ExtractMethodBody(source, "private void SelectElement");
+    var deleteSelected = ExtractMethodBody(source, "private void DeleteSelected");
+
+    Assert(
+        buildProperties.Contains(
+            "textBox.TextChanged += (_, _) => ScheduleApplyProperties();",
+            StringComparison.Ordinal),
+        "Main menu text fields should schedule debounced property application.");
+    Assert(
+        !buildProperties.Contains(
+            "textBox.TextChanged += (_, _) => ApplyProperties();",
+            StringComparison.Ordinal),
+        "Main menu text fields should not apply properties on every keystroke.");
+    Assert(
+        buildProperties.Contains(
+            "_actionBox.SelectionChanged += (_, _) => FlushPendingPropertyChanges();",
+            StringComparison.Ordinal),
+        "Main menu action changes should flush pending text edits immediately.");
+    Assert(
+        scheduleBody.Contains("_propertyApplyTimer.Stop();", StringComparison.Ordinal)
+            && scheduleBody.Contains("_propertyApplyTimer.Start();", StringComparison.Ordinal),
+        "Main menu debounced property application should restart its timer.");
+    Assert(
+        buildFooter.Contains("FlushPendingPropertyChanges();", StringComparison.Ordinal),
+        "Saving the main menu should flush pending property edits.");
+    Assert(
+        selectElement.Contains("FlushPendingPropertyChanges();", StringComparison.Ordinal),
+        "Changing selected main menu element should flush pending property edits.");
+    Assert(
+        deleteSelected.Contains("_propertyApplyTimer.Stop();", StringComparison.Ordinal),
+        "Deleting a main menu element should cancel pending property edits.");
 }
 
 static void MainMenuPropertyPanelStampTracksFields()
