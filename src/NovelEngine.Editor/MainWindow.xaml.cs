@@ -515,6 +515,8 @@ public partial class MainWindow : Window
         NovelProject project,
         string query)
     {
+        var normalizedQuery = query.Trim();
+        var isSearching = normalizedQuery.Length > 0;
         var hash = new HashCode();
         hash.Add(project.Title, StringComparer.Ordinal);
         foreach (var node in project.Nodes)
@@ -522,12 +524,15 @@ public partial class MainWindow : Window
             hash.Add(node.Id, StringComparer.Ordinal);
             hash.Add(node.Kind);
             hash.Add(node.Title, StringComparer.Ordinal);
-            hash.Add(node.Speaker, StringComparer.Ordinal);
-            hash.Add(node.Text, StringComparer.Ordinal);
+            if (isSearching)
+            {
+                hash.Add(node.Speaker, StringComparer.Ordinal);
+                hash.Add(node.Text, StringComparer.Ordinal);
+            }
         }
 
         return new ProjectExplorerStamp(
-            query.Trim(),
+            normalizedQuery,
             project.Nodes.Count,
             hash.ToHashCode());
     }

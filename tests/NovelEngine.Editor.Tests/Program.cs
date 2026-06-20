@@ -2557,10 +2557,19 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
 {
     var project = NovelProject.CreateDefault();
     var baseline = MainWindow.CreateProjectExplorerStamp(project, " scene ");
+    var emptySearchBaseline = MainWindow.CreateProjectExplorerStamp(project, string.Empty);
 
     Assert(
         baseline == MainWindow.CreateProjectExplorerStamp(project, "scene"),
         "Project explorer stamp should normalize the search query.");
+
+    var changedHiddenFieldsProject = NovelProject.CreateDefault();
+    changedHiddenFieldsProject.Nodes[0].Speaker += " updated";
+    changedHiddenFieldsProject.Nodes[0].Text += " updated";
+    Assert(
+        emptySearchBaseline
+            == MainWindow.CreateProjectExplorerStamp(changedHiddenFieldsProject, string.Empty),
+        "Project explorer stamp should ignore searchable-only fields when search is empty.");
 
     var changedTitleProject = NovelProject.CreateDefault();
     changedTitleProject.Nodes[0].Title += " updated";
@@ -2573,6 +2582,10 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
     Assert(
         baseline != MainWindow.CreateProjectExplorerStamp(changedSearchProject, "scene"),
         "Project explorer stamp should change when searchable node text changes.");
+    Assert(
+        emptySearchBaseline
+            == MainWindow.CreateProjectExplorerStamp(changedSearchProject, string.Empty),
+        "Project explorer stamp should not refresh hidden searchable text without a search query.");
 
     var changedPositionProject = NovelProject.CreateDefault();
     changedPositionProject.Nodes[0].X += 10;
