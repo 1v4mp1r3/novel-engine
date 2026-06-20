@@ -45,6 +45,7 @@ var tests = new (string Name, Action Run)[]
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
+    ("output editor copy is output neutral", OutputEditorCopyIsOutputNeutral),
     ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("output script block shortcut uses ctrl b", OutputScriptBlockShortcutUsesCtrlB),
@@ -1122,6 +1123,25 @@ static void AssetTransitionSoundMenuListsNodeOutputs()
     Assert(
         MainWindow.GetBindableTransitionSoundOutputs(audio, null).Count == 0,
         "Transition sound target listing should require a selected node.");
+}
+
+static void OutputEditorCopyIsOutputNeutral()
+{
+    Assert(
+        OutputEditorWindow.EditorTitle == "Выход",
+        "Output editor title should be neutral for scene and dialogue outputs.");
+    Assert(
+        OutputEditorWindow.LabelCaption == "Текст выхода",
+        "Output editor label caption should be output-neutral.");
+    Assert(
+        OutputEditorWindow.ScriptCaption == "Скрипт выхода",
+        "Output editor script caption should be output-neutral.");
+    Assert(
+        OutputEditorWindow.ScriptBlocksTitle == "Блоки скрипта выхода",
+        "Output script block dialog title should be output-neutral.");
+    Assert(
+        OutputEditorWindow.EmptyLabelMessage == "Текст выхода не может быть пустым.",
+        "Output editor validation message should be output-neutral.");
 }
 
 static void OutputDetailEditorPolicyAcceptsSceneNextOutputs()

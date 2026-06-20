@@ -12,6 +12,12 @@ namespace NovelEngine.Editor;
 
 public sealed class OutputEditorWindow : Window
 {
+    internal const string EditorTitle = "Выход";
+    internal const string LabelCaption = "Текст выхода";
+    internal const string ScriptCaption = "Скрипт выхода";
+    internal const string ScriptBlocksTitle = "Блоки скрипта выхода";
+    internal const string EmptyLabelMessage = "Текст выхода не может быть пустым.";
+
     private readonly TextBox _labelBox;
     private readonly TextBox _conditionBox;
     private readonly TextBox _scriptBox;
@@ -24,7 +30,7 @@ public sealed class OutputEditorWindow : Window
         NodeOutput output,
         IEnumerable<string>? knownVariables = null)
     {
-        Title = "Вариант ответа";
+        Title = EditorTitle;
         Width = 560;
         Height = 535;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -65,12 +71,12 @@ public sealed class OutputEditorWindow : Window
         _scriptBlocksButton.Click += (_, _) => EditScriptBlocks();
 
         var panel = DialogUi.Panel();
-        panel.Children.Add(DialogUi.Label("Текст варианта"));
+        panel.Children.Add(DialogUi.Label(LabelCaption));
         panel.Children.Add(_labelBox);
         panel.Children.Add(DialogUi.Label("Условие показа, например: score >= 3"));
         panel.Children.Add(_conditionBox);
         panel.Children.Add(CreateConditionButtons());
-        panel.Children.Add(DialogUi.Label("Скрипт при выборе"));
+        panel.Children.Add(DialogUi.Label(ScriptCaption));
         _scriptBox.Height = 150;
         panel.Children.Add(_scriptBox);
         panel.Children.Add(_scriptBlocksButton);
@@ -133,7 +139,7 @@ public sealed class OutputEditorWindow : Window
     {
         var dialog = new VisualScriptBlocksWindow(
             _scriptBlocks,
-            "Блоки скрипта варианта",
+            ScriptBlocksTitle,
             _knownVariables,
             _scriptBox.Text)
         {
@@ -184,8 +190,8 @@ public sealed class OutputEditorWindow : Window
         {
             MessageBox.Show(
                 this,
-                "Текст варианта не может быть пустым.",
-                "Вариант ответа",
+                EmptyLabelMessage,
+                EditorTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;

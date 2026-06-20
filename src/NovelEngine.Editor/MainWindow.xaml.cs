@@ -4818,7 +4818,7 @@ public partial class MainWindow : Window
             MessageBox.Show(
                 this,
                 error.Message,
-                "Ошибка варианта",
+                "Ошибка выхода",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return false;
