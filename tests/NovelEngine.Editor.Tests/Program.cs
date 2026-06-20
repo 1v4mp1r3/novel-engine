@@ -61,6 +61,7 @@ var tests = new (string Name, Action Run)[]
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
+    ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
@@ -1665,6 +1666,44 @@ static void NodePropertyGuardSkipsUnchangedApply()
             node.InheritCharacters,
             "set flag = false"),
         "Changed script should refresh node properties.");
+}
+
+static void NodeCharacterEditingPolicyRespectsInheritance()
+{
+    var start = new NovelNode
+    {
+        Id = "start",
+        Kind = NodeKind.Start,
+        InheritCharacters = true,
+    };
+    var scene = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        InheritCharacters = false,
+    };
+    var inheritedScene = new NovelNode
+    {
+        Id = "inherited",
+        Kind = NodeKind.Scene,
+        InheritCharacters = true,
+    };
+
+    Assert(
+        MainWindow.CanEditNodeCharacters(start, inheritCharactersChecked: true),
+        "Start node characters should remain editable regardless of the inheritance checkbox.");
+    Assert(
+        MainWindow.CanEditNodeCharacters(scene, inheritCharactersChecked: false),
+        "Scene characters should be editable when character inheritance is off.");
+    Assert(
+        !MainWindow.CanEditNodeCharacters(scene, inheritCharactersChecked: true),
+        "Scene characters should not be editable while the panel has inherited characters checked.");
+    Assert(
+        !MainWindow.CanEditNodeCharacters(inheritedScene, inheritedScene.InheritCharacters),
+        "Inherited scene characters should not be edited by direct panel commands.");
+    Assert(
+        !MainWindow.CanEditNodeCharacters(null, inheritCharactersChecked: false),
+        "Character editing should require a selected node.");
 }
 
 static void OutputEditorGuardSkipsUnchangedApply()

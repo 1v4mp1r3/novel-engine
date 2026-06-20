@@ -564,7 +564,7 @@ public partial class MainWindow : Window
                     _project.FindNode(output.TargetNodeId)?.Title ?? "не подключено"))
                 .ToList();
 
-            SetCharacterButtons(node.Kind == NodeKind.Start || !node.InheritCharacters);
+            SetCharacterButtons(CanEditNodeCharacters(node, node.InheritCharacters));
             SetOutputButtons(
                 node.Kind == NodeKind.Dialogue,
                 OutputsGrid.SelectedItem is OutputView);
@@ -4141,8 +4141,9 @@ public partial class MainWindow : Window
             || InheritMusicCheck.IsChecked != true;
         MusicFolderBox.IsEnabled = MusicBox.IsEnabled;
         MusicAssetBox.IsEnabled = MusicBox.IsEnabled;
-        SetCharacterButtons(
-            node.Kind == NodeKind.Start || InheritCharactersCheck.IsChecked != true);
+        SetCharacterButtons(CanEditNodeCharacters(
+            node,
+            InheritCharactersCheck.IsChecked == true));
     }
 
     private void BackgroundFolderBox_SelectionChanged(
@@ -4286,7 +4287,7 @@ public partial class MainWindow : Window
     private void AddCharacter_Click(object sender, RoutedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
-        if (node is null)
+        if (!CanEditSelectedNodeCharacters(node))
         {
             return;
         }
@@ -4304,14 +4305,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        AddCharacterToNodeFromDialog(node, dialog);
+        AddCharacterToNodeFromDialog(node!, dialog);
         MarkDirty();
     }
 
     private void AddLibraryCharacter_Click(object sender, RoutedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
-        if (node is null)
+        if (!CanEditSelectedNodeCharacters(node))
         {
             return;
         }
@@ -4335,7 +4336,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        node.InheritCharacters = false;
+        node!.InheritCharacters = false;
         if (node.UsesTypeDefaults)
         {
             node.PropertyOverrides.Add("inheritCharacters");
@@ -4349,6 +4350,12 @@ public partial class MainWindow : Window
 
     private void SaveCharacterToLibrary_Click(object sender, RoutedEventArgs e)
     {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (!CanEditSelectedNodeCharacters(node))
+        {
+            return;
+        }
+
         var character = SelectedCharacter();
         if (character is null)
         {
@@ -4371,6 +4378,12 @@ public partial class MainWindow : Window
 
     private void EditCharacter_Click(object sender, RoutedEventArgs e)
     {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (!CanEditSelectedNodeCharacters(node))
+        {
+            return;
+        }
+
         var character = SelectedCharacter();
         if (character is null)
         {
@@ -4402,7 +4415,6 @@ public partial class MainWindow : Window
             character.Rotation = 0;
         }
         character.Position = dialog.Position;
-        var node = _project.FindNode(Graph.SelectedNodeId);
         if (node?.UsesTypeDefaults == true)
         {
             node.PropertyOverrides.Add("characters");
@@ -4486,6 +4498,17 @@ public partial class MainWindow : Window
             .Trim();
     }
 
+    internal static bool CanEditNodeCharacters(
+        NovelNode? node,
+        bool inheritCharactersChecked) =>
+        node is not null
+        && (node.Kind == NodeKind.Start || !inheritCharactersChecked);
+
+    private bool CanEditSelectedNodeCharacters(NovelNode? node) =>
+        CanEditNodeCharacters(
+            node,
+            InheritCharactersCheck.IsChecked == true);
+
     private static void CopyCharacterValues(
         CharacterPlacement source,
         CharacterPlacement target)
@@ -4507,11 +4530,11 @@ public partial class MainWindow : Window
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var character = SelectedCharacter();
-        if (node is null || character is null)
+        if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
             return;
         }
-        node.Characters.Remove(character);
+        node!.Characters.Remove(character);
         if (node.UsesTypeDefaults)
         {
             node.PropertyOverrides.Add("characters");
@@ -4523,12 +4546,12 @@ public partial class MainWindow : Window
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var character = SelectedCharacter();
-        if (node is null || character is null)
+        if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
             return;
         }
 
-        var duplicate = _project.DuplicateCharacter(node.Id, character.Id);
+        var duplicate = _project.DuplicateCharacter(node!.Id, character.Id);
         MarkDirty();
         SelectCharacterView(duplicate.Id);
         StatusText.Text = $"Персонаж «{CharacterLabel(character)}» продублирован";
@@ -4558,12 +4581,12 @@ public partial class MainWindow : Window
 
         var node = _project.FindNode(Graph.SelectedNodeId);
         var character = SelectedCharacter();
-        if (node is null || character is null)
+        if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
             return;
         }
 
-        if (!_project.MoveCharacter(node.Id, character.Id, direction))
+        if (!_project.MoveCharacter(node!.Id, character.Id, direction))
         {
             return;
         }
@@ -4577,13 +4600,15 @@ public partial class MainWindow : Window
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var character = SelectedCharacter();
-        if (node is null || character is null || character.Position == position)
+        if (!CanEditSelectedNodeCharacters(node)
+            || character is null
+            || character.Position == position)
         {
             return;
         }
 
         var characterId = character.Id;
-        if (!_project.SetCharacterPosition(node.Id, character.Id, position))
+        if (!_project.SetCharacterPosition(node!.Id, character.Id, position))
         {
             return;
         }
@@ -4614,8 +4639,7 @@ public partial class MainWindow : Window
         ContextMenuEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
-        var canEdit = node is not null
-            && (node.Kind == NodeKind.Start || InheritCharactersCheck.IsChecked != true);
+        var canEdit = CanEditSelectedNodeCharacters(node);
         var character = SelectedCharacter();
         var selectedIndex = CharactersGrid.SelectedIndex;
         var characterCount = CharactersGrid.Items.Count;
@@ -4682,6 +4706,12 @@ public partial class MainWindow : Window
 
     private void CharactersGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        if (!CanEditSelectedNodeCharacters(node))
+        {
+            return;
+        }
+
         if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
         {
             EditCharacter_Click(this, new RoutedEventArgs());
@@ -4777,9 +4807,7 @@ public partial class MainWindow : Window
     private void CharactersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
-        SetCharacterButtons(
-            node is not null
-            && (node.Kind == NodeKind.Start || InheritCharactersCheck.IsChecked != true));
+        SetCharacterButtons(CanEditSelectedNodeCharacters(node));
     }
 
     private void SetCharacterButtons(bool canEdit)
