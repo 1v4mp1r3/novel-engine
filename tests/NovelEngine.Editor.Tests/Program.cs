@@ -52,6 +52,7 @@ var tests = new (string Name, Action Run)[]
     ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
+    ("graph editing shortcuts require graph focus", GraphEditingShortcutsRequireGraphFocus),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -1275,6 +1276,66 @@ static void OutputTransitionChangeGuardSkipsUnchangedEdits()
     Assert(
         MainWindow.HasOutputTransitionChanges(output, "@click", 350),
         "Changed transition fade duration should dirty the project.");
+}
+
+static void GraphEditingShortcutsRequireGraphFocus()
+{
+    Assert(
+        MainWindow.IsGraphDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.None,
+            isTextEditing: false,
+            isGraphShortcutContext: true),
+        "Delete should edit the graph when the graph has focus.");
+    Assert(
+        !MainWindow.IsGraphDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.None,
+            isTextEditing: false,
+            isGraphShortcutContext: false),
+        "Delete should not edit the graph while focus is in tables or panels.");
+    Assert(
+        !MainWindow.IsGraphDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.None,
+            isTextEditing: true,
+            isGraphShortcutContext: true),
+        "Delete should not edit the graph while text is being edited.");
+    Assert(
+        !MainWindow.IsGraphDeleteShortcut(
+            Key.Delete,
+            ModifierKeys.Shift,
+            isTextEditing: false,
+            isGraphShortcutContext: true),
+        "Modified Delete should be left to the focused control.");
+    Assert(
+        MainWindow.IsGraphDuplicateShortcut(
+            Key.D,
+            ModifierKeys.Control,
+            isTextEditing: false,
+            isGraphShortcutContext: true),
+        "Ctrl+D should duplicate a graph node when the graph has focus.");
+    Assert(
+        !MainWindow.IsGraphDuplicateShortcut(
+            Key.D,
+            ModifierKeys.Control,
+            isTextEditing: false,
+            isGraphShortcutContext: false),
+        "Ctrl+D should not duplicate a graph node from table focus.");
+    Assert(
+        MainWindow.IsGraphCenterShortcut(
+            Key.Home,
+            ModifierKeys.None,
+            isTextEditing: false,
+            isGraphShortcutContext: true),
+        "Home should center the graph when the graph has focus.");
+    Assert(
+        !MainWindow.IsGraphCenterShortcut(
+            Key.Home,
+            ModifierKeys.None,
+            isTextEditing: false,
+            isGraphShortcutContext: false),
+        "Home should be left to focused lists and tables outside the graph.");
 }
 
 static void DiagnosticPanelStampTracksVisibleDiagnostics()

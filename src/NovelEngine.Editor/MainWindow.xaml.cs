@@ -179,6 +179,9 @@ public partial class MainWindow : Window
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
+        var modifiers = Keyboard.Modifiers;
+        var isTextEditing = IsTextEditing();
+        var isGraphShortcutContext = IsGraphShortcutContext();
         if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None)
         {
             _ = RunCompiledGameAsync(debugMode: false);
@@ -231,19 +234,29 @@ public partial class MainWindow : Window
             SaveProjectAs();
             e.Handled = true;
         }
-        else if (e.Key == Key.Delete && !IsTextEditing())
+        else if (IsGraphDeleteShortcut(
+                e.Key,
+                modifiers,
+                isTextEditing,
+                isGraphShortcutContext))
         {
             Graph.DeleteSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.D
-            && Keyboard.Modifiers == ModifierKeys.Control
-            && !IsTextEditing())
+        else if (IsGraphDuplicateShortcut(
+            e.Key,
+            modifiers,
+            isTextEditing,
+            isGraphShortcutContext))
         {
             Graph.DuplicateSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.Home && !IsTextEditing())
+        else if (IsGraphCenterShortcut(
+            e.Key,
+            modifiers,
+            isTextEditing,
+            isGraphShortcutContext))
         {
             Graph.CenterGraph();
             e.Handled = true;
@@ -262,6 +275,58 @@ public partial class MainWindow : Window
 
     private static bool IsTextEditing() =>
         Keyboard.FocusedElement is TextBox or RichTextBox;
+
+    private bool IsGraphShortcutContext() =>
+        Keyboard.FocusedElement is DependencyObject focused
+        && IsDescendantOf(focused, Graph);
+
+    private static bool IsDescendantOf(
+        DependencyObject source,
+        DependencyObject target)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (ReferenceEquals(current, target))
+            {
+                return true;
+            }
+
+            current = VisualTreeHelper.GetParent(current)
+                ?? LogicalTreeHelper.GetParent(current);
+        }
+        return false;
+    }
+
+    internal static bool IsGraphDeleteShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool isTextEditing,
+        bool isGraphShortcutContext) =>
+        key == Key.Delete
+        && modifiers == ModifierKeys.None
+        && !isTextEditing
+        && isGraphShortcutContext;
+
+    internal static bool IsGraphDuplicateShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool isTextEditing,
+        bool isGraphShortcutContext) =>
+        key == Key.D
+        && modifiers == ModifierKeys.Control
+        && !isTextEditing
+        && isGraphShortcutContext;
+
+    internal static bool IsGraphCenterShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool isTextEditing,
+        bool isGraphShortcutContext) =>
+        key == Key.Home
+        && modifiers == ModifierKeys.None
+        && !isTextEditing
+        && isGraphShortcutContext;
 
     private void SetProject(
         NovelProject project,
