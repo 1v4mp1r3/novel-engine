@@ -4829,51 +4829,66 @@ public partial class MainWindow : Window
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
         var output = SelectedOutput();
-        var canEdit = node?.Kind == NodeKind.Dialogue;
+        var canEditChoices = node?.Kind == NodeKind.Dialogue;
         var menu = OutputsGrid.ContextMenu ?? new ContextMenu();
         OutputsGrid.ContextMenu = menu;
         menu.Items.Clear();
 
-        if (!canEdit)
+        if (node is null)
         {
-            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите диалоговую ноду"));
+            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите ноду"));
             return;
         }
 
-        menu.Items.Add(CreateOutputMenuItem("Добавить вариант", () => AddOutput(node!.Id)));
+        if (canEditChoices)
+        {
+            menu.Items.Add(CreateOutputMenuItem("Добавить вариант", () => AddOutput(node.Id)));
+        }
         if (output is null)
         {
-            menu.Items.Add(CreateDisabledAssetMenuItem("Выберите вариант"));
+            menu.Items.Add(CreateDisabledAssetMenuItem(
+                canEditChoices ? "Выберите вариант" : "Выберите переход"));
             return;
         }
 
         var selectedIndex = OutputsGrid.SelectedIndex;
         var outputCount = OutputsGrid.Items.Count;
         menu.Items.Add(new Separator());
-        menu.Items.Add(CreateOutputMenuItem("Изменить", () => EditOutput_Click(this, new RoutedEventArgs())));
+        if (canEditChoices)
+        {
+            menu.Items.Add(CreateOutputMenuItem(
+                "Изменить",
+                () => EditOutput_Click(this, new RoutedEventArgs())));
+            menu.Items.Add(CreateOutputMenuItem(
+                "Блоки скрипта...",
+                () => EditOutputScriptBlocks(node, output)));
+            menu.Items.Add(CreateOutputMenuItem(
+                "Дублировать",
+                () => DuplicateOutput_Click(this, new RoutedEventArgs())));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(CreateOutputMenuItem(
+                "Выше",
+                () => MoveSelectedOutput(-1),
+                selectedIndex > 0));
+            menu.Items.Add(CreateOutputMenuItem(
+                "Ниже",
+                () => MoveSelectedOutput(1),
+                selectedIndex >= 0 && selectedIndex < outputCount - 1));
+            menu.Items.Add(new Separator());
+        }
         menu.Items.Add(CreateOutputMenuItem(
-            "Блоки скрипта...",
-            () => EditOutputScriptBlocks(node!, output)));
-        menu.Items.Add(CreateOutputMenuItem(
-            "Дублировать",
-            () => DuplicateOutput_Click(this, new RoutedEventArgs())));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(CreateOutputMenuItem(
-            "Выше",
-            () => MoveSelectedOutput(-1),
-            selectedIndex > 0));
-        menu.Items.Add(CreateOutputMenuItem(
-            "Ниже",
-            () => MoveSelectedOutput(1),
-            selectedIndex >= 0 && selectedIndex < outputCount - 1));
-        menu.Items.Add(new Separator());
+            "Переход...",
+            () => EditSelectedOutputTransition()));
         menu.Items.Add(CreateOutputMenuItem(
             "Разорвать переход",
             () => DisconnectOutput_Click(this, new RoutedEventArgs()),
             output.TargetNodeId is not null));
-        menu.Items.Add(CreateOutputMenuItem(
-            "Удалить",
-            () => DeleteOutput_Click(this, new RoutedEventArgs())));
+        if (canEditChoices)
+        {
+            menu.Items.Add(CreateOutputMenuItem(
+                "Удалить",
+                () => DeleteOutput_Click(this, new RoutedEventArgs())));
+        }
     }
 
     private void OutputsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -4980,9 +4995,32 @@ public partial class MainWindow : Window
         MoveOutputUpButton.IsEnabled = canAdd && selected && selectedIndex > 0;
         MoveOutputDownButton.IsEnabled =
             canAdd && selected && selectedIndex >= 0 && selectedIndex < outputCount - 1;
+        EditTransitionButton.IsEnabled = selected;
         DeleteOutputButton.IsEnabled = canAdd && selected;
         DisconnectOutputButton.IsEnabled = selected;
     }
+
+    private void EditSelectedOutputTransition_Click(object sender, RoutedEventArgs e) =>
+        EditSelectedOutputTransition();
+
+    private void EditSelectedOutputTransition()
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        if (!CanEditSelectedOutputTransition(node, output))
+        {
+            return;
+        }
+
+        EditTransition(node!.Id, output!.Id);
+    }
+
+    internal static bool CanEditSelectedOutputTransition(
+        NovelNode? node,
+        NodeOutput? output) =>
+        node is not null
+        && output is not null
+        && node.Outputs.Any(candidate => candidate.Id == output.Id);
 
     private void EditTransition(string sourceNodeId, string outputId)
     {

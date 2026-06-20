@@ -293,6 +293,7 @@
                                 <Button x:Name="DuplicateOutputButton" Content="Дублировать" Click="DuplicateOutput_Click" />
                                 <Button x:Name="MoveOutputUpButton" Content="Выше" Click="MoveOutputUp_Click" />
                                 <Button x:Name="MoveOutputDownButton" Content="Ниже" Click="MoveOutputDown_Click" />
+                                <Button x:Name="EditTransitionButton" Content="Переход..." Click="EditSelectedOutputTransition_Click" />
                                 <Button x:Name="DeleteOutputButton" Content="Удалить" Click="DeleteOutput_Click" />
                                 <Button x:Name="DisconnectOutputButton" Content="Разорвать" Click="DisconnectOutput_Click" />
                             </WrapPanel>

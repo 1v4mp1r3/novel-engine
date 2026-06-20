@@ -110,7 +110,8 @@ currently installed on this workstation.
   sprite there first, then add it from the properties panel or from the asset
   context menu.
 - A node may inherit music without restarting playback.
-- Right-click a connection to configure its transition sound and fade duration.
+- Right-click a connection or use the selected output's `Переход...` button to
+  configure its transition sound and fade duration.
 - Press `F5` to compile and launch the game, `F6` for a debug build,
   `Shift+F5` to stop it, or `Ctrl+F5` to preview the selected node.
 - Right-click any node to start its preview.

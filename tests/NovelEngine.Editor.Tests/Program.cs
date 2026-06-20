@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
+    ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -1055,6 +1056,31 @@ static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()
     Assert(
         !MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, foreignOutput),
         "Transition sound binding should reject outputs from a different node.");
+}
+
+static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Default scene node was not found.");
+    var dialogue = project.FindNode("dialogue-1")
+        ?? throw new InvalidOperationException("Default dialogue node was not found.");
+    var sceneOutput = scene.Outputs.First();
+    var dialogueOutput = dialogue.Outputs.First();
+    var foreignOutput = new NodeOutput { Id = "foreign", Label = "Foreign" };
+
+    Assert(
+        MainWindow.CanEditSelectedOutputTransition(scene, sceneOutput),
+        "Scene next outputs should be editable from the outputs table.");
+    Assert(
+        MainWindow.CanEditSelectedOutputTransition(dialogue, dialogueOutput),
+        "Dialogue choice transitions should be editable from the outputs table.");
+    Assert(
+        !MainWindow.CanEditSelectedOutputTransition(scene, null),
+        "Transition editing should require a selected output.");
+    Assert(
+        !MainWindow.CanEditSelectedOutputTransition(scene, foreignOutput),
+        "Transition editing should reject outputs from a different node.");
 }
 
 static void DiagnosticPanelStampTracksVisibleDiagnostics()
