@@ -781,7 +781,7 @@ public partial class MainWindow : Window
                 node.PropertyOverrides.Add("script");
             }
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text =
             dialog.ClearImportedScript
                 ? $"Блоки скрипта ноды «{node.Title}»: {node.ScriptBlocks.Count}, текстовый скрипт очищен"

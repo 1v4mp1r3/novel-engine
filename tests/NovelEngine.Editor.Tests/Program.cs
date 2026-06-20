@@ -2066,6 +2066,9 @@ static void NodeRenderedPropertyGuardSkipsHiddenGraphRefresh()
         "NovelEngine.Editor",
         "MainWindow.xaml.cs"));
     var applyBody = ExtractMethodBody(source, "private bool ApplyProperties");
+    var scriptBlocksBody = ExtractMethodBody(
+        source,
+        "private void EditNodeScriptBlocks(NovelNode node)");
     var node = new NovelNode
     {
         Id = "scene",
@@ -2124,6 +2127,9 @@ static void NodeRenderedPropertyGuardSkipsHiddenGraphRefresh()
         applyBody.Contains("HasRenderedNodePropertyChanges(", StringComparison.Ordinal)
             && applyBody.Contains("MarkDirty(refreshGraph);", StringComparison.Ordinal),
         "Node property apply should skip graph refresh for hidden-only changes.");
+    Assert(
+        scriptBlocksBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+        "Node script block edits should skip graph refresh.");
 }
 
 static void NodeCharacterEditingPolicyRespectsInheritance()
