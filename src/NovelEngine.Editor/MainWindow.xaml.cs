@@ -81,7 +81,7 @@ public partial class MainWindow : Window
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
         _nodeAssetChoicesCache = [];
-    private AssetPickerCacheStamp? _assetPickerCacheStamp;
+    private bool _nodeAssetPickerCachesDirty = true;
     private ProjectDiagnosticReport? _projectDiagnosticsCache;
     private DiagnosticPanelStamp? _diagnosticsPanelStamp;
     private readonly Dictionary<string, TreeViewItem> _projectTreeItemsByNodeId =
@@ -368,7 +368,7 @@ public partial class MainWindow : Window
         bool saveStructureChanges = true)
     {
         _project = project;
-        _nodePropertyPanelStamp = null;
+        ClearNodeAssetPickerCaches();
         _projectPath = path;
         _workspaceDirectory = NormalizeWorkspaceDirectory(
             workspaceDirectory
@@ -911,17 +911,6 @@ public partial class MainWindow : Window
     {
         var hash = new HashCode();
         hash.Add(project.Characters.Count);
-        foreach (var folder in project.AssetFolders)
-        {
-            hash.Add(ProjectAssets.NormalizeFolder(folder), StringComparer.OrdinalIgnoreCase);
-        }
-        foreach (var asset in project.Assets)
-        {
-            hash.Add(asset.Id, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Path, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Folder, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Kind);
-        }
 
         if (node is null)
         {
@@ -1088,7 +1077,7 @@ public partial class MainWindow : Window
         {
             var entry = _projectHistory[historyIndex];
             _project = ProjectSerializer.FromJson(entry.Snapshot);
-            _nodePropertyPanelStamp = null;
+            ClearNodeAssetPickerCaches();
             _projectHistoryIndex = historyIndex;
             _codeHasPendingChanges = false;
             ClearProjectAnalysisCaches();
@@ -1189,7 +1178,7 @@ public partial class MainWindow : Window
             VisualScriptBlockPreserver.PreserveFrom(_project, compiled);
 
             _project = compiled;
-            _nodePropertyPanelStamp = null;
+            ClearNodeAssetPickerCaches();
             _project.SourceCode = source;
             SetCodeCursorCache(source);
             _codeHasPendingChanges = false;
@@ -1597,8 +1586,16 @@ public partial class MainWindow : Window
         {
             ClearAssetFileCaches();
         }
+        else if (!syncFromDisk)
+        {
+            ClearNodeAssetPickerCaches();
+        }
         RefreshAssetFolders();
         RefreshAssetList();
+        if (!syncFromDisk || externalFileEvent || filesChanged)
+        {
+            RefreshProperties();
+        }
     }
 
     private void ClearAssetFileCaches()
@@ -1797,42 +1794,22 @@ public partial class MainWindow : Window
 
     private void EnsureAssetPickerCachesCurrent()
     {
-        var stamp = CreateAssetPickerCacheStamp();
-        if (_assetPickerCacheStamp == stamp)
+        if (!_nodeAssetPickerCachesDirty)
         {
             return;
         }
 
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
-        _assetPickerCacheStamp = stamp;
+        _nodeAssetPickerCachesDirty = false;
     }
 
     private void ClearNodeAssetPickerCaches()
     {
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
-        _assetPickerCacheStamp = null;
-    }
-
-    private AssetPickerCacheStamp CreateAssetPickerCacheStamp()
-    {
-        var hash = new HashCode();
-        foreach (var folder in _project.AssetFolders)
-        {
-            hash.Add(ProjectAssets.NormalizeFolder(folder), StringComparer.OrdinalIgnoreCase);
-        }
-        foreach (var asset in _project.Assets)
-        {
-            hash.Add(asset.Id, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Path, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Folder, StringComparer.OrdinalIgnoreCase);
-            hash.Add(asset.Kind);
-        }
-        return new AssetPickerCacheStamp(
-            _project.Assets.Count,
-            _project.AssetFolders.Count,
-            hash.ToHashCode());
+        _nodeAssetPickerCachesDirty = true;
+        _nodePropertyPanelStamp = null;
     }
 
     private bool SyncFilesFromDisk(bool refreshCode = true)
@@ -6559,11 +6536,6 @@ public partial class MainWindow : Window
     private readonly record struct NodeAssetChoiceCacheKey(
         AssetKind Kind,
         string Folder);
-
-    private readonly record struct AssetPickerCacheStamp(
-        int AssetCount,
-        int FolderCount,
-        int Hash);
 
     internal readonly record struct AssetListStamp(
         string? Folder,

@@ -83,6 +83,7 @@ var tests = new (string Name, Action Run)[]
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
+    ("node asset picker cache invalidates property panel", NodeAssetPickerCacheInvalidatesPropertyPanel),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
     ("main menu text properties use debounced apply", MainMenuTextPropertiesUseDebouncedApply),
@@ -2676,10 +2677,40 @@ static void NodePropertyPanelStampTracksVisibleState()
         Path = "files/backgrounds/MountFuji.jpg",
     });
     Assert(
-        baseline != MainWindow.CreateNodePropertyPanelStamp(
+        baseline == MainWindow.CreateNodePropertyPanelStamp(
             changedAssetsProject,
             changedAssetsNode),
-        "Node property panel stamp should track asset picker inputs.");
+        "Node property panel stamp should leave asset picker inputs to explicit cache invalidation.");
+}
+
+static void NodeAssetPickerCacheInvalidatesPropertyPanel()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var stampBody = ExtractMethodBody(
+        source,
+        "internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp");
+    var ensureBody = ExtractMethodBody(source, "private void EnsureAssetPickerCachesCurrent");
+    var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
+    var refreshAssetsBody = ExtractMethodBody(source, "private void RefreshAssets");
+
+    Assert(
+        !stampBody.Contains("project.Assets", StringComparison.Ordinal)
+            && !stampBody.Contains("project.AssetFolders", StringComparison.Ordinal),
+        "Node property panel stamp should not scan the full asset catalog.");
+    Assert(
+        !ensureBody.Contains("CreateAssetPickerCacheStamp", StringComparison.Ordinal),
+        "Node asset picker cache validation should not rescan assets during property refresh.");
+    Assert(
+        clearBody.Contains("_nodePropertyPanelStamp = null;", StringComparison.Ordinal),
+        "Asset picker cache invalidation should force the property panel to rebuild.");
+    Assert(
+        refreshAssetsBody.Contains("ClearNodeAssetPickerCaches();", StringComparison.Ordinal)
+            && refreshAssetsBody.Contains("RefreshProperties();", StringComparison.Ordinal),
+        "Asset refresh should invalidate picker caches and refresh visible node properties.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()
