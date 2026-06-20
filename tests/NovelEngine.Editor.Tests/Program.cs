@@ -81,6 +81,7 @@ var tests = new (string Name, Action Run)[]
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("output rendered property guard skips hidden graph refresh", OutputRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
+    ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
@@ -2592,6 +2593,25 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
     Assert(
         baseline == MainWindow.CreateProjectExplorerStamp(changedPositionProject, "scene"),
         "Project explorer stamp should ignore node position-only changes.");
+}
+
+static void ProjectExplorerSelectionSkipsUnchangedSync()
+{
+    Assert(
+        !MainWindow.ShouldSyncProjectTreeSelection("scene", "scene", selectedItemIsSelected: true),
+        "Project explorer selection sync should skip an already selected node.");
+    Assert(
+        MainWindow.ShouldSyncProjectTreeSelection("scene", "scene", selectedItemIsSelected: false),
+        "Project explorer selection sync should repair stale item selection state.");
+    Assert(
+        MainWindow.ShouldSyncProjectTreeSelection("scene", "dialogue", selectedItemIsSelected: true),
+        "Project explorer selection sync should switch to a different requested node.");
+    Assert(
+        MainWindow.ShouldSyncProjectTreeSelection(null, "scene", selectedItemIsSelected: true),
+        "Project explorer selection sync should clear an existing selection.");
+    Assert(
+        !MainWindow.ShouldSyncProjectTreeSelection(null, null, selectedItemIsSelected: false),
+        "Project explorer selection sync should skip when no node and no item are selected.");
 }
 
 static void NodePropertyPanelStampTracksVisibleState()

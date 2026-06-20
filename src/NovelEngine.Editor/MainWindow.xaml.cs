@@ -477,6 +477,15 @@ public partial class MainWindow : Window
 
     private void SyncProjectTreeSelection(string? nodeId)
     {
+        var selectedItemNodeId = _selectedProjectTreeItem?.Tag as string;
+        if (!ShouldSyncProjectTreeSelection(
+                nodeId,
+                selectedItemNodeId,
+                _selectedProjectTreeItem?.IsSelected == true))
+        {
+            return;
+        }
+
         if (_selectedProjectTreeItem is not null)
         {
             _selectedProjectTreeItem.IsSelected = false;
@@ -491,6 +500,20 @@ public partial class MainWindow : Window
 
         item.IsSelected = true;
         _selectedProjectTreeItem = item;
+    }
+
+    internal static bool ShouldSyncProjectTreeSelection(
+        string? requestedNodeId,
+        string? selectedItemNodeId,
+        bool selectedItemIsSelected)
+    {
+        if (requestedNodeId is null)
+        {
+            return selectedItemNodeId is not null;
+        }
+
+        return !selectedItemIsSelected
+            || !requestedNodeId.Equals(selectedItemNodeId, StringComparison.Ordinal);
     }
 
     private IEnumerable<NovelNode> FilteredNodes(string query) =>
