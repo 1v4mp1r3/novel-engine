@@ -44,6 +44,7 @@ var tests = new (string Name, Action Run)[]
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
+    ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -1120,6 +1121,33 @@ static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
     Assert(
         !MainWindow.CanEditSelectedOutputTransition(scene, foreignOutput),
         "Transition editing should reject outputs from a different node.");
+}
+
+static void OutputTransitionResetAppearsOnlyForCustomizedTransitions()
+{
+    Assert(
+        !MainWindow.ShouldShowResetOutputTransition(null),
+        "Transition reset should require a selected output.");
+    Assert(
+        !MainWindow.ShouldShowResetOutputTransition(new NodeOutput
+        {
+            Id = "default",
+        }),
+        "Default transitions should not show the reset action.");
+    Assert(
+        MainWindow.ShouldShowResetOutputTransition(new NodeOutput
+        {
+            Id = "sound",
+            TransitionSound = "@click",
+        }),
+        "Transitions with a sound should show the reset action.");
+    Assert(
+        MainWindow.ShouldShowResetOutputTransition(new NodeOutput
+        {
+            Id = "fade",
+            FadeDurationMs = 700,
+        }),
+        "Transitions with a custom fade duration should show the reset action.");
 }
 
 static void DiagnosticPanelStampTracksVisibleDiagnostics()

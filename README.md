@@ -112,6 +112,8 @@ currently installed on this workstation.
 - A node may inherit music without restarting playback.
 - Right-click a connection or use the selected output's `Переход...` button to
   configure its transition sound and fade duration.
+- Right-click a selected output to reset customized transition sound and fade
+  back to the default plain transition.
 - Press `F5` to compile and launch the game, `F6` for a debug build,
   `Shift+F5` to stop it, or `Ctrl+F5` to preview the selected node.
 - Right-click any node to start its preview.

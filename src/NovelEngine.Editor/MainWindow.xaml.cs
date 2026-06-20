@@ -4926,6 +4926,10 @@ public partial class MainWindow : Window
             "Переход...",
             () => EditSelectedOutputTransition()));
         menu.Items.Add(CreateOutputMenuItem(
+            "Сбросить переход",
+            () => ResetSelectedOutputTransition(),
+            ShouldShowResetOutputTransition(output)));
+        menu.Items.Add(CreateOutputMenuItem(
             "Разорвать переход",
             () => DisconnectOutput_Click(this, new RoutedEventArgs()),
             output.TargetNodeId is not null));
@@ -5060,6 +5064,23 @@ public partial class MainWindow : Window
 
         EditTransition(node!.Id, output!.Id);
     }
+
+    private void ResetSelectedOutputTransition()
+    {
+        var output = SelectedOutput();
+        if (!ShouldShowResetOutputTransition(output))
+        {
+            return;
+        }
+
+        output!.TransitionSound = string.Empty;
+        output.FadeDurationMs = 350;
+        MarkDirty();
+    }
+
+    internal static bool ShouldShowResetOutputTransition(NodeOutput? output) =>
+        output is not null
+        && (output.TransitionSound.Length > 0 || output.FadeDurationMs != 350);
 
     internal static bool CanEditSelectedOutputTransition(
         NovelNode? node,
