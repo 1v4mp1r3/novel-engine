@@ -73,6 +73,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
+    ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
@@ -2280,6 +2281,33 @@ static void SceneEditorCharacterListStampTracksVisibleRows()
     Assert(
         baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
         "Scene character list stamp should track added rows.");
+}
+
+static void GraphSurfaceShortcutsUseExactModifiers()
+{
+    Assert(
+        GraphSurface.IsDeleteShortcut(Key.Delete, ModifierKeys.None),
+        "Plain Delete should delete the selected graph node.");
+    Assert(
+        !GraphSurface.IsDeleteShortcut(Key.Delete, ModifierKeys.Shift),
+        "Modified Delete should be left to the focused control.");
+    Assert(
+        GraphSurface.IsDuplicateShortcut(Key.D, ModifierKeys.Control),
+        "Ctrl+D should duplicate the selected graph node.");
+    Assert(
+        !GraphSurface.IsDuplicateShortcut(Key.D, ModifierKeys.None),
+        "Plain D should not duplicate graph nodes.");
+    Assert(
+        !GraphSurface.IsDuplicateShortcut(
+            Key.D,
+            ModifierKeys.Control | ModifierKeys.Shift),
+        "Extra modifiers should not duplicate graph nodes.");
+    Assert(
+        GraphSurface.IsCenterShortcut(Key.Home, ModifierKeys.None),
+        "Plain Home should center the graph.");
+    Assert(
+        !GraphSurface.IsCenterShortcut(Key.Home, ModifierKeys.Control),
+        "Modified Home should be left to the focused control.");
 }
 
 static void GraphDragMovementSkipsMicroDeltas()

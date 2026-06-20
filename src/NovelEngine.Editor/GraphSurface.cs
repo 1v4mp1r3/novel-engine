@@ -411,17 +411,18 @@ public sealed class GraphSurface : FrameworkElement
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Key == Key.Delete)
+        var modifiers = Keyboard.Modifiers;
+        if (IsDeleteShortcut(e.Key, modifiers))
         {
             DeleteSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control)
+        else if (IsDuplicateShortcut(e.Key, modifiers))
         {
             DuplicateSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.Home)
+        else if (IsCenterShortcut(e.Key, modifiers))
         {
             CenterGraph();
             e.Handled = true;
@@ -437,6 +438,15 @@ public sealed class GraphSurface : FrameworkElement
         SelectCreatedNode(node);
         return node;
     }
+
+    internal static bool IsDeleteShortcut(Key key, ModifierKeys modifiers) =>
+        key == Key.Delete && modifiers == ModifierKeys.None;
+
+    internal static bool IsDuplicateShortcut(Key key, ModifierKeys modifiers) =>
+        key == Key.D && modifiers == ModifierKeys.Control;
+
+    internal static bool IsCenterShortcut(Key key, ModifierKeys modifiers) =>
+        key == Key.Home && modifiers == ModifierKeys.None;
 
     private NovelNode AddNodeTemplateAt(Point worldPosition, NodeTemplateKind template)
     {
