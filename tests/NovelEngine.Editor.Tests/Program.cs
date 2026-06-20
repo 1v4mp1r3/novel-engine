@@ -1229,14 +1229,16 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
         "private void DeleteAsset_Click",
         "private string? BrowseAsset",
     };
+    var helperBody = ExtractMethodBody(
+        source,
+        "private void RefreshAssetCatalogAfterEditorChange");
 
     Assert(
         !Regex.IsMatch(source, @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(\);"),
         "Editor-driven asset mutations should not immediately rescan files from disk.");
     Assert(
-        Regex.IsMatch(
-            source,
-            @"MarkDirty\(refreshGraph: false\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
+        helperBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal)
+            && helperBody.Contains("RefreshAssets(syncFromDisk: false);", StringComparison.Ordinal),
         "Editor-driven asset mutations should refresh known asset state without disk sync.");
 
     foreach (var method in assetMutationMethods)
@@ -1246,8 +1248,8 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
             !body.Contains("MarkDirty();", StringComparison.Ordinal),
             $"{method} should not refresh the graph for asset manager changes.");
         Assert(
-            body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
-            $"{method} should dirty asset manager changes without refreshing the graph.");
+            body.Contains("RefreshAssetCatalogAfterEditorChange();", StringComparison.Ordinal),
+            $"{method} should use the catalog-change refresh helper.");
     }
 }
 
@@ -2696,6 +2698,18 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     var ensureBody = ExtractMethodBody(source, "private void EnsureAssetPickerCachesCurrent");
     var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
     var refreshAssetsBody = ExtractMethodBody(source, "private void RefreshAssets");
+    var catalogChangeBody = ExtractMethodBody(
+        source,
+        "private void RefreshAssetCatalogAfterEditorChange");
+    var clearIndex = catalogChangeBody.IndexOf(
+        "ClearNodeAssetPickerCaches();",
+        StringComparison.Ordinal);
+    var markIndex = catalogChangeBody.IndexOf(
+        "MarkDirty(refreshGraph: false);",
+        StringComparison.Ordinal);
+    var refreshIndex = catalogChangeBody.IndexOf(
+        "RefreshAssets(syncFromDisk: false);",
+        StringComparison.Ordinal);
 
     Assert(
         !stampBody.Contains("project.Assets", StringComparison.Ordinal)
@@ -2708,9 +2722,12 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
         clearBody.Contains("_nodePropertyPanelStamp = null;", StringComparison.Ordinal),
         "Asset picker cache invalidation should force the property panel to rebuild.");
     Assert(
-        refreshAssetsBody.Contains("ClearNodeAssetPickerCaches();", StringComparison.Ordinal)
-            && refreshAssetsBody.Contains("RefreshProperties();", StringComparison.Ordinal),
-        "Asset refresh should invalidate picker caches and refresh visible node properties.");
+        clearIndex >= 0 && markIndex > clearIndex && refreshIndex > markIndex,
+        "Editor asset catalog changes should invalidate picker caches before dirty refreshes.");
+    Assert(
+        !refreshAssetsBody.Contains("ClearNodeAssetPickerCaches();", StringComparison.Ordinal)
+            && refreshAssetsBody.Contains("if (externalFileEvent || filesChanged)", StringComparison.Ordinal),
+        "Plain asset refresh should keep picker caches warm and only refresh properties for disk changes.");
 }
 
 static void MainMenuDragPositionClampsAndSkipsMicroMoves()

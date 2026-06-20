@@ -1586,13 +1586,9 @@ public partial class MainWindow : Window
         {
             ClearAssetFileCaches();
         }
-        else if (!syncFromDisk)
-        {
-            ClearNodeAssetPickerCaches();
-        }
         RefreshAssetFolders();
         RefreshAssetList();
-        if (!syncFromDisk || externalFileEvent || filesChanged)
+        if (externalFileEvent || filesChanged)
         {
             RefreshProperties();
         }
@@ -1607,6 +1603,13 @@ public partial class MainWindow : Window
         _assetPreviewStamp = null;
         _projectDiagnosticsCache = null;
         ClearNodeAssetPickerCaches();
+    }
+
+    private void RefreshAssetCatalogAfterEditorChange()
+    {
+        ClearNodeAssetPickerCaches();
+        MarkDirty(refreshGraph: false);
+        RefreshAssets(syncFromDisk: false);
     }
 
     internal static bool ShouldClearAssetFileCaches(
@@ -3355,8 +3358,7 @@ public partial class MainWindow : Window
             var importedCount = after - before;
             if (ShouldRefreshAssetsAfterImport(before, after))
             {
-                MarkDirty(refreshGraph: false);
-                RefreshAssets(syncFromDisk: false);
+                RefreshAssetCatalogAfterEditorChange();
             }
             StatusText.Text = importedCount > 0
                 ? $"Импортировано файлов: {importedCount}"
@@ -3397,8 +3399,7 @@ public partial class MainWindow : Window
             VoiceBlipGenerator.WriteWaveFile(targetPath, dialog.Options);
             var asset = ProjectAssets.Import(_project, _projectPath!, targetPath, folder);
             _selectedAssetFolder = folder;
-            MarkDirty(refreshGraph: false);
-            RefreshAssets(syncFromDisk: false);
+            RefreshAssetCatalogAfterEditorChange();
             AssetsGrid.SelectedItem = AssetsGrid.Items
                 .OfType<AssetView>()
                 .FirstOrDefault(view => view.Id == asset.Id);
@@ -3445,8 +3446,7 @@ public partial class MainWindow : Window
                             '/',
                             Path.DirectorySeparatorChar)));
             }
-            MarkDirty(refreshGraph: false);
-            RefreshAssets(syncFromDisk: false);
+            RefreshAssetCatalogAfterEditorChange();
         }
         catch (InvalidDataException error)
         {
@@ -3490,8 +3490,7 @@ public partial class MainWindow : Window
             _selectedAssetFolder = parent.Length == 0
                 ? dialog.FolderName
                 : $"{parent}/{dialog.FolderName}";
-            MarkDirty(refreshGraph: false);
-            RefreshAssets(syncFromDisk: false);
+            RefreshAssetCatalogAfterEditorChange();
         }
         catch (Exception error) when (
             error is IOException
@@ -3530,8 +3529,7 @@ public partial class MainWindow : Window
                 _projectPath!,
                 _selectedAssetFolder);
             _selectedAssetFolder = null;
-            MarkDirty(refreshGraph: false);
-            RefreshAssets(syncFromDisk: false);
+            RefreshAssetCatalogAfterEditorChange();
         }
         catch (Exception error) when (
             error is IOException
@@ -3573,8 +3571,7 @@ public partial class MainWindow : Window
                 asset,
                 dialog.SelectedFolder);
             _selectedAssetFolder = dialog.SelectedFolder;
-            MarkDirty(refreshGraph: false);
-            RefreshAssets(syncFromDisk: false);
+            RefreshAssetCatalogAfterEditorChange();
         }
         catch (Exception error) when (
             error is IOException
@@ -3634,8 +3631,7 @@ public partial class MainWindow : Window
             oldId,
             AssetReference.Create(dialog.AssetId));
         asset.Id = dialog.AssetId;
-        MarkDirty(refreshGraph: false);
-        RefreshAssets(syncFromDisk: false);
+        RefreshAssetCatalogAfterEditorChange();
         AssetsGrid.SelectedItem = AssetsGrid.Items
             .OfType<AssetView>()
             .FirstOrDefault(view => view.Id == dialog.AssetId);
@@ -3712,8 +3708,7 @@ public partial class MainWindow : Window
                     MessageBoxImage.Warning);
             }
         }
-        MarkDirty(refreshGraph: false);
-        RefreshAssets(syncFromDisk: false);
+        RefreshAssetCatalogAfterEditorChange();
     }
 
     private void DeleteManagedAssetFile(NovelAsset asset)
@@ -4431,8 +4426,7 @@ public partial class MainWindow : Window
             var reference = ImportAssetFile(dialog.FileName, folder);
             if (_project.Assets.Count != count)
             {
-                MarkDirty(refreshGraph: false);
-                RefreshAssets(syncFromDisk: false);
+                RefreshAssetCatalogAfterEditorChange();
             }
             return reference;
         }
