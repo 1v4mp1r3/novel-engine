@@ -32,6 +32,10 @@ internal static class RecentProjectsStore
             return entries
                 .Select(NormalizeEntry)
                 .OfType<RecentProjectEntry>()
+                .GroupBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group
+                    .OrderByDescending(entry => entry.LastOpenedUtc)
+                    .First())
                 .OrderByDescending(entry => entry.LastOpenedUtc)
                 .Take(MaxEntries)
                 .ToList();

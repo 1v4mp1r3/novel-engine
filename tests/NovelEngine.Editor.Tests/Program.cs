@@ -27,6 +27,7 @@ var tests = new (string Name, Action Run)[]
     ("autosave pruning keeps newest snapshots", AutoSavePruningKeepsNewestSnapshots),
     ("autosave pruning skips locked snapshots", AutoSavePruningSkipsLockedSnapshots),
     ("recent projects deduplicate and order entries", RecentProjectsDeduplicateAndOrderEntries),
+    ("recent projects deduplicate normalized cache entries", RecentProjectsDeduplicateNormalizedCacheEntries),
     ("recent projects ignore corrupt cache", RecentProjectsIgnoreCorruptCache),
     ("recent projects ignore blank cache entries", RecentProjectsIgnoreBlankCacheEntries),
     ("recent projects normalize quoted cache paths", RecentProjectsNormalizeQuotedCachePaths),
@@ -587,6 +588,48 @@ static void RecentProjectsDeduplicateAndOrderEntries()
                     "first",
                     StringComparison.OrdinalIgnoreCase),
                 "Recent project display name was not derived from the project file.");
+        });
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void RecentProjectsDeduplicateNormalizedCacheEntries()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var storePath = Path.Combine(directory, "recent.json");
+        var projectPath = Path.Combine(directory, "duplicated.novel.json");
+        File.WriteAllText(projectPath, "{}");
+        File.WriteAllText(
+            storePath,
+            $$"""
+            [
+              {
+                "Path": "{{projectPath.Replace("\\", "\\\\")}}",
+                "DisplayName": "Old duplicate",
+                "LastOpenedUtc": "2026-06-17T10:00:00Z"
+              },
+              {
+                "Path": "  \"{{projectPath.Replace("\\", "\\\\").Replace("\"", "\\\"")}}\"  ",
+                "DisplayName": "Newest duplicate",
+                "LastOpenedUtc": "2026-06-17T11:00:00Z"
+              }
+            ]
+            """);
+
+        WithRecentProjectsStore(storePath, () =>
+        {
+            var entries = RecentProjectsStore.Load();
+
+            Assert(entries.Count == 1, "Recent projects kept normalized duplicate cache entries.");
+            Assert(entries[0].Path == projectPath, "Recent projects did not normalize the duplicate path.");
+            Assert(
+                entries[0].DisplayName == "Newest duplicate",
+                "Recent projects did not keep the newest duplicate entry.");
         });
     }
     finally
