@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
+    ("asset size cache tracks file stamp", AssetSizeCacheTracksFileStamp),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
@@ -1108,6 +1109,25 @@ static void AssetFileCachesClearOnlyAfterDiskChanges()
             externalFileEvent: false,
             diskSyncChangedProject: true),
         "Disk sync project changes should clear file caches.");
+}
+
+static void AssetSizeCacheTracksFileStamp()
+{
+    var stamp = new DateTime(2026, 6, 20, 12, 0, 0, DateTimeKind.Utc);
+    var cached = new AssetSizeCacheEntry(1024, stamp, "1 КБ");
+
+    Assert(
+        MainWindow.ShouldReuseAssetSizeCache(cached, 1024, stamp),
+        "Asset size cache should be reused for the same file stamp.");
+    Assert(
+        !MainWindow.ShouldReuseAssetSizeCache(cached, 2048, stamp),
+        "Asset size cache should be refreshed when the file length changes.");
+    Assert(
+        !MainWindow.ShouldReuseAssetSizeCache(
+            cached,
+            1024,
+            stamp.AddSeconds(1)),
+        "Asset size cache should be refreshed when the file timestamp changes.");
 }
 
 static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()

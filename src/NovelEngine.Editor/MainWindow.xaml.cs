@@ -19,6 +19,11 @@ internal enum NodeVoiceBindingResult
     Changed,
 }
 
+internal sealed record AssetSizeCacheEntry(
+    long Bytes,
+    DateTime LastWriteTimeUtc,
+    string Label);
+
 public partial class MainWindow : Window
 {
     private const int MaxProjectHistoryEntries = 100;
@@ -64,7 +69,7 @@ public partial class MainWindow : Window
     private bool _restoringProjectHistory;
     private string _savedProjectSnapshot = string.Empty;
     private string? _assetPreviewAudioPath;
-    private readonly Dictionary<string, string> _assetSizeCache =
+    private readonly Dictionary<string, AssetSizeCacheEntry> _assetSizeCache =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly BoundedCache<string, BitmapImage?> _assetPreviewImageCache =
         new(MaxCachedAssetPreviewImages, StringComparer.OrdinalIgnoreCase);
@@ -2140,43 +2145,66 @@ public partial class MainWindow : Window
             return "некорректный путь";
         }
 
-        if (_assetSizeCache.TryGetValue(path, out var cached))
-        {
-            return cached;
-        }
-
-        string size;
-        if (!File.Exists(path))
-        {
-            size = "нет файла";
-            _assetSizeCache[path] = size;
-            return size;
-        }
-        long bytes;
+        FileInfo fileInfo;
         try
         {
-            bytes = new FileInfo(path).Length;
+            fileInfo = new FileInfo(path);
         }
         catch (Exception error) when (
             error is IOException
             or UnauthorizedAccessException
             or NotSupportedException)
         {
-            size = "недоступен";
-            _assetSizeCache[path] = size;
-            return size;
+            return "недоступен";
         }
 
-        size = bytes switch
+        if (!fileInfo.Exists)
+        {
+            _assetSizeCache.Remove(path);
+            return "нет файла";
+        }
+
+        long bytes;
+        DateTime lastWriteTimeUtc;
+        try
+        {
+            bytes = fileInfo.Length;
+            lastWriteTimeUtc = fileInfo.LastWriteTimeUtc;
+        }
+        catch (Exception error) when (
+            error is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+        {
+            _assetSizeCache.Remove(path);
+            return "недоступен";
+        }
+
+        if (_assetSizeCache.TryGetValue(path, out var cached)
+            && ShouldReuseAssetSizeCache(cached, bytes, lastWriteTimeUtc))
+        {
+            return cached.Label;
+        }
+
+        var size = bytes switch
         {
             >= 1024L * 1024L =>
                 $"{bytes / (1024d * 1024d):0.##} МБ",
             >= 1024L => $"{bytes / 1024d:0.##} КБ",
             _ => $"{bytes} Б",
         };
-        _assetSizeCache[path] = size;
+        _assetSizeCache[path] = new AssetSizeCacheEntry(
+            bytes,
+            lastWriteTimeUtc,
+            size);
         return size;
     }
+
+    internal static bool ShouldReuseAssetSizeCache(
+        AssetSizeCacheEntry cached,
+        long bytes,
+        DateTime lastWriteTimeUtc) =>
+        cached.Bytes == bytes && cached.LastWriteTimeUtc == lastWriteTimeUtc;
 
     private void RefreshAssetPreview()
     {
