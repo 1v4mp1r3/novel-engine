@@ -281,6 +281,8 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Текст" Binding="{Binding Label}" Width="*" />
                                     <DataGridTextColumn Header="Условие" Binding="{Binding Condition}" Width="110" />
+                                    <DataGridTextColumn Header="Звук" Binding="{Binding TransitionSoundLabel}" Width="105" />
+                                    <DataGridTextColumn Header="Фейд" Binding="{Binding FadeDurationLabel}" Width="60" />
                                     <DataGridTextColumn Header="Блоки" Binding="{Binding BlockCount}" Width="65" />
                                     <DataGridTextColumn Header="Цель" Binding="{Binding TargetTitle}" Width="115" />
                                 </DataGrid.Columns>

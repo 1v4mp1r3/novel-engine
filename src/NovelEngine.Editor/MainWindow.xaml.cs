@@ -795,6 +795,8 @@ public partial class MainWindow : Window
             hash.Add(
                 project.FindNode(output.TargetNodeId)?.Title ?? string.Empty,
                 StringComparer.Ordinal);
+            hash.Add(output.TransitionSound, StringComparer.Ordinal);
+            hash.Add(output.FadeDurationMs);
             hash.Add(output.ScriptBlocks.Count);
         }
 
@@ -2391,11 +2393,19 @@ public partial class MainWindow : Window
 
         if (view.Asset.Kind == AssetKind.Audio)
         {
+            var selectedOutput = SelectedOutput();
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateAssetMenuItem(
                 "Привязать как музыку выбранной ноды",
                 () => BindAssetAsNodeMusic(view.Asset),
                 selectedNode is not null));
+            menu.Items.Add(CreateAssetMenuItem(
+                "Привязать как звук выбранного перехода",
+                () => BindAssetAsOutputTransitionSound(view.Asset),
+                CanBindAssetAsOutputTransitionSound(
+                    view.Asset,
+                    selectedNode,
+                    selectedOutput)));
             if (IsInAssetFolder(view.Asset, "voices"))
             {
                 menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
@@ -2642,6 +2652,31 @@ public partial class MainWindow : Window
         RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
+
+    private void BindAssetAsOutputTransitionSound(NovelAsset asset)
+    {
+        var node = _project.FindNode(Graph.SelectedNodeId);
+        var output = SelectedOutput();
+        if (!CanBindAssetAsOutputTransitionSound(asset, node, output))
+        {
+            return;
+        }
+
+        var reference = AssetReference.Create(asset.Id);
+        output!.TransitionSound = reference;
+        MarkDirty();
+        RefreshAssetUsageAfterBinding();
+        StatusText.Text = $"Звук перехода «{output.Label}»: {reference}";
+    }
+
+    internal static bool CanBindAssetAsOutputTransitionSound(
+        NovelAsset asset,
+        NovelNode? node,
+        NodeOutput? output) =>
+        asset.Kind == AssetKind.Audio
+        && node is not null
+        && output is not null
+        && node.Outputs.Any(candidate => candidate.Id == output.Id);
 
     private void CreateLibraryCharacterFromSprite(
         NovelAsset asset,
@@ -5827,6 +5862,10 @@ public partial class MainWindow : Window
         public string Id => Output.Id;
         public string Label => Output.Label;
         public string Condition => Output.Condition.Length == 0 ? "всегда" : Output.Condition;
+        public string TransitionSoundLabel =>
+            Output.TransitionSound.Length == 0 ? "-" : Output.TransitionSound;
+        public string FadeDurationLabel =>
+            Output.FadeDurationMs == 350 ? "-" : $"{Output.FadeDurationMs} мс";
         public int BlockCount => Output.ScriptBlocks.Count;
     }
 

@@ -198,3 +198,5 @@ currently installed on this workstation.
   `files/voices` to the matching character. If the sprite is not used by any
   character yet, the same menu can create a library character with the selected
   voice blip already attached.
+- Right-click an audio asset to assign it as the selected node's music or as
+  the selected choice/transition sound directly from the file manager.

@@ -41,6 +41,7 @@ var tests = new (string Name, Action Run)[]
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
+    ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -1022,6 +1023,40 @@ static void AssetImportRefreshPolicySkipsUnchangedImports()
         "Asset import should refresh after adding a new asset.");
 }
 
+static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()
+{
+    var project = NovelProject.CreateDefault();
+    var node = project.FindNode("dialogue-1")
+        ?? throw new InvalidOperationException("Default dialogue node was not found.");
+    var output = node.Outputs.First();
+    var audio = new NovelAsset
+    {
+        Id = "click",
+        Kind = AssetKind.Audio,
+        Path = "files/audio_fx/click.wav",
+    };
+    var image = new NovelAsset
+    {
+        Id = "bg",
+        Kind = AssetKind.Image,
+        Path = "files/backgrounds/bg.png",
+    };
+    var foreignOutput = new NodeOutput { Id = "foreign", Label = "Foreign" };
+
+    Assert(
+        MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, output),
+        "Audio asset should bind to a selected output of the selected node.");
+    Assert(
+        !MainWindow.CanBindAssetAsOutputTransitionSound(image, node, output),
+        "Image asset should not bind as a transition sound.");
+    Assert(
+        !MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, null),
+        "Transition sound binding should require a selected output.");
+    Assert(
+        !MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, foreignOutput),
+        "Transition sound binding should reject outputs from a different node.");
+}
+
 static void DiagnosticPanelStampTracksVisibleDiagnostics()
 {
     var diagnostics = new[]
@@ -1315,6 +1350,17 @@ static void NodePropertyPanelStampTracksVisibleState()
             changedTargetProject,
             changedTargetScene),
         "Node property panel stamp should track output target titles.");
+
+    var changedTransitionProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
+    var changedTransitionNode = changedTransitionProject.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Transition source node was not found.");
+    changedTransitionNode.Outputs[0].TransitionSound = "@click";
+    changedTransitionNode.Outputs[0].FadeDurationMs = 700;
+    Assert(
+        baseline != MainWindow.CreateNodePropertyPanelStamp(
+            changedTransitionProject,
+            changedTransitionNode),
+        "Node property panel stamp should track visible transition settings.");
 
     var changedAssetsProject = ProjectSerializer.FromJson(ProjectSerializer.ToJson(baselineProject));
     var changedAssetsNode = changedAssetsProject.FindNode("scene-1")
