@@ -9,6 +9,7 @@ public sealed class ScriptLiteralEditorControl : StackPanel
 {
     private readonly ComboBox _kindBox;
     private readonly TextBox _valueBox;
+    private bool _suppressLiteralChanged;
 
     public ScriptLiteralEditorControl()
     {
@@ -27,10 +28,10 @@ public sealed class ScriptLiteralEditorControl : StackPanel
         _kindBox.SelectionChanged += (_, _) =>
         {
             UpdateValueBox();
-            LiteralChanged?.Invoke(this, EventArgs.Empty);
+            RaiseLiteralChanged();
         };
         _valueBox.TextChanged += (_, _) =>
-            LiteralChanged?.Invoke(this, EventArgs.Empty);
+            RaiseLiteralChanged();
         IsEnabledChanged += (_, _) => UpdateValueBox();
 
         Children.Add(_kindBox);
@@ -91,6 +92,19 @@ public sealed class ScriptLiteralEditorControl : StackPanel
 
     public void LoadLiteral(string literal)
     {
+        _suppressLiteralChanged = true;
+        try
+        {
+            LoadLiteralCore(literal);
+        }
+        finally
+        {
+            _suppressLiteralChanged = false;
+        }
+    }
+
+    private void LoadLiteralCore(string literal)
+    {
         literal = literal.Trim();
         if (literal.Equals("true", StringComparison.OrdinalIgnoreCase))
         {
@@ -126,6 +140,14 @@ public sealed class ScriptLiteralEditorControl : StackPanel
 
         SelectKind(ScriptLiteralKind.Raw);
         _valueBox.Text = literal;
+    }
+
+    private void RaiseLiteralChanged()
+    {
+        if (!_suppressLiteralChanged)
+        {
+            LiteralChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void SelectKind(ScriptLiteralKind kind)

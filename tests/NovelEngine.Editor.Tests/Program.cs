@@ -65,6 +65,7 @@ var tests = new (string Name, Action Run)[]
     ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
+    ("script literal load suppresses change events", ScriptLiteralLoadSuppressesChangeEvents),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
@@ -1834,6 +1835,33 @@ static void VisualScriptFilterUsesDebouncedRefresh()
             "RefreshList(GetSelectedBlockIndex(), blocksChanged: false);",
             StringComparison.Ordinal),
         "Visual script filter refresh should keep the compiled preview cache.");
+}
+
+static void ScriptLiteralLoadSuppressesChangeEvents()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "ScriptLiteralEditorControl.cs"));
+    var loadBody = ExtractMethodBody(source, "public void LoadLiteral");
+    var raiseBody = ExtractMethodBody(source, "private void RaiseLiteralChanged");
+
+    Assert(
+        source.Contains("private bool _suppressLiteralChanged;", StringComparison.Ordinal),
+        "Script literal editor should track programmatic literal loading.");
+    Assert(
+        source.Contains("RaiseLiteralChanged();", StringComparison.Ordinal),
+        "Script literal editor event handlers should route through the guarded notifier.");
+    Assert(
+        loadBody.Contains("_suppressLiteralChanged = true;", StringComparison.Ordinal)
+            && loadBody.Contains("finally", StringComparison.Ordinal)
+            && loadBody.Contains("_suppressLiteralChanged = false;", StringComparison.Ordinal),
+        "Script literal loading should suppress change events until loading finishes.");
+    Assert(
+        raiseBody.Contains("if (!_suppressLiteralChanged)", StringComparison.Ordinal)
+            && raiseBody.Contains("LiteralChanged?.Invoke(this, EventArgs.Empty);", StringComparison.Ordinal),
+        "Script literal changes should still notify after interactive edits.");
 }
 
 static void ScriptBlockDialogGuardSkipsUnchangedApply()
