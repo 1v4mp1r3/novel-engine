@@ -87,8 +87,10 @@ currently installed on this workstation.
 - Duplicate a dialogue choice to reuse its condition, script, sound, and fade
   settings without copying its graph connection.
 - Move dialogue choices up or down to control their in-game order.
-- Right-click a dialogue choice in the outputs table to edit, duplicate,
-  reorder, disconnect, delete, or open its script blocks.
+- Right-click any output in the outputs table to edit it, disconnect it, open
+  its script blocks, or configure/reset its transition.
+- Dialogue choices in the outputs table can also be duplicated, reordered, or
+  deleted.
 - In the outputs table, `Enter`, `Ctrl+D`, `Delete`, `Backspace`, `Ctrl+T`,
   `Ctrl+R`, and `Alt+Up/Down` provide edit, duplicate, delete, disconnect,
   transition edit/reset, and reorder actions from the keyboard.

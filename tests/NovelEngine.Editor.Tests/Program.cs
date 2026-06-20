@@ -45,6 +45,7 @@ var tests = new (string Name, Action Run)[]
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
+    ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
@@ -1118,6 +1119,31 @@ static void AssetTransitionSoundMenuListsNodeOutputs()
     Assert(
         MainWindow.GetBindableTransitionSoundOutputs(audio, null).Count == 0,
         "Transition sound target listing should require a selected node.");
+}
+
+static void OutputDetailEditorPolicyAcceptsSceneNextOutputs()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Default scene node was not found.");
+    var dialogue = project.FindNode("dialogue-1")
+        ?? throw new InvalidOperationException("Default dialogue node was not found.");
+    var sceneOutput = scene.Outputs.First();
+    var dialogueOutput = dialogue.Outputs.First();
+    var foreignOutput = new NodeOutput { Id = "foreign", Label = "Foreign" };
+
+    Assert(
+        MainWindow.CanEditOutputDetails(scene, sceneOutput),
+        "Scene next outputs should expose output details from the context menu.");
+    Assert(
+        MainWindow.CanEditOutputDetails(dialogue, dialogueOutput),
+        "Dialogue choice outputs should expose output details from the context menu.");
+    Assert(
+        !MainWindow.CanEditOutputDetails(scene, null),
+        "Output detail editing should require a selected output.");
+    Assert(
+        !MainWindow.CanEditOutputDetails(scene, foreignOutput),
+        "Output detail editing should reject outputs from a different node.");
 }
 
 static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()

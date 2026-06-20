@@ -4899,15 +4899,18 @@ public partial class MainWindow : Window
 
         var selectedIndex = OutputsGrid.SelectedIndex;
         var outputCount = OutputsGrid.Items.Count;
+        var canEditOutputDetails = CanEditOutputDetails(node, output);
         menu.Items.Add(new Separator());
+        menu.Items.Add(CreateOutputMenuItem(
+            "Изменить",
+            () => EditOutput_Click(this, new RoutedEventArgs()),
+            canEditOutputDetails));
+        menu.Items.Add(CreateOutputMenuItem(
+            "Блоки скрипта...",
+            () => EditOutputScriptBlocks(node, output),
+            canEditOutputDetails));
         if (canEditChoices)
         {
-            menu.Items.Add(CreateOutputMenuItem(
-                "Изменить",
-                () => EditOutput_Click(this, new RoutedEventArgs())));
-            menu.Items.Add(CreateOutputMenuItem(
-                "Блоки скрипта...",
-                () => EditOutputScriptBlocks(node, output)));
             menu.Items.Add(CreateOutputMenuItem(
                 "Дублировать",
                 () => DuplicateOutput_Click(this, new RoutedEventArgs())));
@@ -4920,6 +4923,10 @@ public partial class MainWindow : Window
                 "Ниже",
                 () => MoveSelectedOutput(1),
                 selectedIndex >= 0 && selectedIndex < outputCount - 1));
+            menu.Items.Add(new Separator());
+        }
+        else
+        {
             menu.Items.Add(new Separator());
         }
         menu.Items.Add(CreateOutputMenuItem(
@@ -5076,6 +5083,13 @@ public partial class MainWindow : Window
         Key key,
         ModifierKeys modifiers) =>
         key == Key.R && modifiers == ModifierKeys.Control;
+
+    internal static bool CanEditOutputDetails(
+        NovelNode? node,
+        NodeOutput? output) =>
+        node is not null
+        && output is not null
+        && node.Outputs.Any(candidate => candidate.Id == output.Id);
 
     private void EditSelectedOutputTransition()
     {
