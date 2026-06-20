@@ -2856,7 +2856,7 @@ public partial class MainWindow : Window
         MarkOverrideIfChanged(node, "background", node.Background, reference);
         node.InheritBackground = false;
         node.Background = reference;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Фон ноды «{node.Title}»: {reference}";
     }
@@ -2874,7 +2874,7 @@ public partial class MainWindow : Window
         MarkOverrideIfChanged(node, "music", node.Music, reference);
         node.InheritMusic = false;
         node.Music = reference;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
@@ -2945,7 +2945,7 @@ public partial class MainWindow : Window
             dialog,
             CreateUniqueLibraryCharacterId(dialog.CharacterName));
         _project.Characters.Add(character);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text =
             initialVoice is null
                 ? $"Персонаж «{CharacterLabel(character)}» создан в библиотеке"
@@ -2977,7 +2977,7 @@ public partial class MainWindow : Window
         }
 
         var character = AddCharacterToNodeFromDialog(node, dialog);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text =
             $"Персонаж «{CharacterLabel(character)}» добавлен в ноду «{node.Title}»";
     }
@@ -3019,7 +3019,7 @@ public partial class MainWindow : Window
         }
 
         var character = node.Characters.First(candidate => candidate.Id == characterId);
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text =
             $"Voice-блипы персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";
@@ -3116,7 +3116,7 @@ public partial class MainWindow : Window
         }
         character.SetVoiceSounds(voices);
 
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text =
             $"Voice-блипы библиотечного персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";

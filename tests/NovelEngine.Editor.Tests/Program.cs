@@ -44,6 +44,7 @@ var tests = new (string Name, Action Run)[]
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset size cache tracks file stamp", AssetSizeCacheTracksFileStamp),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
+    ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
@@ -1157,6 +1158,32 @@ static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()
     Assert(
         !body.Contains("RequestDiagnosticsRefresh(", StringComparison.Ordinal),
         "Asset binding post-refresh should not duplicate MarkDirty diagnostics refresh.");
+}
+
+static void AssetBindingsSkipHiddenGraphRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var hiddenBindingMethods = new[]
+    {
+        "private void BindAssetAsNodeBackground",
+        "private void BindAssetAsNodeMusic",
+        "private void CreateLibraryCharacterFromSprite",
+        "private void AddCharacterFromSpriteToSelectedNode",
+        "private void BindVoiceAssetToCharacter",
+        "private void BindVoiceAssetToLibraryCharacter",
+    };
+
+    foreach (var method in hiddenBindingMethods)
+    {
+        var body = ExtractMethodBody(source, method);
+        Assert(
+            body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+            $"{method} should dirty the project without refreshing the graph.");
+    }
 }
 
 static void TransitionEditsRefreshAssetUsage()
