@@ -43,6 +43,7 @@ var tests = new (string Name, Action Run)[]
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset size cache tracks file stamp", AssetSizeCacheTracksFileStamp),
+    ("asset size cache skips repeated file info reads", AssetSizeCacheSkipsRepeatedFileInfoReads),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
@@ -1138,6 +1139,26 @@ static void AssetSizeCacheTracksFileStamp()
             1024,
             stamp.AddSeconds(1)),
         "Asset size cache should be refreshed when the file timestamp changes.");
+}
+
+static void AssetSizeCacheSkipsRepeatedFileInfoReads()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private string AssetSize");
+    var cacheIndex = body.IndexOf(
+        "_assetSizeCache.TryGetValue(path, out var cachedSize)",
+        StringComparison.Ordinal);
+    var fileInfoIndex = body.IndexOf("new FileInfo(path)", StringComparison.Ordinal);
+
+    Assert(cacheIndex >= 0, "Asset size should check the cached label for known paths.");
+    Assert(fileInfoIndex >= 0, "Asset size should still read file info for uncached paths.");
+    Assert(
+        cacheIndex < fileInfoIndex,
+        "Asset size should return cached labels before touching the filesystem.");
 }
 
 static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()

@@ -2171,6 +2171,11 @@ public partial class MainWindow : Window
             return "некорректный путь";
         }
 
+        if (_assetSizeCache.TryGetValue(path, out var cachedSize))
+        {
+            return cachedSize.Label;
+        }
+
         FileInfo fileInfo;
         try
         {
