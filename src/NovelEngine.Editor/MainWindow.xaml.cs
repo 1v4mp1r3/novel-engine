@@ -4971,6 +4971,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (IsOutputTransitionEditShortcut(e.Key, Keyboard.Modifiers))
+        {
+            EditSelectedOutputTransition();
+            e.Handled = true;
+            return;
+        }
+
+        if (IsOutputTransitionResetShortcut(e.Key, Keyboard.Modifiers))
+        {
+            ResetSelectedOutputTransition();
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers != ModifierKeys.Alt)
         {
             return;
@@ -5052,6 +5066,16 @@ public partial class MainWindow : Window
 
     private void EditSelectedOutputTransition_Click(object sender, RoutedEventArgs e) =>
         EditSelectedOutputTransition();
+
+    internal static bool IsOutputTransitionEditShortcut(
+        Key key,
+        ModifierKeys modifiers) =>
+        key == Key.T && modifiers == ModifierKeys.Control;
+
+    internal static bool IsOutputTransitionResetShortcut(
+        Key key,
+        ModifierKeys modifiers) =>
+        key == Key.R && modifiers == ModifierKeys.Control;
 
     private void EditSelectedOutputTransition()
     {

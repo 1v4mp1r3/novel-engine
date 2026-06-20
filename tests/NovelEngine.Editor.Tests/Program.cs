@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Windows;
+using System.Windows.Input;
 using NovelEngine.Core;
 using NovelEngine.Editor;
 
@@ -45,6 +46,7 @@ var tests = new (string Name, Action Run)[]
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
+    ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
@@ -1141,6 +1143,28 @@ static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
     Assert(
         !MainWindow.CanEditSelectedOutputTransition(scene, foreignOutput),
         "Transition editing should reject outputs from a different node.");
+}
+
+static void OutputTransitionKeyboardShortcutsUseCtrlCombos()
+{
+    Assert(
+        MainWindow.IsOutputTransitionEditShortcut(Key.T, ModifierKeys.Control),
+        "Ctrl+T should open selected output transition settings.");
+    Assert(
+        !MainWindow.IsOutputTransitionEditShortcut(Key.T, ModifierKeys.None),
+        "Transition edit shortcut should require Ctrl.");
+    Assert(
+        !MainWindow.IsOutputTransitionEditShortcut(Key.R, ModifierKeys.Control),
+        "Ctrl+R should not open transition settings.");
+    Assert(
+        MainWindow.IsOutputTransitionResetShortcut(Key.R, ModifierKeys.Control),
+        "Ctrl+R should reset selected output transition settings.");
+    Assert(
+        !MainWindow.IsOutputTransitionResetShortcut(Key.R, ModifierKeys.None),
+        "Transition reset shortcut should require Ctrl.");
+    Assert(
+        !MainWindow.IsOutputTransitionResetShortcut(Key.T, ModifierKeys.Control),
+        "Ctrl+T should not reset transition settings.");
 }
 
 static void OutputTransitionResetAppearsOnlyForCustomizedTransitions()
