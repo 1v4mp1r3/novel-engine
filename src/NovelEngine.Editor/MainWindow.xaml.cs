@@ -5275,20 +5275,54 @@ public partial class MainWindow : Window
     {
         var selectedIndex = OutputsGrid.SelectedIndex;
         var outputCount = OutputsGrid.Items.Count;
+        var state = CreateOutputButtonState(
+            canAdd,
+            selected,
+            selectedIndex,
+            outputCount);
 
-        AddOutputButton.IsEnabled = canAdd;
-        EditOutputButton.IsEnabled = selected;
-        DuplicateOutputButton.IsEnabled = canAdd && selected;
-        MoveOutputUpButton.IsEnabled = canAdd && selected && selectedIndex > 0;
-        MoveOutputDownButton.IsEnabled =
-            canAdd && selected && selectedIndex >= 0 && selectedIndex < outputCount - 1;
-        EditTransitionButton.IsEnabled = selected;
-        DeleteOutputButton.IsEnabled = canAdd && selected;
-        DisconnectOutputButton.IsEnabled = selected;
+        AddOutputButton.Visibility = state.ChoiceActionVisibility;
+        DuplicateOutputButton.Visibility = state.ChoiceActionVisibility;
+        MoveOutputUpButton.Visibility = state.ChoiceActionVisibility;
+        MoveOutputDownButton.Visibility = state.ChoiceActionVisibility;
+        DeleteOutputButton.Visibility = state.ChoiceActionVisibility;
+
+        AddOutputButton.IsEnabled = state.CanAddChoice;
+        EditOutputButton.IsEnabled = state.CanEditOutput;
+        DuplicateOutputButton.IsEnabled = state.CanDuplicateChoice;
+        MoveOutputUpButton.IsEnabled = state.CanMoveChoiceUp;
+        MoveOutputDownButton.IsEnabled = state.CanMoveChoiceDown;
+        EditTransitionButton.IsEnabled = state.CanEditTransition;
+        DeleteOutputButton.IsEnabled = state.CanDeleteChoice;
+        DisconnectOutputButton.IsEnabled = state.CanDisconnectOutput;
     }
 
     private void EditSelectedOutputTransition_Click(object sender, RoutedEventArgs e) =>
         EditSelectedOutputTransition();
+
+    internal static OutputButtonState CreateOutputButtonState(
+        bool canEditOutputList,
+        bool selected,
+        int selectedIndex,
+        int outputCount)
+    {
+        var choiceActionVisibility = canEditOutputList
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        return new OutputButtonState(
+            choiceActionVisibility,
+            CanAddChoice: canEditOutputList,
+            CanEditOutput: selected,
+            CanDuplicateChoice: canEditOutputList && selected,
+            CanMoveChoiceUp: canEditOutputList && selected && selectedIndex > 0,
+            CanMoveChoiceDown: canEditOutputList
+                && selected
+                && selectedIndex >= 0
+                && selectedIndex < outputCount - 1,
+            CanEditTransition: selected,
+            CanDeleteChoice: canEditOutputList && selected,
+            CanDisconnectOutput: selected);
+    }
 
     internal static bool CanEditOutputList(NovelNode? node) =>
         node?.Kind == NodeKind.Dialogue;
@@ -6359,6 +6393,17 @@ public partial class MainWindow : Window
     internal readonly record struct NodePropertyPanelStamp(
         string? NodeId,
         int Hash);
+
+    internal readonly record struct OutputButtonState(
+        Visibility ChoiceActionVisibility,
+        bool CanAddChoice,
+        bool CanEditOutput,
+        bool CanDuplicateChoice,
+        bool CanMoveChoiceUp,
+        bool CanMoveChoiceDown,
+        bool CanEditTransition,
+        bool CanDeleteChoice,
+        bool CanDisconnectOutput);
 
     internal readonly record struct DiagnosticPanelStamp(
         bool ShowPanel,

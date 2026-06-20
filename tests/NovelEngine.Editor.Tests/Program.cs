@@ -51,6 +51,7 @@ var tests = new (string Name, Action Run)[]
     ("output script block shortcut uses ctrl b", OutputScriptBlockShortcutUsesCtrlB),
     ("output transition keyboard shortcuts use ctrl combos", OutputTransitionKeyboardShortcutsUseCtrlCombos),
     ("output list shortcuts require dialogue nodes", OutputListShortcutsRequireDialogueNodes),
+    ("output buttons hide choice actions for scene outputs", OutputButtonsHideChoiceActionsForSceneOutputs),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
     ("graph editing shortcuts require graph focus", GraphEditingShortcutsRequireGraphFocus),
@@ -1297,6 +1298,57 @@ static void OutputListShortcutsRequireDialogueNodes()
             ModifierKeys.Alt,
             canEditOutputList: false),
         "Alt+Down should not be consumed by scene output rows.");
+}
+
+static void OutputButtonsHideChoiceActionsForSceneOutputs()
+{
+    var sceneState = MainWindow.CreateOutputButtonState(
+        canEditOutputList: false,
+        selected: true,
+        selectedIndex: 0,
+        outputCount: 1);
+
+    Assert(
+        sceneState.ChoiceActionVisibility == Visibility.Collapsed,
+        "Scene outputs should hide dialogue-only choice buttons.");
+    Assert(
+        !sceneState.CanAddChoice
+        && !sceneState.CanDuplicateChoice
+        && !sceneState.CanMoveChoiceUp
+        && !sceneState.CanMoveChoiceDown
+        && !sceneState.CanDeleteChoice,
+        "Scene outputs should not enable dialogue choice list actions.");
+    Assert(
+        sceneState.CanEditOutput
+        && sceneState.CanEditTransition
+        && sceneState.CanDisconnectOutput,
+        "Scene outputs should still allow editing output details and transition.");
+
+    var firstChoiceState = MainWindow.CreateOutputButtonState(
+        canEditOutputList: true,
+        selected: true,
+        selectedIndex: 0,
+        outputCount: 2);
+    Assert(
+        firstChoiceState.ChoiceActionVisibility == Visibility.Visible,
+        "Dialogue outputs should show choice list buttons.");
+    Assert(firstChoiceState.CanAddChoice, "Dialogue nodes should allow adding choices.");
+    Assert(firstChoiceState.CanDuplicateChoice, "Selected choices should be duplicable.");
+    Assert(!firstChoiceState.CanMoveChoiceUp, "First choice should not move up.");
+    Assert(firstChoiceState.CanMoveChoiceDown, "First choice should move down.");
+    Assert(firstChoiceState.CanDeleteChoice, "Selected choices should be deletable.");
+
+    var emptyDialogueState = MainWindow.CreateOutputButtonState(
+        canEditOutputList: true,
+        selected: false,
+        selectedIndex: -1,
+        outputCount: 0);
+    Assert(
+        emptyDialogueState.ChoiceActionVisibility == Visibility.Visible,
+        "Empty dialogue output lists should still show the add-choice action.");
+    Assert(emptyDialogueState.CanAddChoice, "Empty dialogue output lists should allow adding choices.");
+    Assert(!emptyDialogueState.CanEditOutput, "No selected output should disable edit.");
+    Assert(!emptyDialogueState.CanDisconnectOutput, "No selected output should disable disconnect.");
 }
 
 static void OutputTransitionResetAppearsOnlyForCustomizedTransitions()
