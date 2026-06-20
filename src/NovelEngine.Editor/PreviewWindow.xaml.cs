@@ -1123,15 +1123,37 @@ public partial class PreviewWindow : Window
             return;
         }
 
-        if (e.Key is >= Key.D1 and <= Key.D9)
+        if (TryGetChoiceShortcutIndex(e.Key, out var index))
         {
-            var index = e.Key - Key.D1;
             var buttons = ChoicesPanel.Children.OfType<Button>().ToList();
-            if (index < buttons.Count)
+            if (ChoiceAvailability.CanChooseByShortcut(
+                    _choicesReady,
+                    _paused,
+                    _transitioning,
+                    index,
+                    buttons.Count))
             {
                 buttons[index].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                e.Handled = true;
             }
         }
+    }
+
+    private static bool TryGetChoiceShortcutIndex(Key key, out int index)
+    {
+        if (key is >= Key.D1 and <= Key.D9)
+        {
+            index = key - Key.D1;
+            return true;
+        }
+        if (key is >= Key.NumPad1 and <= Key.NumPad9)
+        {
+            index = key - Key.NumPad1;
+            return true;
+        }
+
+        index = -1;
+        return false;
     }
 
     private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

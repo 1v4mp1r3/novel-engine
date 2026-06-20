@@ -1319,6 +1319,46 @@ static void ChoiceAvailabilityWaitsForDialogueTyping()
             paused: false,
             transitioning: true),
         "Choices were enabled during a transition.");
+    Assert(
+        !ChoiceAvailability.CanChooseByShortcut(
+            choicesReady: false,
+            paused: false,
+            transitioning: false,
+            choiceIndex: 0,
+            choiceCount: 2),
+        "Choice shortcuts were enabled before dialogue typing finished.");
+    Assert(
+        !ChoiceAvailability.CanChooseByShortcut(
+            choicesReady: true,
+            paused: true,
+            transitioning: false,
+            choiceIndex: 0,
+            choiceCount: 2),
+        "Choice shortcuts were enabled while paused.");
+    Assert(
+        !ChoiceAvailability.CanChooseByShortcut(
+            choicesReady: true,
+            paused: false,
+            transitioning: true,
+            choiceIndex: 0,
+            choiceCount: 2),
+        "Choice shortcuts were enabled during a transition.");
+    Assert(
+        !ChoiceAvailability.CanChooseByShortcut(
+            choicesReady: true,
+            paused: false,
+            transitioning: false,
+            choiceIndex: 2,
+            choiceCount: 2),
+        "Choice shortcuts accepted an out-of-range choice.");
+    Assert(
+        ChoiceAvailability.CanChooseByShortcut(
+            choicesReady: true,
+            paused: false,
+            transitioning: false,
+            choiceIndex: 1,
+            choiceCount: 2),
+        "Choice shortcuts did not accept a ready in-range choice.");
 }
 
 static void InheritedMusicDoesNotChangeTrack()
