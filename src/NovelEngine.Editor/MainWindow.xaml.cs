@@ -2902,26 +2902,66 @@ public partial class MainWindow : Window
             return;
         }
 
+        var effectiveCharacters = node.Kind != NodeKind.Start && node.InheritCharacters
+            ? GetEffectiveCharacters(node)
+            : null;
+        if (!TryBindVoiceAssetToNodeCharacter(
+                node,
+                asset,
+                characterId,
+                effectiveCharacters))
+        {
+            StatusText.Text = "Персонаж для привязки voice-блипа не найден";
+            return;
+        }
+
+        var character = node.Characters.First(candidate => candidate.Id == characterId);
+        MarkDirty();
+        RefreshAssetUsageAfterBinding();
+        StatusText.Text =
+            $"Voice-блипы персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";
+    }
+
+    internal static bool TryBindVoiceAssetToNodeCharacter(
+        NovelNode node,
+        NovelAsset asset,
+        string characterId,
+        IEnumerable<CharacterPlacement>? effectiveCharacters = null)
+    {
+        if (asset.Kind != AssetKind.Audio)
+        {
+            return false;
+        }
+
+        CharacterPlacement? character;
         if (node.Kind != NodeKind.Start && node.InheritCharacters)
         {
-            var effectiveCharacters = GetEffectiveCharacters(node)
-                .Select(character => character.Clone())
+            var inheritedCharacters = (effectiveCharacters ?? node.Characters)
+                .Select(candidate => candidate.Clone())
                 .ToList();
+            character = inheritedCharacters.FirstOrDefault(
+                candidate => candidate.Id == characterId);
+            if (character is null)
+            {
+                return false;
+            }
+
             node.Characters.Clear();
-            node.Characters.AddRange(effectiveCharacters);
+            node.Characters.AddRange(inheritedCharacters);
             node.InheritCharacters = false;
             if (node.UsesTypeDefaults)
             {
                 node.PropertyOverrides.Add("inheritCharacters");
             }
         }
-
-        var character = node.Characters.FirstOrDefault(
-            candidate => candidate.Id == characterId);
-        if (character is null)
+        else
         {
-            StatusText.Text = "Персонаж для привязки voice-блипа не найден";
-            return;
+            character = node.Characters.FirstOrDefault(
+                candidate => candidate.Id == characterId);
+            if (character is null)
+            {
+                return false;
+            }
         }
 
         var reference = AssetReference.Create(asset.Id);
@@ -2935,11 +2975,7 @@ public partial class MainWindow : Window
         {
             node.PropertyOverrides.Add("characters");
         }
-
-        MarkDirty();
-        RefreshAssetUsageAfterBinding();
-        StatusText.Text =
-            $"Voice-блипы персонажа «{character.Name}»: {character.VoiceSounds.Count}";
+        return true;
     }
 
     private void BindVoiceAssetToLibraryCharacter(

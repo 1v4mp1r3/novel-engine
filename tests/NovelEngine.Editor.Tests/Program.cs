@@ -66,6 +66,8 @@ var tests = new (string Name, Action Run)[]
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
+    ("node voice binding materializes inherited characters", NodeVoiceBindingMaterializesInheritedCharacters),
+    ("node voice binding skips missing inherited character", NodeVoiceBindingSkipsMissingInheritedCharacter),
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
@@ -1890,6 +1892,101 @@ static void NodeCharacterEditingPolicyRespectsInheritance()
     Assert(
         !MainWindow.CanEditNodeCharacters(null, inheritCharactersChecked: false),
         "Character editing should require a selected node.");
+}
+
+static void NodeVoiceBindingMaterializesInheritedCharacters()
+{
+    var node = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        UsesTypeDefaults = true,
+        InheritCharacters = true,
+    };
+    node.Characters.Add(new CharacterPlacement
+    {
+        Id = "stale",
+        Name = "Stale",
+    });
+    var inherited = new[]
+    {
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+        },
+    };
+    var asset = new NovelAsset
+    {
+        Id = "hero_voice",
+        Kind = AssetKind.Audio,
+        Folder = "voices",
+        Path = "files/voices/hero.wav",
+    };
+
+    var bound = MainWindow.TryBindVoiceAssetToNodeCharacter(
+        node,
+        asset,
+        "hero",
+        inherited);
+
+    Assert(bound, "Voice binding did not accept an inherited character.");
+    Assert(!node.InheritCharacters, "Voice binding did not materialize inherited characters.");
+    Assert(node.Characters.Count == 1, "Voice binding kept stale local characters.");
+    Assert(
+        node.Characters[0].Id == "hero",
+        "Voice binding did not copy the inherited target character.");
+    Assert(
+        node.Characters[0].GetVoiceSounds().SequenceEqual([AssetReference.Create(asset.Id)]),
+        "Voice binding did not attach the voice reference to the inherited character.");
+    Assert(
+        node.PropertyOverrides.Contains("inheritCharacters")
+            && node.PropertyOverrides.Contains("characters"),
+        "Voice binding did not mark type-default character overrides.");
+}
+
+static void NodeVoiceBindingSkipsMissingInheritedCharacter()
+{
+    var node = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        UsesTypeDefaults = true,
+        InheritCharacters = true,
+    };
+    node.Characters.Add(new CharacterPlacement
+    {
+        Id = "local",
+        Name = "Local",
+    });
+    var inherited = new[]
+    {
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+        },
+    };
+    var asset = new NovelAsset
+    {
+        Id = "hero_voice",
+        Kind = AssetKind.Audio,
+        Folder = "voices",
+        Path = "files/voices/hero.wav",
+    };
+
+    var bound = MainWindow.TryBindVoiceAssetToNodeCharacter(
+        node,
+        asset,
+        "missing",
+        inherited);
+
+    Assert(!bound, "Voice binding accepted a missing inherited character.");
+    Assert(node.InheritCharacters, "Failed voice binding changed character inheritance.");
+    Assert(node.Characters.Count == 1, "Failed voice binding replaced local characters.");
+    Assert(node.Characters[0].Id == "local", "Failed voice binding changed the local character.");
+    Assert(node.Characters[0].GetVoiceSounds().Count == 0, "Failed voice binding added a voice reference.");
+    Assert(node.PropertyOverrides.Count == 0, "Failed voice binding marked type-default overrides.");
 }
 
 static void OutputEditorGuardSkipsUnchangedApply()
