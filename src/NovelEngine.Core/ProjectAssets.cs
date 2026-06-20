@@ -173,7 +173,7 @@ public static class ProjectAssets
 
         var projectDirectory = GetProjectDirectory(projectPath);
         var knownRelativePaths = project.Assets
-            .Select(asset => asset.Path)
+            .Select(asset => NormalizeRelativeAssetPath(asset.Path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var knownFullPaths = project.Assets
             .Select(asset => ResolvePath(projectPath, asset))
@@ -202,7 +202,7 @@ public static class ProjectAssets
                 fullPath,
                 relativeProjectPath,
                 relativeFolder);
-            knownRelativePaths.Add(imported.Path);
+            knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
             knownFullPaths.Add(ResolvePath(projectPath, imported));
             changes += project.Assets.Count - before;
         }
@@ -417,6 +417,9 @@ public static class ProjectAssets
             ? $"{ManagedFilesDirectoryName}/{fileName}"
             : $"{ManagedFilesDirectoryName}/{folder}/{fileName}";
     }
+
+    private static string NormalizeRelativeAssetPath(string path) =>
+        path.Replace('\\', '/');
 
     private static string GetProjectDirectory(string projectPath) =>
         Path.GetDirectoryName(Path.GetFullPath(projectPath))

@@ -52,6 +52,7 @@ var tests = new (string Name, Action Run)[]
     ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
+    ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
@@ -2167,6 +2168,41 @@ static void ProjectAssetSyncPreservesManagedFilePaths()
         Assert(
             ProjectAssets.SyncFromDisk(project, projectPath) == 0,
             "Second sync duplicated managed files.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectAssetSyncNormalizesExistingPathSeparators()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-sync-separators-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var backgroundFolder = Path.Combine(directory, "files", "backgrounds");
+        Directory.CreateDirectory(backgroundFolder);
+        File.WriteAllBytes(Path.Combine(backgroundFolder, "hero.png"), [137, 80, 78, 71]);
+        var project = NovelProject.CreateDefault();
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "hero",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = @"files\backgrounds\hero.png",
+        });
+
+        var changes = ProjectAssets.SyncFromDisk(project, projectPath);
+
+        Assert(
+            changes == 1,
+            "Sync should only register the missing folder for an existing backslash path.");
+        Assert(project.AssetFolders.Contains("backgrounds"), "Sync did not register the physical folder.");
+        Assert(project.Assets.Count == 1, "Sync duplicated an existing backslash path.");
     }
     finally
     {
