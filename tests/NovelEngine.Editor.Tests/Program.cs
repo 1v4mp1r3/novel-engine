@@ -1212,6 +1212,18 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
         "src",
         "NovelEngine.Editor",
         "MainWindow.xaml.cs"));
+    var assetMutationMethods = new[]
+    {
+        "private void ImportAssets_Click",
+        "private void CreateVoiceBlip_Click",
+        "private void CreateAssetFolder_Click",
+        "private void RenameAssetFolder_Click",
+        "private void DeleteAssetFolder_Click",
+        "private void MoveAsset_Click",
+        "private void RenameAsset_Click",
+        "private void DeleteAsset_Click",
+        "private string? BrowseAsset",
+    };
 
     Assert(
         !Regex.IsMatch(source, @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(\);"),
@@ -1219,8 +1231,19 @@ static void EditorAssetMutationsSkipDiskSyncRefreshes()
     Assert(
         Regex.IsMatch(
             source,
-            @"MarkDirty\(\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
+            @"MarkDirty\(refreshGraph: false\);\s*\r?\n\s*RefreshAssets\(syncFromDisk: false\);"),
         "Editor-driven asset mutations should refresh known asset state without disk sync.");
+
+    foreach (var method in assetMutationMethods)
+    {
+        var body = ExtractMethodBody(source, method);
+        Assert(
+            !body.Contains("MarkDirty();", StringComparison.Ordinal),
+            $"{method} should not refresh the graph for asset manager changes.");
+        Assert(
+            body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+            $"{method} should dirty asset manager changes without refreshing the graph.");
+    }
 }
 
 static void AssetImportRefreshPolicySkipsUnchangedImports()

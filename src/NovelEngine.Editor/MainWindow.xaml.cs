@@ -3347,7 +3347,7 @@ public partial class MainWindow : Window
             var importedCount = after - before;
             if (ShouldRefreshAssetsAfterImport(before, after))
             {
-                MarkDirty();
+                MarkDirty(refreshGraph: false);
                 RefreshAssets(syncFromDisk: false);
             }
             StatusText.Text = importedCount > 0
@@ -3389,7 +3389,7 @@ public partial class MainWindow : Window
             VoiceBlipGenerator.WriteWaveFile(targetPath, dialog.Options);
             var asset = ProjectAssets.Import(_project, _projectPath!, targetPath, folder);
             _selectedAssetFolder = folder;
-            MarkDirty();
+            MarkDirty(refreshGraph: false);
             RefreshAssets(syncFromDisk: false);
             AssetsGrid.SelectedItem = AssetsGrid.Items
                 .OfType<AssetView>()
@@ -3437,7 +3437,7 @@ public partial class MainWindow : Window
                             '/',
                             Path.DirectorySeparatorChar)));
             }
-            MarkDirty();
+            MarkDirty(refreshGraph: false);
             RefreshAssets(syncFromDisk: false);
         }
         catch (InvalidDataException error)
@@ -3482,7 +3482,7 @@ public partial class MainWindow : Window
             _selectedAssetFolder = parent.Length == 0
                 ? dialog.FolderName
                 : $"{parent}/{dialog.FolderName}";
-            MarkDirty();
+            MarkDirty(refreshGraph: false);
             RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
@@ -3522,7 +3522,7 @@ public partial class MainWindow : Window
                 _projectPath!,
                 _selectedAssetFolder);
             _selectedAssetFolder = null;
-            MarkDirty();
+            MarkDirty(refreshGraph: false);
             RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
@@ -3565,7 +3565,7 @@ public partial class MainWindow : Window
                 asset,
                 dialog.SelectedFolder);
             _selectedAssetFolder = dialog.SelectedFolder;
-            MarkDirty();
+            MarkDirty(refreshGraph: false);
             RefreshAssets(syncFromDisk: false);
         }
         catch (Exception error) when (
@@ -3626,7 +3626,7 @@ public partial class MainWindow : Window
             oldId,
             AssetReference.Create(dialog.AssetId));
         asset.Id = dialog.AssetId;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssets(syncFromDisk: false);
         AssetsGrid.SelectedItem = AssetsGrid.Items
             .OfType<AssetView>()
@@ -3704,7 +3704,7 @@ public partial class MainWindow : Window
                     MessageBoxImage.Warning);
             }
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssets(syncFromDisk: false);
     }
 
@@ -4423,7 +4423,7 @@ public partial class MainWindow : Window
             var reference = ImportAssetFile(dialog.FileName, folder);
             if (_project.Assets.Count != count)
             {
-                MarkDirty();
+                MarkDirty(refreshGraph: false);
                 RefreshAssets(syncFromDisk: false);
             }
             return reference;
