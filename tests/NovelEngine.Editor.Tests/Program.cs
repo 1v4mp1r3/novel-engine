@@ -16,6 +16,7 @@ var tests = new (string Name, Action Run)[]
     ("manual save policy skips unchanged saved projects", ManualSavePolicySkipsUnchangedSavedProjects),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
+    ("project resolver prefers single novel project over generic json", ProjectResolverPrefersSingleNovelProjectOverGenericJson),
     ("project resolver opens the only json project in a folder", ProjectResolverOpensOnlyJsonProject),
     ("project resolver treats empty folder as workspace", ProjectResolverTreatsEmptyFolderAsWorkspace),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
@@ -309,6 +310,29 @@ static void ProjectResolverOpensOnlyProject()
         Assert(result.ProjectPath == projectPath, "Resolver did not open the only project file.");
         Assert(result.WorkspaceDirectory == directory, "Resolver changed workspace directory.");
         Assert(!result.CreatedEmptyWorkspace, "Resolver marked a folder with one project as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectResolverPrefersSingleNovelProjectOverGenericJson()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var projectPath = Path.Combine(directory, "custom-name.novel.json");
+        File.WriteAllText(projectPath, "{}");
+        File.WriteAllText(Path.Combine(directory, "tool-config.json"), "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(
+            result.ProjectPath == projectPath,
+            "Resolver did not prefer the single .novel.json project over generic JSON.");
+        Assert(result.WorkspaceDirectory == directory, "Resolver changed mixed-json workspace directory.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a folder with one .novel.json project as empty.");
     }
     finally
     {

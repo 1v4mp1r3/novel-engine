@@ -9,12 +9,6 @@ internal sealed record ProjectOpenResult(
 
 internal static class ProjectOpenResolver
 {
-    private static readonly string[] ProjectPatterns =
-    [
-        "*.novel.json",
-        "*.json",
-    ];
-
     public static ProjectOpenResult Resolve(string inputPath)
     {
         if (string.IsNullOrWhiteSpace(inputPath))
@@ -45,10 +39,16 @@ internal static class ProjectOpenResolver
     private static ProjectOpenResult ResolveProjectFromDirectory(string directory)
     {
         directory = Path.GetFullPath(directory);
-        var projectFiles = ProjectPatterns
-            .SelectMany(pattern => Directory.EnumerateFiles(
+        var novelProjectFiles = Directory.EnumerateFiles(
                 directory,
-                pattern,
+                "*.novel.json",
+                SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var projectFiles = novelProjectFiles
+            .Concat(Directory.EnumerateFiles(
+                directory,
+                "*.json",
                 SearchOption.TopDirectoryOnly))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -69,6 +69,14 @@ internal static class ProjectOpenResolver
         {
             return new ProjectOpenResult(
                 preferredProject,
+                directory,
+                CreatedEmptyWorkspace: false);
+        }
+
+        if (novelProjectFiles.Count == 1)
+        {
+            return new ProjectOpenResult(
+                novelProjectFiles[0],
                 directory,
                 CreatedEmptyWorkspace: false);
         }
