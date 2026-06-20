@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
+    ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
@@ -1056,6 +1057,44 @@ static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()
     Assert(
         !MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, foreignOutput),
         "Transition sound binding should reject outputs from a different node.");
+}
+
+static void AssetTransitionSoundMenuListsNodeOutputs()
+{
+    var project = NovelProject.CreateDefault();
+    var scene = project.FindNode("scene-1")
+        ?? throw new InvalidOperationException("Default scene node was not found.");
+    var dialogue = project.FindNode("dialogue-1")
+        ?? throw new InvalidOperationException("Default dialogue node was not found.");
+    var audio = new NovelAsset
+    {
+        Id = "click",
+        Kind = AssetKind.Audio,
+        Path = "files/audio_fx/click.wav",
+    };
+    var image = new NovelAsset
+    {
+        Id = "bg",
+        Kind = AssetKind.Image,
+        Path = "files/backgrounds/bg.png",
+    };
+
+    Assert(
+        MainWindow.GetBindableTransitionSoundOutputs(audio, scene)
+            .Select(output => output.Id)
+            .SequenceEqual(scene.Outputs.Select(output => output.Id)),
+        "Audio transition menu should include scene next outputs.");
+    Assert(
+        MainWindow.GetBindableTransitionSoundOutputs(audio, dialogue)
+            .Select(output => output.Id)
+            .SequenceEqual(dialogue.Outputs.Select(output => output.Id)),
+        "Audio transition menu should include every dialogue choice output.");
+    Assert(
+        MainWindow.GetBindableTransitionSoundOutputs(image, dialogue).Count == 0,
+        "Non-audio assets should not list transition sound targets.");
+    Assert(
+        MainWindow.GetBindableTransitionSoundOutputs(audio, null).Count == 0,
+        "Transition sound target listing should require a selected node.");
 }
 
 static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()

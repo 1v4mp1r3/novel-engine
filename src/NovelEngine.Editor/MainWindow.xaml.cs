@@ -2399,13 +2399,10 @@ public partial class MainWindow : Window
                 "Привязать как музыку выбранной ноды",
                 () => BindAssetAsNodeMusic(view.Asset),
                 selectedNode is not null));
-            menu.Items.Add(CreateAssetMenuItem(
-                "Привязать как звук выбранного перехода",
-                () => BindAssetAsOutputTransitionSound(view.Asset),
-                CanBindAssetAsOutputTransitionSound(
-                    view.Asset,
-                    selectedNode,
-                    selectedOutput)));
+            menu.Items.Add(CreateTransitionSoundBindingMenu(
+                view.Asset,
+                selectedNode,
+                selectedOutput));
             if (IsInAssetFolder(view.Asset, "voices"))
             {
                 menu.Items.Add(CreateVoiceBindingMenu(view.Asset, selectedNode));
@@ -2565,6 +2562,46 @@ public partial class MainWindow : Window
         return menu;
     }
 
+    private MenuItem CreateTransitionSoundBindingMenu(
+        NovelAsset asset,
+        NovelNode? node,
+        NodeOutput? selectedOutput)
+    {
+        if (node is null)
+        {
+            return CreateDisabledAssetMenuItem(
+                "Привязать звук перехода: выберите ноду");
+        }
+
+        var outputs = GetBindableTransitionSoundOutputs(asset, node);
+        if (outputs.Count == 0)
+        {
+            return CreateDisabledAssetMenuItem(
+                "Привязать звук перехода: переходов нет");
+        }
+
+        if (outputs.Count == 1)
+        {
+            var output = outputs[0];
+            return CreateAssetMenuItem(
+                $"Привязать как звук перехода «{output.Label}»",
+                () => BindAssetAsOutputTransitionSound(asset, output.Id));
+        }
+
+        var selectedOutputId = selectedOutput?.Id;
+        var menu = CreateHoverSubmenu("Привязать как звук перехода");
+        foreach (var output in outputs)
+        {
+            var label = output.Id == selectedOutputId
+                ? $"Выбранный: {output.Label}"
+                : output.Label;
+            menu.Items.Add(CreateAssetMenuItem(
+                label,
+                () => BindAssetAsOutputTransitionSound(asset, output.Id)));
+        }
+        return menu;
+    }
+
     private static string CharacterLabel(CharacterPlacement character) =>
         string.IsNullOrWhiteSpace(character.Name)
             ? character.Id
@@ -2653,10 +2690,12 @@ public partial class MainWindow : Window
         StatusText.Text = $"Музыка ноды «{node.Title}»: {reference}";
     }
 
-    private void BindAssetAsOutputTransitionSound(NovelAsset asset)
+    private void BindAssetAsOutputTransitionSound(NovelAsset asset, string? outputId = null)
     {
         var node = _project.FindNode(Graph.SelectedNodeId);
-        var output = SelectedOutput();
+        var output = outputId is null
+            ? SelectedOutput()
+            : node?.Outputs.FirstOrDefault(candidate => candidate.Id == outputId);
         if (!CanBindAssetAsOutputTransitionSound(asset, node, output))
         {
             return;
@@ -2668,6 +2707,13 @@ public partial class MainWindow : Window
         RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Звук перехода «{output.Label}»: {reference}";
     }
+
+    internal static IReadOnlyList<NodeOutput> GetBindableTransitionSoundOutputs(
+        NovelAsset asset,
+        NovelNode? node) =>
+        asset.Kind == AssetKind.Audio && node is not null
+            ? [.. node.Outputs]
+            : [];
 
     internal static bool CanBindAssetAsOutputTransitionSound(
         NovelAsset asset,
