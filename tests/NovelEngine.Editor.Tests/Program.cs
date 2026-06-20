@@ -40,6 +40,7 @@ var tests = new (string Name, Action Run)[]
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
     ("asset preview stamp tracks visible input state", AssetPreviewStampTracksVisibleInputState),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
+    ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
@@ -1036,6 +1037,54 @@ static void DispatcherDebounceGateCollapsesPendingRequests()
 
     Assert(!gate.IsPending, "Dispatcher refresh gate should clear its pending state.");
     Assert(gate.TryRequest(), "Dispatcher refresh gate should allow a request after completion.");
+}
+
+static void SearchTextChangesUseDebouncedRefreshes()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var projectTextChanged = ExtractMethodBody(
+        source,
+        "private void ProjectSearchBox_TextChanged");
+    var projectKeyDown = ExtractMethodBody(
+        source,
+        "private void ProjectSearchBox_KeyDown");
+    var assetTextChanged = ExtractMethodBody(
+        source,
+        "private void AssetSearchBox_TextChanged");
+    var assetKeyDown = ExtractMethodBody(
+        source,
+        "private void AssetSearchBox_KeyDown");
+
+    Assert(
+        projectTextChanged.Contains(
+            "ScheduleProjectExplorerRefresh();",
+            StringComparison.Ordinal),
+        "Project search text changes should schedule a debounced refresh.");
+    Assert(
+        !projectTextChanged.Contains("RefreshExplorer();", StringComparison.Ordinal),
+        "Project search text changes should not refresh immediately.");
+    Assert(
+        assetTextChanged.Contains(
+            "ScheduleAssetListRefresh();",
+            StringComparison.Ordinal),
+        "Asset search text changes should schedule a debounced refresh.");
+    Assert(
+        !assetTextChanged.Contains("RefreshAssetList();", StringComparison.Ordinal),
+        "Asset search text changes should not refresh immediately.");
+    Assert(
+        projectKeyDown.Contains(
+            "_projectExplorerSearchTimer.Stop();",
+            StringComparison.Ordinal)
+            && projectKeyDown.Contains("RefreshExplorer();", StringComparison.Ordinal),
+        "Project search Enter should flush the debounced refresh immediately.");
+    Assert(
+        assetKeyDown.Contains("_assetSearchTimer.Stop();", StringComparison.Ordinal)
+            && assetKeyDown.Contains("RefreshAssetList();", StringComparison.Ordinal),
+        "Asset search Escape should flush the debounced refresh immediately.");
 }
 
 static void AssetFileCachesClearOnlyAfterDiskChanges()

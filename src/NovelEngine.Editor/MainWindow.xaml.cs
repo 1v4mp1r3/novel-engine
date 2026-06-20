@@ -44,6 +44,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _autoSaveTimer;
     private readonly DispatcherTimer _filesRefreshTimer;
     private readonly DispatcherTimer _diagnosticsTimer;
+    private readonly DispatcherTimer _projectExplorerSearchTimer;
+    private readonly DispatcherTimer _assetSearchTimer;
     private string _codeCursorSource = string.Empty;
     private int[] _codeLineStarts = [0];
     private int _lastCodeCursorOffset = -1;
@@ -158,6 +160,24 @@ public partial class MainWindow : Window
         {
             _diagnosticsTimer.Stop();
             RefreshProjectDiagnostics(showPanel: false);
+        };
+        _projectExplorerSearchTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+        };
+        _projectExplorerSearchTimer.Tick += (_, _) =>
+        {
+            _projectExplorerSearchTimer.Stop();
+            RefreshExplorer();
+        };
+        _assetSearchTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(180),
+        };
+        _assetSearchTimer.Tick += (_, _) =>
+        {
+            _assetSearchTimer.Stop();
+            RefreshAssetList();
         };
 
         SetProject(_project, null);
@@ -2280,8 +2300,16 @@ public partial class MainWindow : Window
     private void AssetsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
         RefreshAssetPreview();
 
-    private void AssetSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        RefreshAssetList();
+    private void AssetSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ScheduleAssetListRefresh();
+    }
+
+    private void ScheduleAssetListRefresh()
+    {
+        _assetSearchTimer.Stop();
+        _assetSearchTimer.Start();
+    }
 
     private void AssetSearchBox_KeyDown(object sender, KeyEventArgs e)
     {
@@ -2291,6 +2319,8 @@ public partial class MainWindow : Window
         }
 
         AssetSearchBox.Clear();
+        _assetSearchTimer.Stop();
+        RefreshAssetList();
         e.Handled = true;
     }
 
@@ -4163,8 +4193,16 @@ public partial class MainWindow : Window
         Graph.SelectNode((e.NewValue as TreeViewItem)?.Tag as string);
     }
 
-    private void ProjectSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        RefreshExplorer();
+    private void ProjectSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ScheduleProjectExplorerRefresh();
+    }
+
+    private void ScheduleProjectExplorerRefresh()
+    {
+        _projectExplorerSearchTimer.Stop();
+        _projectExplorerSearchTimer.Start();
+    }
 
     private void ProjectSearchBox_KeyDown(object sender, KeyEventArgs e)
     {
@@ -4185,6 +4223,7 @@ public partial class MainWindow : Window
         }
 
         Graph.SelectNode(node.Id);
+        _projectExplorerSearchTimer.Stop();
         RefreshExplorer();
         StatusText.Text = $"Найдена нода «{node.Title}»";
         e.Handled = true;
