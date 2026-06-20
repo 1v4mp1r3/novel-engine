@@ -5076,11 +5076,19 @@ public partial class MainWindow : Window
         output!.TransitionSound = string.Empty;
         output.FadeDurationMs = 350;
         MarkDirty();
+        RefreshAssetUsageAfterBinding();
     }
 
     internal static bool ShouldShowResetOutputTransition(NodeOutput? output) =>
         output is not null
         && (output.TransitionSound.Length > 0 || output.FadeDurationMs != 350);
+
+    internal static bool HasOutputTransitionChanges(
+        NodeOutput output,
+        string transitionSound,
+        int fadeDurationMs) =>
+        !output.TransitionSound.Equals(transitionSound, StringComparison.Ordinal)
+        || output.FadeDurationMs != fadeDurationMs;
 
     internal static bool CanEditSelectedOutputTransition(
         NovelNode? node,
@@ -5102,9 +5110,19 @@ public partial class MainWindow : Window
         {
             return;
         }
-        output.TransitionSound = NormalizeAssetPath(dialog.TransitionSound);
+        var transitionSound = NormalizeAssetPath(dialog.TransitionSound);
+        if (!HasOutputTransitionChanges(
+                output,
+                transitionSound,
+                dialog.FadeDurationMs))
+        {
+            return;
+        }
+
+        output.TransitionSound = transitionSound;
         output.FadeDurationMs = dialog.FadeDurationMs;
         MarkDirty();
+        RefreshAssetUsageAfterBinding();
     }
 
     private void ApplyProperties_Click(object sender, RoutedEventArgs e) => ApplyProperties();

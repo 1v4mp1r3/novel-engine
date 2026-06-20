@@ -39,12 +39,14 @@ var tests = new (string Name, Action Run)[]
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
+    ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
+    ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
@@ -998,6 +1000,24 @@ static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()
         "Asset binding post-refresh should not duplicate MarkDirty diagnostics refresh.");
 }
 
+static void TransitionEditsRefreshAssetUsage()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var editBody = ExtractMethodBody(source, "private void EditTransition");
+    var resetBody = ExtractMethodBody(source, "private void ResetSelectedOutputTransition");
+
+    Assert(
+        editBody.Contains("RefreshAssetUsageAfterBinding();", StringComparison.Ordinal),
+        "Editing transition sound should refresh asset usage state.");
+    Assert(
+        resetBody.Contains("RefreshAssetUsageAfterBinding();", StringComparison.Ordinal),
+        "Resetting transition sound should refresh asset usage state.");
+}
+
 static void EditorAssetMutationsSkipDiskSyncRefreshes()
 {
     var source = File.ReadAllText(Path.Combine(
@@ -1148,6 +1168,26 @@ static void OutputTransitionResetAppearsOnlyForCustomizedTransitions()
             FadeDurationMs = 700,
         }),
         "Transitions with a custom fade duration should show the reset action.");
+}
+
+static void OutputTransitionChangeGuardSkipsUnchangedEdits()
+{
+    var output = new NodeOutput
+    {
+        Id = "next",
+        TransitionSound = "@click",
+        FadeDurationMs = 700,
+    };
+
+    Assert(
+        !MainWindow.HasOutputTransitionChanges(output, "@click", 700),
+        "Unchanged transition dialog values should not dirty the project.");
+    Assert(
+        MainWindow.HasOutputTransitionChanges(output, "@other", 700),
+        "Changed transition sound should dirty the project.");
+    Assert(
+        MainWindow.HasOutputTransitionChanges(output, "@click", 350),
+        "Changed transition fade duration should dirty the project.");
 }
 
 static void DiagnosticPanelStampTracksVisibleDiagnostics()
