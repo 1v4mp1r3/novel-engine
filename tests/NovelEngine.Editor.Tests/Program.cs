@@ -70,6 +70,7 @@ var tests = new (string Name, Action Run)[]
     ("script literal load suppresses change events", ScriptLiteralLoadSuppressesChangeEvents),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
+    ("node rendered property guard skips hidden graph refresh", NodeRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
     ("node voice binding materializes inherited characters", NodeVoiceBindingMaterializesInheritedCharacters),
     ("node voice binding skips missing inherited character", NodeVoiceBindingSkipsMissingInheritedCharacter),
@@ -2026,6 +2027,74 @@ static void NodePropertyGuardSkipsUnchangedApply()
             node.InheritCharacters,
             "set flag = false"),
         "Changed script should refresh node properties.");
+}
+
+static void NodeRenderedPropertyGuardSkipsHiddenGraphRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var applyBody = ExtractMethodBody(source, "private bool ApplyProperties");
+    var node = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        Title = "Scene",
+        Speaker = "Hero",
+        Text = "Line",
+        Background = "@old",
+        Music = "@theme",
+        InheritCharacters = false,
+        Script = "set flag = true",
+    };
+
+    Assert(
+        MainWindow.HasNodePropertyChanges(
+            node,
+            node.Title,
+            node.Speaker,
+            node.Text,
+            inheritBackground: true,
+            "@new",
+            inheritMusic: false,
+            node.Music,
+            inheritCharacters: true,
+            "set flag = false"),
+        "Hidden node properties should still dirty the project.");
+    Assert(
+        !MainWindow.HasRenderedNodePropertyChanges(
+            node,
+            node.Title,
+            node.Speaker,
+            node.Text),
+        "Hidden node properties should not refresh the graph card.");
+    Assert(
+        MainWindow.HasRenderedNodePropertyChanges(
+            node,
+            "Scene 2",
+            node.Speaker,
+            node.Text),
+        "Changing the visible title should refresh the graph card.");
+    Assert(
+        MainWindow.HasRenderedNodePropertyChanges(
+            node,
+            node.Title,
+            "Guide",
+            node.Text),
+        "Changing the visible speaker should refresh the graph card.");
+    Assert(
+        MainWindow.HasRenderedNodePropertyChanges(
+            node,
+            node.Title,
+            node.Speaker,
+            "Different line"),
+        "Changing the visible preview text should refresh the graph card.");
+    Assert(
+        applyBody.Contains("HasRenderedNodePropertyChanges(", StringComparison.Ordinal)
+            && applyBody.Contains("MarkDirty(refreshGraph);", StringComparison.Ordinal),
+        "Node property apply should skip graph refresh for hidden-only changes.");
 }
 
 static void NodeCharacterEditingPolicyRespectsInheritance()

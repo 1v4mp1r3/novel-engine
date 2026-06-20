@@ -712,6 +712,12 @@ public partial class MainWindow : Window
             inheritCharacters);
         MarkOverrideIfChanged(node, "script", node.Script, script);
 
+        var refreshGraph = HasRenderedNodePropertyChanges(
+            node,
+            title,
+            speaker,
+            text);
+
         node.Title = title;
         node.Speaker = speaker;
         node.Text = text;
@@ -721,7 +727,7 @@ public partial class MainWindow : Window
         node.Music = music;
         node.InheritCharacters = inheritCharacters;
         node.Script = script;
-        MarkDirty();
+        MarkDirty(refreshGraph);
         return true;
     }
 
@@ -861,6 +867,15 @@ public partial class MainWindow : Window
             || !node.Music.Equals(music, StringComparison.Ordinal)
             || node.InheritCharacters != inheritCharacters
             || !node.Script.Equals(script, StringComparison.Ordinal);
+
+    internal static bool HasRenderedNodePropertyChanges(
+        NovelNode node,
+        string title,
+        string speaker,
+        string text) =>
+        !node.Title.Equals(title, StringComparison.Ordinal)
+            || !node.Speaker.Equals(speaker, StringComparison.Ordinal)
+            || !node.Text.Equals(text, StringComparison.Ordinal);
 
     internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp(
         NovelProject project,
