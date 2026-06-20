@@ -819,7 +819,7 @@ public partial class MainWindow : Window
         {
             output.Script = string.Empty;
         }
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         StatusText.Text =
             dialog.ClearImportedScript
                 ? $"Блоки скрипта выхода «{output.Label}» в ноде «{node.Title}»: {output.ScriptBlocks.Count}, текстовый скрипт очищен"
@@ -2892,7 +2892,7 @@ public partial class MainWindow : Window
 
         var reference = AssetReference.Create(asset.Id);
         output!.TransitionSound = reference;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text = $"Звук перехода «{output.Label}»: {reference}";
     }
@@ -5051,8 +5051,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        var refreshGraph = HasRenderedOutputPropertyChanges(
+            output,
+            dialog.OutputLabel);
         dialog.ApplyTo(output);
-        MarkDirty();
+        MarkDirty(refreshGraph);
     }
 
     private bool ValidateOutputDialog(OutputEditorWindow dialog)
@@ -5127,6 +5130,11 @@ public partial class MainWindow : Window
 
         return !VisualScriptBlocksEqual(output.ScriptBlocks, scriptBlocks);
     }
+
+    internal static bool HasRenderedOutputPropertyChanges(
+        NodeOutput output,
+        string label) =>
+        !output.Label.Equals(label, StringComparison.Ordinal);
 
     private static bool VisualScriptBlocksEqual(
         IReadOnlyList<VisualScriptBlock> first,
@@ -5574,7 +5582,7 @@ public partial class MainWindow : Window
 
         output!.TransitionSound = string.Empty;
         output.FadeDurationMs = 350;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
     }
 
@@ -5620,7 +5628,7 @@ public partial class MainWindow : Window
 
         output.TransitionSound = transitionSound;
         output.FadeDurationMs = dialog.FadeDurationMs;
-        MarkDirty();
+        MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
     }
 

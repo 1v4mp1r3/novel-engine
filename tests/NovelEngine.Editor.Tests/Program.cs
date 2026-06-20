@@ -76,6 +76,7 @@ var tests = new (string Name, Action Run)[]
     ("node voice binding skips missing inherited character", NodeVoiceBindingSkipsMissingInheritedCharacter),
     ("node voice binding skips duplicate inherited voice", NodeVoiceBindingSkipsDuplicateInheritedVoice),
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
+    ("output rendered property guard skips hidden graph refresh", OutputRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -2343,6 +2344,65 @@ static void OutputEditorGuardSkipsUnchangedApply()
                 },
             ]),
         "Changed output script blocks should dirty the project.");
+}
+
+static void OutputRenderedPropertyGuardSkipsHiddenGraphRefresh()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var editBody = ExtractMethodBody(source, "private void EditOutput_Click");
+    var scriptBlocksBody = ExtractMethodBody(
+        source,
+        "private void EditOutputScriptBlocks");
+    var resetTransitionBody = ExtractMethodBody(
+        source,
+        "private void ResetSelectedOutputTransition");
+    var editTransitionBody = ExtractMethodBody(source, "private void EditTransition");
+    var bindTransitionBody = ExtractMethodBody(
+        source,
+        "private void BindAssetAsOutputTransitionSound");
+    var output = new NodeOutput
+    {
+        Id = "next",
+        Label = "Дальше",
+        Condition = "score >= 1",
+        Script = "add score 1",
+    };
+
+    Assert(
+        MainWindow.HasOutputEditorChanges(
+            output,
+            output.Label,
+            "score >= 2",
+            output.ConditionExpression,
+            "set visited = true",
+            output.ScriptBlocks),
+        "Hidden output fields should still dirty the project.");
+    Assert(
+        !MainWindow.HasRenderedOutputPropertyChanges(output, output.Label),
+        "Hidden output fields should not refresh the graph port label.");
+    Assert(
+        MainWindow.HasRenderedOutputPropertyChanges(output, "Продолжить"),
+        "Changing the visible output label should refresh the graph port label.");
+    Assert(
+        editBody.Contains("HasRenderedOutputPropertyChanges(", StringComparison.Ordinal)
+            && editBody.Contains("MarkDirty(refreshGraph);", StringComparison.Ordinal),
+        "Output editor apply should refresh the graph only for visible output changes.");
+    Assert(
+        scriptBlocksBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+        "Output script block edits should skip graph refresh.");
+    Assert(
+        resetTransitionBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+        "Resetting output transition should skip graph refresh.");
+    Assert(
+        editTransitionBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+        "Editing output transition should skip graph refresh.");
+    Assert(
+        bindTransitionBody.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
+        "Binding an output transition sound should skip graph refresh.");
 }
 
 static void ProjectExplorerStampTracksVisibleNodeFields()
