@@ -56,6 +56,7 @@ var tests = new (string Name, Action Run)[]
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
+    ("project language syntax spans respect limit", ProjectLanguageSyntaxSpansRespectLimit),
     ("project language suggests context completions", ProjectLanguageSuggestsCompletions),
     ("project language completes noisy scopes quickly", ProjectLanguageCompletesNoisyScopesQuickly),
     ("project language finds nested code scopes", ProjectLanguageFindsScopes),
@@ -2396,6 +2397,37 @@ static void ProjectLanguageSyntaxAndLocations()
     Assert(
         source.Substring(location!.Start, location.Length) == "start",
         "Node declaration location points to the wrong text.");
+}
+
+static void ProjectLanguageSyntaxSpansRespectLimit()
+{
+    const string source = """
+        novel "Syntax"
+        asset bg : image "assets/bg.png"
+        node start : start {
+            background @bg
+            next "End" -> none
+        }
+        """;
+
+    var allSpans = ProjectLanguage.GetSyntaxSpans(source);
+
+    Assert(allSpans.Count > 4, "Test source should produce enough syntax spans.");
+    Assert(
+        !ProjectLanguage.TryGetSyntaxSpans(source, 4, out var limitedSpans),
+        "Limited syntax span collection should report overflow.");
+    Assert(
+        limitedSpans.Count == 0,
+        "Overflowed syntax span collection should not return partial highlights.");
+    Assert(
+        ProjectLanguage.TryGetSyntaxSpans(
+            source,
+            allSpans.Count,
+            out var exactSpans),
+        "Syntax span collection should accept the exact boundary.");
+    Assert(
+        allSpans.SequenceEqual(exactSpans),
+        "Limited syntax span collection changed the highlighted spans.");
 }
 
 static void ProjectLanguageSuggestsCompletions()

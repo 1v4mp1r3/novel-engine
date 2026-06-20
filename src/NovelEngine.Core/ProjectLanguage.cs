@@ -131,9 +131,31 @@ public static class ProjectLanguage
     }
 
     public static IReadOnlyList<ProjectLanguageSyntaxSpan> GetSyntaxSpans(
-        string source)
+        string source) =>
+        GetSyntaxSpansCore(source, null, out _);
+
+    public static bool TryGetSyntaxSpans(
+        string source,
+        int maxSpans,
+        out IReadOnlyList<ProjectLanguageSyntaxSpan> spans)
+    {
+        if (maxSpans < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxSpans));
+        }
+
+        var result = GetSyntaxSpansCore(source, maxSpans, out var exceededLimit);
+        spans = exceededLimit ? [] : result;
+        return !exceededLimit;
+    }
+
+    private static IReadOnlyList<ProjectLanguageSyntaxSpan> GetSyntaxSpansCore(
+        string source,
+        int? maxSpans,
+        out bool exceededLimit)
     {
         var spans = new List<ProjectLanguageSyntaxSpan>();
+        exceededLimit = false;
         var index = 0;
         var declarationExpected = false;
         while (index < source.Length)
@@ -153,11 +175,14 @@ public static class ProjectLanguage
                 {
                     index++;
                 }
-                spans.Add(
-                    new ProjectLanguageSyntaxSpan(
+                if (!AddSpan(
                         start,
                         index - start,
-                        ProjectLanguageSyntaxKind.Comment));
+                        ProjectLanguageSyntaxKind.Comment))
+                {
+                    exceededLimit = true;
+                    return spans;
+                }
                 continue;
             }
             if (current == '"')
@@ -191,11 +216,14 @@ public static class ProjectLanguage
                     }
                     index++;
                 }
-                spans.Add(
-                    new ProjectLanguageSyntaxSpan(
+                if (!AddSpan(
                         start,
                         index - start,
-                        ProjectLanguageSyntaxKind.String));
+                        ProjectLanguageSyntaxKind.String))
+                {
+                    exceededLimit = true;
+                    return spans;
+                }
                 declarationExpected = false;
                 continue;
             }
@@ -206,11 +234,14 @@ public static class ProjectLanguage
                 {
                     index++;
                 }
-                spans.Add(
-                    new ProjectLanguageSyntaxSpan(
+                if (!AddSpan(
                         start,
                         index - start,
-                        ProjectLanguageSyntaxKind.AssetReference));
+                        ProjectLanguageSyntaxKind.AssetReference))
+                {
+                    exceededLimit = true;
+                    return spans;
+                }
                 declarationExpected = false;
                 continue;
             }
@@ -224,11 +255,14 @@ public static class ProjectLanguage
                 {
                     index++;
                 }
-                spans.Add(
-                    new ProjectLanguageSyntaxSpan(
+                if (!AddSpan(
                         start,
                         index - start,
-                        ProjectLanguageSyntaxKind.Number));
+                        ProjectLanguageSyntaxKind.Number))
+                {
+                    exceededLimit = true;
+                    return spans;
+                }
                 declarationExpected = false;
                 continue;
             }
@@ -245,8 +279,11 @@ public static class ProjectLanguage
                     : SyntaxKeywords.Contains(value)
                         ? ProjectLanguageSyntaxKind.Keyword
                         : ProjectLanguageSyntaxKind.Declaration;
-                spans.Add(
-                    new ProjectLanguageSyntaxSpan(start, index - start, kind));
+                if (!AddSpan(start, index - start, kind))
+                {
+                    exceededLimit = true;
+                    return spans;
+                }
                 declarationExpected = value.Equals(
                         "node",
                         StringComparison.OrdinalIgnoreCase)
@@ -261,14 +298,30 @@ public static class ProjectLanguage
                 && source[index + 1] == '>'
                     ? 2
                     : 1;
-            spans.Add(
-                new ProjectLanguageSyntaxSpan(
+            if (!AddSpan(
                     index,
                     punctuationLength,
-                    ProjectLanguageSyntaxKind.Punctuation));
+                    ProjectLanguageSyntaxKind.Punctuation))
+            {
+                exceededLimit = true;
+                return spans;
+            }
             index += punctuationLength;
         }
         return spans;
+
+        bool AddSpan(
+            int start,
+            int length,
+            ProjectLanguageSyntaxKind kind)
+        {
+            spans.Add(new ProjectLanguageSyntaxSpan(start, length, kind));
+            if (maxSpans.HasValue && spans.Count > maxSpans.Value)
+            {
+                return false;
+            }
+            return true;
+        }
     }
 
     public static ProjectLanguageCompletionContext GetCompletions(

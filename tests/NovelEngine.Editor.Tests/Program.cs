@@ -63,6 +63,7 @@ var tests = new (string Name, Action Run)[]
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
+    ("code highlighting skips span overflow repaint", CodeHighlightingSkipsSpanOverflowRepaint),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
     ("script literal load suppresses change events", ScriptLiteralLoadSuppressesChangeEvents),
@@ -1781,6 +1782,41 @@ static void CodeCursorCacheSkipsOversizedLineScans()
     Assert(
         body.Contains("_codeCursorCacheDirty = false;", StringComparison.Ordinal),
         "Oversized code cursor cache should avoid repeated scan attempts until the source changes.");
+}
+
+static void CodeHighlightingSkipsSpanOverflowRepaint()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var applyBody = ExtractMethodBody(
+        source,
+        "private void ApplyCodeHighlighting");
+    var spansBody = ExtractMethodBody(
+        source,
+        "private IReadOnlyList<ProjectLanguageSyntaxSpan> GetCodeSyntaxSpans");
+
+    Assert(
+        source.Contains("private bool _codeSyntaxSpanLimitExceeded;", StringComparison.Ordinal),
+        "Code editor should remember when syntax highlighting exceeds the span limit.");
+    Assert(
+        spansBody.Contains("ProjectLanguage.TryGetSyntaxSpans(", StringComparison.Ordinal),
+        "Code editor should stop syntax span collection at the configured limit.");
+    Assert(
+        spansBody.Contains("CodeEditorPerformancePolicy.MaxHighlightedSyntaxSpans", StringComparison.Ordinal),
+        "Code editor should use the configured syntax span limit.");
+    Assert(
+        applyBody.Contains("if (error is null && _codeSyntaxSpanLimitExceeded)", StringComparison.Ordinal)
+            && applyBody.Contains("return;", StringComparison.Ordinal),
+        "Code editor should skip live repaint when syntax spans overflow without an error.");
+    Assert(
+        applyBody.IndexOf(
+            "if (error is null && _codeSyntaxSpanLimitExceeded)",
+            StringComparison.Ordinal)
+        < applyBody.IndexOf("CodeEditor.ApplySyntax(", StringComparison.Ordinal),
+        "Code editor should skip overflow repaint before touching the RichTextBox document.");
 }
 
 static void VisualScriptFilterKeepsPreviewCache()

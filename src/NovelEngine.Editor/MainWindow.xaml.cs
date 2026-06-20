@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private bool _codeCursorCacheDirty = true;
     private string? _codeSyntaxSource;
     private IReadOnlyList<ProjectLanguageSyntaxSpan> _codeSyntaxSpans = [];
+    private bool _codeSyntaxSpanLimitExceeded;
     private string? _parsedCodeSource;
     private NovelProject? _parsedCodeProject;
     private bool _codeRefreshPending = true;
@@ -1394,6 +1395,10 @@ public partial class MainWindow : Window
         var spans = ShouldApplyFullSyntaxHighlighting(source)
             ? GetCodeSyntaxSpans(source)
             : Array.Empty<ProjectLanguageSyntaxSpan>();
+        if (error is null && _codeSyntaxSpanLimitExceeded)
+        {
+            return;
+        }
         if (error is null
             && spans.Count == 0
             && !CodeEditorPerformancePolicy.ShouldApplyFullSyntaxHighlighting(source.Length))
@@ -1429,8 +1434,11 @@ public partial class MainWindow : Window
         }
 
         _codeSyntaxSource = source;
-        _codeSyntaxSpans = ProjectLanguage.GetSyntaxSpans(source);
-        if (_codeSyntaxSpans.Count > CodeEditorPerformancePolicy.MaxHighlightedSyntaxSpans)
+        _codeSyntaxSpanLimitExceeded = !ProjectLanguage.TryGetSyntaxSpans(
+            source,
+            CodeEditorPerformancePolicy.MaxHighlightedSyntaxSpans,
+            out _codeSyntaxSpans);
+        if (_codeSyntaxSpanLimitExceeded)
         {
             _codeSyntaxSpans = [];
         }
