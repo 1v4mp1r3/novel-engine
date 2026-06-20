@@ -68,6 +68,7 @@ var tests = new (string Name, Action Run)[]
     ("node character editing policy respects inheritance", NodeCharacterEditingPolicyRespectsInheritance),
     ("node voice binding materializes inherited characters", NodeVoiceBindingMaterializesInheritedCharacters),
     ("node voice binding skips missing inherited character", NodeVoiceBindingSkipsMissingInheritedCharacter),
+    ("node voice binding skips duplicate inherited voice", NodeVoiceBindingSkipsDuplicateInheritedVoice),
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
@@ -1930,7 +1931,9 @@ static void NodeVoiceBindingMaterializesInheritedCharacters()
         "hero",
         inherited);
 
-    Assert(bound, "Voice binding did not accept an inherited character.");
+    Assert(
+        bound == NodeVoiceBindingResult.Changed,
+        "Voice binding did not accept an inherited character.");
     Assert(!node.InheritCharacters, "Voice binding did not materialize inherited characters.");
     Assert(node.Characters.Count == 1, "Voice binding kept stale local characters.");
     Assert(
@@ -1981,12 +1984,61 @@ static void NodeVoiceBindingSkipsMissingInheritedCharacter()
         "missing",
         inherited);
 
-    Assert(!bound, "Voice binding accepted a missing inherited character.");
+    Assert(
+        bound == NodeVoiceBindingResult.Unavailable,
+        "Voice binding accepted a missing inherited character.");
     Assert(node.InheritCharacters, "Failed voice binding changed character inheritance.");
     Assert(node.Characters.Count == 1, "Failed voice binding replaced local characters.");
     Assert(node.Characters[0].Id == "local", "Failed voice binding changed the local character.");
     Assert(node.Characters[0].GetVoiceSounds().Count == 0, "Failed voice binding added a voice reference.");
     Assert(node.PropertyOverrides.Count == 0, "Failed voice binding marked type-default overrides.");
+}
+
+static void NodeVoiceBindingSkipsDuplicateInheritedVoice()
+{
+    var voiceReference = AssetReference.Create("hero_voice");
+    var node = new NovelNode
+    {
+        Id = "scene",
+        Kind = NodeKind.Scene,
+        UsesTypeDefaults = true,
+        InheritCharacters = true,
+    };
+    node.Characters.Add(new CharacterPlacement
+    {
+        Id = "local",
+        Name = "Local",
+    });
+    var inherited = new[]
+    {
+        new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+            VoiceSounds = { voiceReference },
+        },
+    };
+    var asset = new NovelAsset
+    {
+        Id = "hero_voice",
+        Kind = AssetKind.Audio,
+        Folder = "voices",
+        Path = "files/voices/hero.wav",
+    };
+
+    var bound = MainWindow.TryBindVoiceAssetToNodeCharacter(
+        node,
+        asset,
+        "hero",
+        inherited);
+
+    Assert(
+        bound == NodeVoiceBindingResult.Unchanged,
+        "Voice binding changed a character that already had the voice.");
+    Assert(node.InheritCharacters, "Duplicate voice binding changed character inheritance.");
+    Assert(node.Characters.Count == 1, "Duplicate voice binding replaced local characters.");
+    Assert(node.Characters[0].Id == "local", "Duplicate voice binding changed the local character.");
+    Assert(node.PropertyOverrides.Count == 0, "Duplicate voice binding marked type-default overrides.");
 }
 
 static void OutputEditorGuardSkipsUnchangedApply()

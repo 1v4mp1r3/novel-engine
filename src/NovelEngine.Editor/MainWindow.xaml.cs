@@ -12,6 +12,13 @@ using NovelEngine.Core;
 
 namespace NovelEngine.Editor;
 
+internal enum NodeVoiceBindingResult
+{
+    Unavailable,
+    Unchanged,
+    Changed,
+}
+
 public partial class MainWindow : Window
 {
     private const int MaxProjectHistoryEntries = 100;
@@ -2905,13 +2912,28 @@ public partial class MainWindow : Window
         var effectiveCharacters = node.Kind != NodeKind.Start && node.InheritCharacters
             ? GetEffectiveCharacters(node)
             : null;
-        if (!TryBindVoiceAssetToNodeCharacter(
-                node,
-                asset,
-                characterId,
-                effectiveCharacters))
+        var result = TryBindVoiceAssetToNodeCharacter(
+            node,
+            asset,
+            characterId,
+            effectiveCharacters);
+        if (result == NodeVoiceBindingResult.Unavailable)
         {
             StatusText.Text = "Персонаж для привязки voice-блипа не найден";
+            return;
+        }
+
+        if (result == NodeVoiceBindingResult.Unchanged)
+        {
+            var unchangedCharacter = node.Characters.FirstOrDefault(
+                    candidate => candidate.Id == characterId)
+                ?? effectiveCharacters?.FirstOrDefault(
+                    candidate => candidate.Id == characterId);
+            var label = unchangedCharacter is null
+                ? characterId
+                : CharacterLabel(unchangedCharacter);
+            StatusText.Text =
+                $"Voice-блип уже привязан к «{label}»";
             return;
         }
 
@@ -2922,7 +2944,7 @@ public partial class MainWindow : Window
             $"Voice-блипы персонажа «{CharacterLabel(character)}»: {character.VoiceSounds.Count}";
     }
 
-    internal static bool TryBindVoiceAssetToNodeCharacter(
+    internal static NodeVoiceBindingResult TryBindVoiceAssetToNodeCharacter(
         NovelNode node,
         NovelAsset asset,
         string characterId,
@@ -2930,9 +2952,10 @@ public partial class MainWindow : Window
     {
         if (asset.Kind != AssetKind.Audio)
         {
-            return false;
+            return NodeVoiceBindingResult.Unavailable;
         }
 
+        var reference = AssetReference.Create(asset.Id);
         CharacterPlacement? character;
         if (node.Kind != NodeKind.Start && node.InheritCharacters)
         {
@@ -2943,7 +2966,13 @@ public partial class MainWindow : Window
                 candidate => candidate.Id == characterId);
             if (character is null)
             {
-                return false;
+                return NodeVoiceBindingResult.Unavailable;
+            }
+
+            var inheritedVoices = CharacterVoiceReferences(character);
+            if (inheritedVoices.Contains(reference, StringComparer.OrdinalIgnoreCase))
+            {
+                return NodeVoiceBindingResult.Unchanged;
             }
 
             node.Characters.Clear();
@@ -2960,22 +2989,26 @@ public partial class MainWindow : Window
                 candidate => candidate.Id == characterId);
             if (character is null)
             {
-                return false;
+                return NodeVoiceBindingResult.Unavailable;
             }
         }
 
-        var reference = AssetReference.Create(asset.Id);
         var voices = CharacterVoiceReferences(character);
         if (!voices.Contains(reference, StringComparer.OrdinalIgnoreCase))
         {
             voices.Add(reference);
         }
+        else
+        {
+            return NodeVoiceBindingResult.Unchanged;
+        }
+
         character.SetVoiceSounds(voices);
         if (node.UsesTypeDefaults)
         {
             node.PropertyOverrides.Add("characters");
         }
-        return true;
+        return NodeVoiceBindingResult.Changed;
     }
 
     private void BindVoiceAssetToLibraryCharacter(
