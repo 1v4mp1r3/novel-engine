@@ -277,11 +277,8 @@ public static class ProjectLanguage
     {
         caretOffset = Math.Clamp(caretOffset, 0, source.Length);
         var spans = GetSyntaxSpans(source);
-        if (spans.Any(
-            span => span.Kind is ProjectLanguageSyntaxKind.String
-                or ProjectLanguageSyntaxKind.Comment
-                && caretOffset > span.Start
-                && caretOffset <= span.Start + span.Length))
+        var ignoredSpans = GetIgnoredSyntaxSpans(spans);
+        if (IsInsideIgnoredSyntax(caretOffset, ignoredSpans))
         {
             return new ProjectLanguageCompletionContext(caretOffset, 0, []);
         }
@@ -375,11 +372,11 @@ public static class ProjectLanguage
         {
             AddValues(candidates, ["true", "false"], "Логическое значение");
         }
-        else if (GetBraceDepth(source, replacementStart, spans) == 0)
+        else if (GetBraceDepth(source, replacementStart, ignoredSpans) == 0)
         {
             candidates.AddRange(TopLevelCompletions);
         }
-        else if (IsInsideCharacterScope(source, replacementStart))
+        else if (IsInsideCharacterScope(source, replacementStart, ignoredSpans))
         {
             candidates.AddRange(CharacterBodyCompletions);
         }
@@ -1043,28 +1040,96 @@ public static class ProjectLanguage
     private static bool IsSyntaxIdentifierPart(char value) =>
         value is '_' or '-' || char.IsLetterOrDigit(value);
 
-    private static bool IsInsideCharacterScope(string source, int caretOffset)
-    {
-        var scope = GetScopeSpans(source)
+    private static IReadOnlyList<ProjectLanguageSyntaxSpan> GetIgnoredSyntaxSpans(
+        IReadOnlyList<ProjectLanguageSyntaxSpan> spans) =>
+        spans
             .Where(
-                candidate => candidate.OpenBraceOffset < caretOffset
-                    && candidate.CloseBraceOffset >= caretOffset)
-            .OrderByDescending(candidate => candidate.OpenBraceOffset)
-            .FirstOrDefault();
-        if (scope is null)
+                span => span.Kind is ProjectLanguageSyntaxKind.String
+                    or ProjectLanguageSyntaxKind.Comment)
+            .OrderBy(span => span.Start)
+            .ToList();
+
+    private static bool IsInsideIgnoredSyntax(
+        int offset,
+        IReadOnlyList<ProjectLanguageSyntaxSpan> ignoredSpans)
+    {
+        foreach (var span in ignoredSpans)
+        {
+            if (offset <= span.Start)
+            {
+                return false;
+            }
+            if (offset <= span.Start + span.Length)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsInsideCharacterScope(
+        string source,
+        int caretOffset,
+        IReadOnlyList<ProjectLanguageSyntaxSpan> ignoredSpans)
+    {
+        var openBraceOffset = FindCurrentScopeOpening(
+            source,
+            caretOffset,
+            ignoredSpans);
+        if (!openBraceOffset.HasValue)
         {
             return false;
         }
 
         var lineStart = source.LastIndexOf(
             '\n',
-            Math.Max(0, scope.OpenBraceOffset - 1));
+            Math.Max(0, openBraceOffset.Value - 1));
         lineStart = lineStart < 0 ? 0 : lineStart + 1;
-        var header = source[lineStart..scope.OpenBraceOffset];
+        var header = source[lineStart..openBraceOffset.Value];
         return Regex.IsMatch(
             header,
             @"^[ \t]*character[ \t]+[\p{L}_][\p{L}\p{N}_-]*[ \t]*$",
             RegexOptions.CultureInvariant);
+    }
+
+    private static int? FindCurrentScopeOpening(
+        string source,
+        int end,
+        IReadOnlyList<ProjectLanguageSyntaxSpan> ignoredSpans)
+    {
+        var stack = new Stack<int>();
+        var ignoredIndex = 0;
+        for (var index = 0; index < end; index++)
+        {
+            while (ignoredIndex < ignoredSpans.Count
+                && index >= ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
+            {
+                ignoredIndex++;
+            }
+            if (ignoredIndex < ignoredSpans.Count
+                && index >= ignoredSpans[ignoredIndex].Start
+                && index < ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
+            {
+                index = Math.Min(
+                    end,
+                    ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
+                    - 1;
+                continue;
+            }
+
+            if (source[index] == '{')
+            {
+                stack.Push(index);
+            }
+            else if (source[index] == '}')
+            {
+                _ = stack.TryPop(out _);
+            }
+        }
+        return stack.TryPeek(out var opening) ? opening : null;
     }
 
     private static readonly IReadOnlyList<ProjectLanguageCompletion>
@@ -1251,19 +1316,28 @@ public static class ProjectLanguage
     private static int GetBraceDepth(
         string source,
         int end,
-        IReadOnlyList<ProjectLanguageSyntaxSpan> spans)
+        IReadOnlyList<ProjectLanguageSyntaxSpan> ignoredSpans)
     {
-        var ignored = spans
-            .Where(
-                span => span.Kind is ProjectLanguageSyntaxKind.String
-                    or ProjectLanguageSyntaxKind.Comment)
-            .ToList();
         var depth = 0;
+        var ignoredIndex = 0;
         for (var index = 0; index < end; index++)
         {
-            if (ignored.Any(
-                span => index >= span.Start && index < span.Start + span.Length))
+            while (ignoredIndex < ignoredSpans.Count
+                && index >= ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
             {
+                ignoredIndex++;
+            }
+            if (ignoredIndex < ignoredSpans.Count
+                && index >= ignoredSpans[ignoredIndex].Start
+                && index < ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
+            {
+                index = Math.Min(
+                    end,
+                    ignoredSpans[ignoredIndex].Start
+                    + ignoredSpans[ignoredIndex].Length)
+                    - 1;
                 continue;
             }
             depth += source[index] switch

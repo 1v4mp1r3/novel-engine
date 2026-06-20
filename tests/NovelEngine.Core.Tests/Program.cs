@@ -56,6 +56,7 @@ var tests = new (string Name, Action Run)[]
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
     ("project language suggests context completions", ProjectLanguageSuggestsCompletions),
+    ("project language completes noisy scopes quickly", ProjectLanguageCompletesNoisyScopesQuickly),
     ("project language finds nested code scopes", ProjectLanguageFindsScopes),
     ("build compiler preserves visual script blocks", BuildCompilerPreservesVisualScriptBlocks),
     ("build compiler emits runnable package", BuildCompilerEmitsPackage),
@@ -2356,6 +2357,35 @@ static void ProjectLanguageSuggestsCompletions()
         characterCompletions.Items.Any(
             item => item.InsertText == "placement (960, 500)"),
         "Character transform completion was not suggested.");
+}
+
+static void ProjectLanguageCompletesNoisyScopesQuickly()
+{
+    var builder = new System.Text.StringBuilder();
+    builder.AppendLine("novel \"Noisy Completions\"");
+    for (var index = 0; index < 1_000; index++)
+    {
+        builder.AppendLine($"# ignored {{ comment scope {index} }}");
+        builder.AppendLine(
+            $"asset bg_{index} : image \"files/backgrounds/{{ignored-{index}}}.png\"");
+    }
+    builder.AppendLine("node start : scene {");
+    builder.AppendLine("    te");
+    builder.AppendLine("}");
+
+    var source = builder.ToString();
+    var caret = source.LastIndexOf("te", StringComparison.Ordinal) + 2;
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    var completions = ProjectLanguage.GetCompletions(source, caret);
+    stopwatch.Stop();
+
+    Assert(
+        completions.Items.Any(item => item.InsertText == "text \"\""),
+        "Node body text completion was not suggested in a noisy document.");
+    Assert(
+        stopwatch.ElapsedMilliseconds < 1_500,
+        $"Noisy DSL completion is too slow: {stopwatch.ElapsedMilliseconds}ms.");
 }
 
 static void ProjectLanguageFindsScopes()
