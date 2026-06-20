@@ -812,6 +812,12 @@ public sealed class GraphSurface : FrameworkElement
 
     private void ApplyInheritance(NovelNode node, InheritanceResource resource)
     {
+        if (NodeInheritsResource(node, resource))
+        {
+            SelectNode(node.Id);
+            return;
+        }
+
         switch (resource)
         {
             case InheritanceResource.Music:

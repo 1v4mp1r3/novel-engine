@@ -87,6 +87,7 @@ var tests = new (string Name, Action Run)[]
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
+    ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
     ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
     ("graph connection curve bounds include control points", GraphConnectionCurveBoundsIncludeControlPoints),
     ("graph world hit areas ignore viewport offset", GraphWorldHitAreasIgnoreViewportOffset),
@@ -2802,6 +2803,32 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void GraphInheritanceMenuSkipsUnchangedApply()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var body = ExtractMethodBody(source, "private void ApplyInheritance");
+    var noChangeIndex = body.IndexOf(
+        "if (NodeInheritsResource(node, resource))",
+        StringComparison.Ordinal);
+    var projectChangedIndex = body.IndexOf(
+        "ProjectChanged?.Invoke(this, EventArgs.Empty);",
+        StringComparison.Ordinal);
+
+    Assert(
+        noChangeIndex >= 0,
+        "Inheritance menu should guard already inherited resources.");
+    Assert(
+        body.Contains("SelectNode(node.Id);", StringComparison.Ordinal),
+        "Unchanged inheritance should still keep the context node selected.");
+    Assert(
+        projectChangedIndex >= 0 && noChangeIndex < projectChangedIndex,
+        "Unchanged inheritance should return before dirtying the project.");
 }
 
 static void DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges()
