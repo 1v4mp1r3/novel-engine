@@ -779,11 +779,14 @@ public sealed class NovelProject
         }
 
         Nodes.Remove(node);
-        foreach (var output in Nodes.SelectMany(candidate => candidate.Outputs))
+        foreach (var candidate in Nodes)
         {
-            if (output.TargetNodeId == nodeId)
+            foreach (var output in candidate.Outputs)
             {
-                output.TargetNodeId = null;
+                if (output.TargetNodeId == nodeId)
+                {
+                    output.TargetNodeId = null;
+                }
             }
         }
 
@@ -991,12 +994,16 @@ public sealed class NovelProject
             }
         }
 
-        foreach (var output in Nodes.SelectMany(node => node.Outputs))
+        foreach (var node in Nodes)
         {
-            if (output.TargetNodeId is not null && !nodeIds.Contains(output.TargetNodeId))
+            foreach (var output in node.Outputs)
             {
-                throw new InvalidDataException(
-                    $"Выход «{output.Label}» ссылается на отсутствующую ноду.");
+                if (output.TargetNodeId is not null
+                    && !nodeIds.Contains(output.TargetNodeId))
+                {
+                    throw new InvalidDataException(
+                        $"Выход «{output.Label}» ссылается на отсутствующую ноду.");
+                }
             }
         }
 

@@ -1949,10 +1949,19 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
     var usagesBody = ExtractMethodBody(
         source,
         "public IReadOnlyList<AssetUsage> FindAssetUsages");
+    var removeNodeBody = ExtractMethodBody(
+        source,
+        "public bool RemoveNode");
+    var validateBody = ExtractMethodBody(
+        source,
+        "public void Validate");
 
     Assert(
         !source.Contains("private IEnumerable<string> EnumerateAssetValues", StringComparison.Ordinal),
         "Asset reference lookups should not allocate a string-only enumerable wrapper.");
+    Assert(
+        !source.Contains("Nodes.SelectMany", StringComparison.Ordinal),
+        "Core graph paths should not allocate SelectMany iterator chains over node outputs.");
     Assert(
         countBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
             && !countBody.Contains(".Count(", StringComparison.Ordinal),
@@ -1967,6 +1976,14 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
             && !usagesBody.Contains(".Where(", StringComparison.Ordinal)
             && !usagesBody.Contains(".Select(", StringComparison.Ordinal),
         "Asset usage lookup should build results in one direct pass.");
+    Assert(
+        removeNodeBody.Contains("foreach (var candidate in Nodes)", StringComparison.Ordinal)
+            && removeNodeBody.Contains("foreach (var output in candidate.Outputs)", StringComparison.Ordinal),
+        "Node removal should disconnect outputs through direct nested loops.");
+    Assert(
+        validateBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal)
+            && validateBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal),
+        "Project validation should inspect output targets through direct nested loops.");
 }
 
 static void CharacterVoiceSoundsNormalizeWithoutLinq()
