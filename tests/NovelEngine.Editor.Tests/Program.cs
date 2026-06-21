@@ -1056,6 +1056,11 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
             && listBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
         "Asset list runtime stamp should use catalog counts and revision.");
     Assert(
+        listBody.Contains("AssetsGrid.SelectedItem = assetViews", StringComparison.Ordinal)
+            && !listBody.Contains("AssetsGrid.Items\r\n                .OfType<AssetView>()", StringComparison.Ordinal)
+            && !listBody.Contains("AssetsGrid.Items\n                .OfType<AssetView>()", StringComparison.Ordinal),
+        "Asset list should restore selection from freshly built views instead of walking grid items.");
+    Assert(
         folderBody.Contains("_project.AssetFolders.Count", StringComparison.Ordinal)
             && folderBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
             && folderBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),

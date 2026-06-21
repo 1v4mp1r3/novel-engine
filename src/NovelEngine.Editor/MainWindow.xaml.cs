@@ -2051,8 +2051,7 @@ public partial class MainWindow : Window
             : $"Найдено {assetViews.Count} из {filtered.FolderAssetCount}";
         if (selectedId is not null)
         {
-            AssetsGrid.SelectedItem = AssetsGrid.Items
-                .OfType<AssetView>()
+            AssetsGrid.SelectedItem = assetViews
                 .FirstOrDefault(
                     view => view.Id.Equals(
                         selectedId,
