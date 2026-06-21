@@ -82,6 +82,8 @@ public partial class MainWindow : Window
         _nodeAssetFolderOptionsCache = [];
     private readonly Dictionary<NodeAssetChoiceCacheKey, List<NodeAssetChoice>>
         _nodeAssetChoicesCache = [];
+    private readonly Dictionary<string, NovelAsset> _nodeAssetByIdCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private bool _nodeAssetPickerCachesDirty = true;
     private ProjectDiagnosticReport? _projectDiagnosticsCache;
     private DiagnosticPanelStamp? _diagnosticsPanelStamp;
@@ -1768,7 +1770,12 @@ public partial class MainWindow : Window
         {
             return null;
         }
-        return _project.FindAsset(reference[1..]);
+
+        EnsureAssetPickerCachesCurrent();
+        var assetId = reference[1..];
+        return _nodeAssetByIdCache.TryGetValue(assetId, out var asset)
+            ? asset
+            : null;
     }
 
     private void RefreshAssetChoices(
@@ -1831,6 +1838,11 @@ public partial class MainWindow : Window
 
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
+        _nodeAssetByIdCache.Clear();
+        foreach (var asset in _project.Assets)
+        {
+            _nodeAssetByIdCache[asset.Id] = asset;
+        }
         _nodeAssetPickerCachesDirty = false;
     }
 
@@ -1838,6 +1850,7 @@ public partial class MainWindow : Window
     {
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
+        _nodeAssetByIdCache.Clear();
         _nodeAssetPickerCachesDirty = true;
         unchecked
         {

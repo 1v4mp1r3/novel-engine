@@ -2885,6 +2885,7 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
         "internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp");
     var ensureBody = ExtractMethodBody(source, "private void EnsureAssetPickerCachesCurrent");
     var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
+    var resolveBody = ExtractMethodBody(source, "private NovelAsset? ResolveAssetChoice");
     var refreshAssetsBody = ExtractMethodBody(source, "private void RefreshAssets");
     var catalogChangeBody = ExtractMethodBody(
         source,
@@ -2907,8 +2908,19 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
         !ensureBody.Contains("CreateAssetPickerCacheStamp", StringComparison.Ordinal),
         "Node asset picker cache validation should not rescan assets during property refresh.");
     Assert(
+        ensureBody.Contains("_nodeAssetByIdCache.Clear();", StringComparison.Ordinal)
+            && ensureBody.Contains("_nodeAssetByIdCache[asset.Id] = asset;", StringComparison.Ordinal),
+        "Node asset picker cache should build an id lookup with the other picker caches.");
+    Assert(
+        resolveBody.Contains("_nodeAssetByIdCache.TryGetValue", StringComparison.Ordinal)
+            && !resolveBody.Contains("_project.FindAsset", StringComparison.Ordinal),
+        "Node asset picker reference resolution should use the cached id lookup.");
+    Assert(
         clearBody.Contains("_nodePropertyPanelStamp = null;", StringComparison.Ordinal),
         "Asset picker cache invalidation should force the property panel to rebuild.");
+    Assert(
+        clearBody.Contains("_nodeAssetByIdCache.Clear();", StringComparison.Ordinal),
+        "Asset picker cache invalidation should clear the id lookup.");
     Assert(
         clearIndex >= 0 && markIndex > clearIndex && refreshIndex > markIndex,
         "Editor asset catalog changes should invalidate picker caches before dirty refreshes.");
