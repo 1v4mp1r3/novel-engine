@@ -3237,7 +3237,10 @@ public partial class MainWindow : Window
 
     private void RefreshAssetUsageAfterBinding()
     {
-        RefreshAssets(syncFromDisk: false);
+        _assetUsageCountCache = null;
+        _assetListStamp = null;
+        _assetPreviewStamp = null;
+        RefreshAssetList();
     }
 
     private static bool IsInAssetFolder(NovelAsset asset, string folder)

@@ -1223,8 +1223,12 @@ static void AssetBindingRefreshAvoidsDuplicateDirtyRefreshes()
     var body = ExtractMethodBody(source, "private void RefreshAssetUsageAfterBinding");
 
     Assert(
-        body.Contains("RefreshAssets(syncFromDisk: false);", StringComparison.Ordinal),
-        "Asset binding should still refresh asset usage state.");
+        body.Contains("_assetUsageCountCache = null;", StringComparison.Ordinal)
+            && body.Contains("RefreshAssetList();", StringComparison.Ordinal),
+        "Asset binding should refresh asset usage state through the asset list.");
+    Assert(
+        !body.Contains("RefreshAssets(", StringComparison.Ordinal),
+        "Asset binding should not rebuild folders or sync files when only usage counts changed.");
     Assert(
         !body.Contains("Graph.RefreshGraph(", StringComparison.Ordinal),
         "Asset binding post-refresh should not duplicate MarkDirty graph refresh.");
