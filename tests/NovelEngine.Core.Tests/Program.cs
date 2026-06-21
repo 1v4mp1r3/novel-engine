@@ -44,6 +44,7 @@ var tests = new (string Name, Action Run)[]
     ("character transforms and voice survive code and JSON", CharacterTransformsRoundTrip),
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
+    ("asset reference lookups avoid linq pipelines", AssetReferenceLookupsAvoidLinqPipelines),
     ("removed voice assets are cleared from characters", RemovedVoiceAssetsAreClearedFromCharacters),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
     ("voice sound picker supports multiple blips", VoiceSoundPickerSupportsMultipleBlips),
@@ -1885,6 +1886,42 @@ static void MainMenuAndVoiceAssetReferences()
         scene.Characters.Single().VoiceSounds.Count(
             value => value.Equals("@voice_main", StringComparison.OrdinalIgnoreCase)) == 1,
         "Replacing voice assets with the same target should not store duplicates.");
+}
+
+static void AssetReferenceLookupsAvoidLinqPipelines()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var countBody = ExtractMethodBody(
+        source,
+        "public int CountAssetReferences");
+    var batchBody = ExtractMethodBody(
+        source,
+        "public IReadOnlyDictionary<string, int> CountAssetReferencesById");
+    var usagesBody = ExtractMethodBody(
+        source,
+        "public IReadOnlyList<AssetUsage> FindAssetUsages");
+
+    Assert(
+        !source.Contains("private IEnumerable<string> EnumerateAssetValues", StringComparison.Ordinal),
+        "Asset reference lookups should not allocate a string-only enumerable wrapper.");
+    Assert(
+        countBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
+            && !countBody.Contains(".Count(", StringComparison.Ordinal),
+        "Single asset reference counts should use a direct typed-value loop.");
+    Assert(
+        batchBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
+            && batchBody.Contains("AssetReference.TryGetId(value.Value", StringComparison.Ordinal),
+        "Batch asset reference counts should reuse typed values directly.");
+    Assert(
+        usagesBody.Contains("var usages = new List<AssetUsage>();", StringComparison.Ordinal)
+            && usagesBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
+            && !usagesBody.Contains(".Where(", StringComparison.Ordinal)
+            && !usagesBody.Contains(".Select(", StringComparison.Ordinal),
+        "Asset usage lookup should build results in one direct pass.");
 }
 
 static void RemovedVoiceAssetsAreClearedFromCharacters()

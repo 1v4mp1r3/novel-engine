@@ -332,16 +332,23 @@ public sealed class NovelProject
     public int CountAssetReferences(string assetId)
     {
         var reference = AssetReference.Create(assetId);
-        return EnumerateAssetValues().Count(
-            value => value.Equals(reference, StringComparison.OrdinalIgnoreCase));
+        var count = 0;
+        foreach (var value in EnumerateTypedAssetValues())
+        {
+            if (value.Value.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
     public IReadOnlyDictionary<string, int> CountAssetReferencesById()
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in EnumerateAssetValues())
+        foreach (var value in EnumerateTypedAssetValues())
         {
-            if (!AssetReference.TryGetId(value, out var id))
+            if (!AssetReference.TryGetId(value.Value, out var id))
             {
                 continue;
             }
@@ -354,16 +361,21 @@ public sealed class NovelProject
     public IReadOnlyList<AssetUsage> FindAssetUsages(string assetId)
     {
         var reference = AssetReference.Create(assetId);
-        return EnumerateTypedAssetValues()
-            .Where(value => value.Value.Equals(
-                reference,
-                StringComparison.OrdinalIgnoreCase))
-            .Select(value => new AssetUsage(
+        var usages = new List<AssetUsage>();
+        foreach (var value in EnumerateTypedAssetValues())
+        {
+            if (!value.Value.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            usages.Add(new AssetUsage(
                 value.Owner,
                 value.ExpectedKind,
                 value.Value,
-                value.NodeId))
-            .ToList();
+                value.NodeId));
+        }
+        return usages;
     }
 
     public void ReplaceAssetReference(string assetId, string replacement)
@@ -1290,9 +1302,6 @@ public sealed class NovelProject
             node.PropertyOverrides.Add("characters");
         }
     }
-
-    private IEnumerable<string> EnumerateAssetValues() =>
-        EnumerateTypedAssetValues().Select(value => value.Value);
 
     private IEnumerable<AssetValue> EnumerateTypedAssetValues()
     {
