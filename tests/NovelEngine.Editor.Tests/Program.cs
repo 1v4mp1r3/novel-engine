@@ -53,6 +53,7 @@ var tests = new (string Name, Action Run)[]
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("preview asset resolution caches references", PreviewAssetResolutionCachesReferences),
+    ("editor asset preview windows cache resolved references", EditorAssetPreviewWindowsCacheResolvedReferences),
     ("output editor copy is output neutral", OutputEditorCopyIsOutputNeutral),
     ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
@@ -1425,6 +1426,48 @@ static void PreviewAssetResolutionCachesReferences()
     Assert(
         body.Contains("_resolvedAssetCache[path] = resolved;", StringComparison.Ordinal),
         "Preview asset resolution should cache resolved paths.");
+}
+
+static void EditorAssetPreviewWindowsCacheResolvedReferences()
+{
+    AssertResolvedAssetCachePolicy(
+        Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Editor",
+            "MainMenuEditorWindow.cs"),
+        "Main menu editor");
+    AssertResolvedAssetCachePolicy(
+        Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Editor",
+            "SceneEditorWindow.xaml.cs"),
+        "Scene editor");
+}
+
+static void AssertResolvedAssetCachePolicy(string path, string owner)
+{
+    var source = File.ReadAllText(path);
+    var body = ExtractMethodBody(source, "private string ResolveAsset");
+    var cacheIndex = body.IndexOf(
+        "_resolvedAssetCache.TryGetValue(path, out var cached)",
+        StringComparison.Ordinal);
+    var resolveIndex = body.IndexOf(
+        "_project.ResolveAssetReference(path)",
+        StringComparison.Ordinal);
+
+    Assert(
+        source.Contains(
+            "BoundedCache<string, string> _resolvedAssetCache",
+            StringComparison.Ordinal),
+        $"{owner} should keep a bounded resolved asset cache.");
+    Assert(
+        cacheIndex >= 0 && resolveIndex > cacheIndex,
+        $"{owner} should check the cache before scanning project assets.");
+    Assert(
+        body.Contains("_resolvedAssetCache.Set(path, resolved);", StringComparison.Ordinal),
+        $"{owner} should cache resolved paths.");
 }
 
 static void OutputEditorCopyIsOutputNeutral()

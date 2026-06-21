@@ -17,10 +17,13 @@ public sealed class MainMenuEditorWindow : Window
     private const double StageHeight = 540;
     private const double DragUpdateEpsilon = 0.5;
     private const int MaxCachedMainMenuBitmaps = 48;
+    private const int MaxCachedResolvedAssetPaths = 128;
 
     private readonly NovelProject _project;
     private readonly string _assetDirectory;
     private readonly MainMenuDesign _design;
+    private readonly BoundedCache<string, string> _resolvedAssetCache =
+        new(MaxCachedResolvedAssetPaths, StringComparer.OrdinalIgnoreCase);
     private readonly BoundedCache<string, ImageSource?> _bitmapCache =
         new(MaxCachedMainMenuBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly Canvas _stage = new()
@@ -748,12 +751,22 @@ public sealed class MainMenuEditorWindow : Window
 
     private string ResolveAsset(string path)
     {
-        path = _project.ResolveAssetReference(path);
-        if (path.Length == 0 || Path.IsPathRooted(path))
+        if (path.Length == 0)
         {
-            return path;
+            return string.Empty;
         }
-        return Path.GetFullPath(Path.Combine(_assetDirectory, path));
+        if (_resolvedAssetCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var resolved = _project.ResolveAssetReference(path);
+        if (resolved.Length > 0 && !Path.IsPathRooted(resolved))
+        {
+            resolved = Path.GetFullPath(Path.Combine(_assetDirectory, resolved));
+        }
+        _resolvedAssetCache.Set(path, resolved);
+        return resolved;
     }
 
     private ImageSource? LoadBitmapCached(string path)

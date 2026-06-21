@@ -18,9 +18,12 @@ public partial class SceneEditorWindow : Window
     private const double ScaleUpdateEpsilon = 0.001;
     private const double RotationUpdateEpsilon = 0.1;
     private const int MaxCachedSceneBitmaps = 64;
+    private const int MaxCachedResolvedAssetPaths = 128;
 
     private readonly NovelProject _project;
     private readonly string _assetDirectory;
+    private readonly BoundedCache<string, string> _resolvedAssetCache =
+        new(MaxCachedResolvedAssetPaths, StringComparer.OrdinalIgnoreCase);
     private readonly BoundedCache<string, BitmapImage?> _bitmapCache =
         new(MaxCachedSceneBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CharacterVisual> _visuals = [];
@@ -676,12 +679,22 @@ public partial class SceneEditorWindow : Window
 
     private string ResolveAsset(string path)
     {
-        path = _project.ResolveAssetReference(path);
-        if (path.Length == 0 || IOPath.IsPathRooted(path))
+        if (path.Length == 0)
         {
-            return path;
+            return string.Empty;
         }
-        return IOPath.GetFullPath(IOPath.Combine(_assetDirectory, path));
+        if (_resolvedAssetCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var resolved = _project.ResolveAssetReference(path);
+        if (resolved.Length > 0 && !IOPath.IsPathRooted(resolved))
+        {
+            resolved = IOPath.GetFullPath(IOPath.Combine(_assetDirectory, resolved));
+        }
+        _resolvedAssetCache.Set(path, resolved);
+        return resolved;
     }
 
     private BitmapImage? LoadBitmapCached(string path)
