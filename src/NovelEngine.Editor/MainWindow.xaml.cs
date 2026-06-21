@@ -4396,7 +4396,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null)
         {
             return;
@@ -4617,7 +4617,7 @@ public partial class MainWindow : Window
 
     private void SaveCharacterToLibrary_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (!CanEditSelectedNodeCharacters(node))
         {
             return;
@@ -4645,7 +4645,7 @@ public partial class MainWindow : Window
 
     private void EditCharacter_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (!CanEditSelectedNodeCharacters(node))
         {
             return;
@@ -4795,7 +4795,7 @@ public partial class MainWindow : Window
 
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var character = SelectedCharacter();
         if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
@@ -4811,7 +4811,7 @@ public partial class MainWindow : Window
 
     private void DuplicateCharacter_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var character = SelectedCharacter();
         if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
@@ -4846,7 +4846,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var character = SelectedCharacter();
         if (!CanEditSelectedNodeCharacters(node) || character is null)
         {
@@ -4865,7 +4865,7 @@ public partial class MainWindow : Window
 
     private void SetSelectedCharacterPosition(CharacterPosition position)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var character = SelectedCharacter();
         if (!CanEditSelectedNodeCharacters(node)
             || character is null
@@ -4905,7 +4905,7 @@ public partial class MainWindow : Window
         object sender,
         ContextMenuEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var canEdit = CanEditSelectedNodeCharacters(node);
         var character = SelectedCharacter();
         var selectedIndex = CharactersGrid.SelectedIndex;
@@ -4973,7 +4973,7 @@ public partial class MainWindow : Window
 
     private void CharactersGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (!CanEditSelectedNodeCharacters(node))
         {
             return;
@@ -5040,7 +5040,7 @@ public partial class MainWindow : Window
 
     private CharacterPlacement? SelectedCharacter()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var view = CharactersGrid.SelectedItem as CharacterView;
         return node?.Characters.FirstOrDefault(character => character.Id == view?.Id);
     }
@@ -5200,7 +5200,7 @@ public partial class MainWindow : Window
 
     private void DeleteOutput_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         if (node?.Kind == NodeKind.Dialogue
             && output is not null
@@ -5272,7 +5272,7 @@ public partial class MainWindow : Window
 
     private void DuplicateOutput_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         if (node?.Kind != NodeKind.Dialogue || output is null)
         {
@@ -5307,7 +5307,7 @@ public partial class MainWindow : Window
 
     private void MoveSelectedOutput(int direction)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         if (node?.Kind != NodeKind.Dialogue || output is null)
         {

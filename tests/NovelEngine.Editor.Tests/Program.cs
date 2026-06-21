@@ -1291,6 +1291,19 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
         "private void BindVoiceAssetToCharacter",
         "private void AddCharacter_Click",
         "private void AddLibraryCharacter_Click",
+        "private void SaveCharacterToLibrary_Click",
+        "private void EditCharacter_Click",
+        "private void DeleteCharacter_Click",
+        "private void DuplicateCharacter_Click",
+        "private void MoveSelectedCharacter",
+        "private void SetSelectedCharacterPosition",
+        "private void CharactersGrid_ContextMenuOpening",
+        "private void CharactersGrid_PreviewKeyDown",
+        "private CharacterPlacement? SelectedCharacter",
+        "private void DeleteOutput_Click",
+        "private void DuplicateOutput_Click",
+        "private void MoveSelectedOutput",
+        "private void Inheritance_Changed",
     };
 
     foreach (var method in selectedNodeMethods)
