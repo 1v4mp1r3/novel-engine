@@ -3071,6 +3071,30 @@ static void ProjectLanguageCompletesNoisyScopesQuickly()
     Assert(
         stopwatch.ElapsedMilliseconds < 1_500,
         $"Noisy DSL completion is too slow: {stopwatch.ElapsedMilliseconds}ms.");
+
+    var projectLanguageSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectLanguage.cs"));
+    var completionBody = ExtractMethodBody(
+        projectLanguageSource,
+        "public static ProjectLanguageCompletionContext GetCompletions");
+    var ignoredBody = ExtractMethodBody(
+        projectLanguageSource,
+        "private static IReadOnlyList<ProjectLanguageSyntaxSpan> GetIgnoredSyntaxSpans");
+
+    Assert(
+        completionBody.Contains("GetIgnoredSyntaxSpans(source)", StringComparison.Ordinal)
+            && !completionBody.Contains("GetSyntaxSpans(source)", StringComparison.Ordinal),
+        "Completions should scan ignored text directly instead of running full syntax highlighting.");
+    Assert(
+        ignoredBody.Contains("while (index < source.Length)", StringComparison.Ordinal)
+            && ignoredBody.Contains("ProjectLanguageSyntaxKind.Comment", StringComparison.Ordinal)
+            && ignoredBody.Contains("ProjectLanguageSyntaxKind.String", StringComparison.Ordinal)
+            && !ignoredBody.Contains(".Where(", StringComparison.Ordinal)
+            && !ignoredBody.Contains(".OrderBy(", StringComparison.Ordinal),
+        "Ignored syntax scan should collect comments and strings in one direct pass.");
 }
 
 static void ProjectLanguageFindsScopes()
@@ -3091,6 +3115,20 @@ static void ProjectLanguageFindsScopes()
         scopes.Any(scope => scope.Depth == 0)
             && scopes.Any(scope => scope.Depth == 1),
         "Nested scope depths were not detected.");
+
+    var sourceCode = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectLanguage.cs"));
+    var scopeBody = ExtractMethodBody(
+        sourceCode,
+        "public static IReadOnlyList<ProjectLanguageScopeSpan> GetScopeSpans");
+    Assert(
+        scopeBody.Contains("GetIgnoredSyntaxSpans(source)", StringComparison.Ordinal)
+            && !scopeBody.Contains("GetSyntaxSpans(source)", StringComparison.Ordinal)
+            && !scopeBody.Contains(".OrderBy(", StringComparison.Ordinal),
+        "Scope spans should avoid full syntax highlighting and LINQ sorting.");
 }
 
 static void BuildCompilerPreservesVisualScriptBlocks()

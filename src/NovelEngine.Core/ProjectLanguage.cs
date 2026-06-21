@@ -329,8 +329,7 @@ public static class ProjectLanguage
         int caretOffset)
     {
         caretOffset = Math.Clamp(caretOffset, 0, source.Length);
-        var spans = GetSyntaxSpans(source);
-        var ignoredSpans = GetIgnoredSyntaxSpans(spans);
+        var ignoredSpans = GetIgnoredSyntaxSpans(source);
         if (IsInsideIgnoredSyntax(caretOffset, ignoredSpans))
         {
             return new ProjectLanguageCompletionContext(caretOffset, 0, []);
@@ -464,12 +463,7 @@ public static class ProjectLanguage
     public static IReadOnlyList<ProjectLanguageScopeSpan> GetScopeSpans(
         string source)
     {
-        var ignored = GetSyntaxSpans(source)
-            .Where(
-                span => span.Kind is ProjectLanguageSyntaxKind.String
-                    or ProjectLanguageSyntaxKind.Comment)
-            .OrderBy(span => span.Start)
-            .ToList();
+        var ignored = GetIgnoredSyntaxSpans(source);
         var scopes = new List<ProjectLanguageScopeSpan>();
         var stack = new Stack<(int Offset, int Depth)>();
         var ignoredIndex = 0;
@@ -510,11 +504,12 @@ public static class ProjectLanguage
                 new ProjectLanguageScopeSpan(
                     opening.Offset,
                     source.Length,
-                    opening.Depth));
+                opening.Depth));
         }
-        return scopes
-            .OrderBy(scope => scope.OpenBraceOffset)
-            .ToList();
+        scopes.Sort(
+            (left, right) =>
+                left.OpenBraceOffset.CompareTo(right.OpenBraceOffset));
+        return scopes;
     }
 
     public static ProjectLanguageSourceLocation? FindNodeDeclaration(
@@ -1094,13 +1089,76 @@ public static class ProjectLanguage
         value is '_' or '-' || char.IsLetterOrDigit(value);
 
     private static IReadOnlyList<ProjectLanguageSyntaxSpan> GetIgnoredSyntaxSpans(
-        IReadOnlyList<ProjectLanguageSyntaxSpan> spans) =>
-        spans
-            .Where(
-                span => span.Kind is ProjectLanguageSyntaxKind.String
-                    or ProjectLanguageSyntaxKind.Comment)
-            .OrderBy(span => span.Start)
-            .ToList();
+        string source)
+    {
+        var spans = new List<ProjectLanguageSyntaxSpan>();
+        var index = 0;
+        while (index < source.Length)
+        {
+            var current = source[index];
+            if (current == '#'
+                || current == '/' && index + 1 < source.Length
+                    && source[index + 1] == '/')
+            {
+                var start = index;
+                while (index < source.Length && source[index] != '\n')
+                {
+                    index++;
+                }
+                spans.Add(
+                    new ProjectLanguageSyntaxSpan(
+                        start,
+                        index - start,
+                        ProjectLanguageSyntaxKind.Comment));
+                continue;
+            }
+
+            if (current == '"')
+            {
+                var start = index;
+                var triple = index + 2 < source.Length
+                    && source[index + 1] == '"'
+                    && source[index + 2] == '"';
+                index += triple ? 3 : 1;
+                var escaped = false;
+                while (index < source.Length)
+                {
+                    if (triple
+                        && index + 2 < source.Length
+                        && source[index] == '"'
+                        && source[index + 1] == '"'
+                        && source[index + 2] == '"')
+                    {
+                        index += 3;
+                        break;
+                    }
+
+                    if (!triple && !escaped && source[index] == '"')
+                    {
+                        index++;
+                        break;
+                    }
+
+                    escaped = !triple && !escaped && source[index] == '\\';
+                    if (source[index] != '\\')
+                    {
+                        escaped = false;
+                    }
+                    index++;
+                }
+                spans.Add(
+                    new ProjectLanguageSyntaxSpan(
+                        start,
+                        index - start,
+                        ProjectLanguageSyntaxKind.String));
+                continue;
+            }
+
+            index++;
+        }
+
+        return spans;
+    }
 
     private static bool IsInsideIgnoredSyntax(
         int offset,
