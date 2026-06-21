@@ -41,6 +41,7 @@ var tests = new (string Name, Action Run)[]
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
     ("asset catalog runtime stamps avoid full scans", AssetCatalogRuntimeStampsAvoidFullScans),
     ("asset preview stamp tracks visible input state", AssetPreviewStampTracksVisibleInputState),
+    ("asset preview playback stop skips inactive player", AssetPreviewPlaybackStopSkipsInactivePlayer),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
@@ -1139,6 +1140,24 @@ static void AssetPreviewStampTracksVisibleInputState()
         MainWindow.CreateAssetPreviewStamp(null, usageCount: 0)
         == MainWindow.CreateAssetPreviewStamp(null, usageCount: 3),
         "Empty asset preview stamp should ignore usage counts.");
+}
+
+static void AssetPreviewPlaybackStopSkipsInactivePlayer()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var stopBody = ExtractMethodBody(source, "private void StopAssetPreviewPlayback");
+    var stopIndex = stopBody.IndexOf("_assetPreviewPlayer.Stop();", StringComparison.Ordinal);
+    var inactiveGuardIndex = stopBody.IndexOf(
+        "if (IsInitialized && !AssetPreviewStopButton.IsEnabled)",
+        StringComparison.Ordinal);
+
+    Assert(
+        inactiveGuardIndex >= 0 && inactiveGuardIndex < stopIndex,
+        "Inactive asset preview audio should skip MediaPlayer.Stop().");
 }
 
 static void DispatcherDebounceGateCollapsesPendingRequests()

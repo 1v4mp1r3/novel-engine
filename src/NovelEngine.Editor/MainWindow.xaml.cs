@@ -2650,6 +2650,11 @@ public partial class MainWindow : Window
 
     private void StopAssetPreviewPlayback()
     {
+        if (IsInitialized && !AssetPreviewStopButton.IsEnabled)
+        {
+            return;
+        }
+
         _assetPreviewPlayer.Stop();
         if (IsInitialized)
         {
