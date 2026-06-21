@@ -97,13 +97,9 @@ public static class ProjectAssets
             File.Copy(source, target, overwrite: false);
         }
 
-        var baseId = MakeId(Path.GetFileNameWithoutExtension(target));
-        var id = baseId;
-        suffix = 2;
-        while (project.FindAsset(id) is not null)
-        {
-            id = $"{baseId}_{suffix++}";
-        }
+        var id = CreateUniqueAssetId(
+            MakeId(Path.GetFileNameWithoutExtension(target)),
+            BuildAssetIdSet(project));
 
         var asset = new NovelAsset
         {
@@ -178,6 +174,7 @@ public static class ProjectAssets
         var knownFullPaths = project.Assets
             .Select(asset => ResolvePath(projectPath, asset))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownAssetIds = BuildAssetIdSet(project);
         foreach (var file in Directory.EnumerateFiles(
             root,
             "*",
@@ -201,7 +198,8 @@ public static class ProjectAssets
                 project,
                 fullPath,
                 relativeProjectPath,
-                relativeFolder);
+                relativeFolder,
+                knownAssetIds);
             knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
             knownFullPaths.Add(ResolvePath(projectPath, imported));
             changes += project.Assets.Count - before;
@@ -214,18 +212,15 @@ public static class ProjectAssets
         NovelProject project,
         string fullPath,
         string relativeProjectPath,
-        string relativeFolder)
+        string relativeFolder,
+        HashSet<string> knownAssetIds)
     {
         var folder = NormalizeFolder(relativeFolder);
         EnsureFolder(project, folder);
 
-        var baseId = MakeId(Path.GetFileNameWithoutExtension(fullPath));
-        var id = baseId;
-        var suffix = 2;
-        while (project.FindAsset(id) is not null)
-        {
-            id = $"{baseId}_{suffix++}";
-        }
+        var id = CreateUniqueAssetId(
+            MakeId(Path.GetFileNameWithoutExtension(fullPath)),
+            knownAssetIds);
 
         var asset = new NovelAsset
         {
@@ -236,6 +231,24 @@ public static class ProjectAssets
         };
         project.Assets.Add(asset);
         return asset;
+    }
+
+    private static HashSet<string> BuildAssetIdSet(NovelProject project) =>
+        project.Assets
+            .Select(asset => asset.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static string CreateUniqueAssetId(
+        string baseId,
+        HashSet<string> knownAssetIds)
+    {
+        var id = baseId;
+        var suffix = 2;
+        while (!knownAssetIds.Add(id))
+        {
+            id = $"{baseId}_{suffix++}";
+        }
+        return id;
     }
 
     public static void CreateFolder(NovelProject project, string folder)

@@ -57,6 +57,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
+    ("project asset sync caches generated ids", ProjectAssetSyncCachesGeneratedIds),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
@@ -2468,6 +2469,45 @@ static void ProjectAssetSyncNormalizesExistingPathSeparators()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void ProjectAssetSyncCachesGeneratedIds()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectAssets.cs"));
+    var syncBody = ExtractMethodBody(source, "public static int SyncFromDisk");
+    var registerBody = ExtractMethodBody(
+        source,
+        "private static NovelAsset RegisterManagedFile");
+    var createBody = ExtractMethodBody(
+        source,
+        "private static string CreateUniqueAssetId");
+
+    Assert(
+        syncBody.Contains("BuildAssetIdSet(project)", StringComparison.Ordinal),
+        "Asset sync should build the known id set once.");
+    Assert(
+        syncBody.Contains("knownAssetIds", StringComparison.Ordinal)
+            && syncBody.Contains("RegisterManagedFile(", StringComparison.Ordinal),
+        "Asset sync should pass the known id set through file registration.");
+    Assert(
+        registerBody.Contains(
+            "CreateUniqueAssetId(\r\n            MakeId(Path.GetFileNameWithoutExtension(fullPath)),\r\n            knownAssetIds)",
+            StringComparison.Ordinal)
+            || registerBody.Contains(
+                "CreateUniqueAssetId(\n            MakeId(Path.GetFileNameWithoutExtension(fullPath)),\n            knownAssetIds)",
+                StringComparison.Ordinal),
+        "Managed file registration should use the shared id set.");
+    Assert(
+        !syncBody.Contains("FindAsset(", StringComparison.Ordinal)
+            && !registerBody.Contains("FindAsset(", StringComparison.Ordinal),
+        "Asset sync should not use linear asset lookup while registering files.");
+    Assert(
+        createBody.Contains("knownAssetIds.Add(id)", StringComparison.Ordinal),
+        "Unique asset id creation should claim ids through the hash set.");
 }
 
 static void AssetFoldersMoveFiles()
