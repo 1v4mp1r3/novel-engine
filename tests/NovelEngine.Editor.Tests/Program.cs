@@ -3399,6 +3399,12 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     var stampBody = ExtractMethodBody(
         source,
         "internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp");
+    var folderOptionsBody = ExtractMethodBody(
+        source,
+        "private List<NodeAssetFolderOption> GetCachedFolderOptions");
+    var assetChoicesBody = ExtractMethodBody(
+        source,
+        "private List<NodeAssetChoice> GetCachedAssetChoices");
     var ensureBody = ExtractMethodBody(source, "private void EnsureAssetPickerCachesCurrent");
     var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
     var resolveBody = ExtractMethodBody(source, "private NovelAsset? ResolveAssetChoice");
@@ -3423,6 +3429,25 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     Assert(
         !ensureBody.Contains("CreateAssetPickerCacheStamp", StringComparison.Ordinal),
         "Node asset picker cache validation should not rescan assets during property refresh.");
+    Assert(
+        folderOptionsBody.Contains("foreach (var folder in _project.AssetFolders)", StringComparison.Ordinal)
+            && folderOptionsBody.Contains("foreach (var asset in _project.Assets)", StringComparison.Ordinal)
+            && folderOptionsBody.Contains("sortedFolders.Sort(StringComparer.CurrentCultureIgnoreCase)", StringComparison.Ordinal)
+            && !folderOptionsBody.Contains(".GroupBy(", StringComparison.Ordinal)
+            && !folderOptionsBody.Contains(".Concat(", StringComparison.Ordinal)
+            && !folderOptionsBody.Contains(".Distinct(", StringComparison.Ordinal)
+            && !folderOptionsBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !folderOptionsBody.Contains(".Select(", StringComparison.Ordinal),
+        "Node asset folder options should be cached through direct passes over folders and assets.");
+    Assert(
+        assetChoicesBody.Contains("foreach (var asset in _project.Assets)", StringComparison.Ordinal)
+            && assetChoicesBody.Contains("matchingAssets.Sort(", StringComparison.Ordinal)
+            && assetChoicesBody.Contains("new(null, \"Не выбрано\")", StringComparison.Ordinal)
+            && !assetChoicesBody.Contains(".Where(", StringComparison.Ordinal)
+            && !assetChoicesBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !assetChoicesBody.Contains(".Select(", StringComparison.Ordinal)
+            && !assetChoicesBody.Contains(".Prepend(", StringComparison.Ordinal),
+        "Node asset choices should be cached through a direct filter and sort pass.");
     Assert(
         ensureBody.Contains("_nodeAssetByIdCache.Clear();", StringComparison.Ordinal)
             && ensureBody.Contains("_nodeAssetByIdCache[asset.Id] = asset;", StringComparison.Ordinal),

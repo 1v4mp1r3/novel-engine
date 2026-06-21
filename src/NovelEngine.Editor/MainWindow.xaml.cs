@@ -1784,30 +1784,47 @@ public partial class MainWindow : Window
             return cached;
         }
 
-        var folderCounts = _project.Assets
-            .Where(asset => asset.Kind == kind)
-            .GroupBy(
-                asset => asset.Folder,
-                StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Count(),
-                StringComparer.OrdinalIgnoreCase);
-        var folders = _project.AssetFolders
-            .Concat(_project.Assets.Select(asset => asset.Folder))
-            .Select(ProjectAssets.NormalizeFolder)
-            .Where(folder => folder.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(folder => folder, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        var folderCounts = new Dictionary<string, int>(
+            StringComparer.OrdinalIgnoreCase);
+        var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var folder in _project.AssetFolders)
+        {
+            var normalized = ProjectAssets.NormalizeFolder(folder);
+            if (normalized.Length > 0)
+            {
+                folders.Add(normalized);
+            }
+        }
+
+        foreach (var asset in _project.Assets)
+        {
+            var normalized = ProjectAssets.NormalizeFolder(asset.Folder);
+            if (normalized.Length == 0)
+            {
+                continue;
+            }
+
+            folders.Add(normalized);
+            if (asset.Kind == kind)
+            {
+                folderCounts.TryGetValue(normalized, out var count);
+                folderCounts[normalized] = count + 1;
+            }
+        }
+
+        var sortedFolders = new List<string>(folders);
+        sortedFolders.Sort(StringComparer.CurrentCultureIgnoreCase);
         var options = new List<NodeAssetFolderOption>(folders.Count + 1)
         {
             new(string.Empty, "Все папки"),
         };
-        options.AddRange(
-            folders.Select(folder => new NodeAssetFolderOption(
-                folder,
-                $"{folder} ({folderCounts.GetValueOrDefault(folder)})")));
+        foreach (var folder in sortedFolders)
+        {
+            options.Add(
+                new NodeAssetFolderOption(
+                    folder,
+                    $"{folder} ({folderCounts.GetValueOrDefault(folder)})"));
+        }
         _nodeAssetFolderOptionsCache[kind] = options;
         return options;
     }
@@ -1881,17 +1898,40 @@ public partial class MainWindow : Window
             return cached;
         }
 
-        var choices = _project.Assets
-            .Where(asset => asset.Kind == kind)
-            .Where(asset =>
-                normalizedFolder.Length == 0
-                || asset.Folder.Equals(normalizedFolder, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
-            .Select(asset => new NodeAssetChoice(
-                asset,
-                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
-            .Prepend(new NodeAssetChoice(null, "Не выбрано"))
-            .ToList();
+        var matchingAssets = new List<NovelAsset>();
+        foreach (var asset in _project.Assets)
+        {
+            if (asset.Kind != kind)
+            {
+                continue;
+            }
+
+            if (normalizedFolder.Length > 0
+                && !asset.Folder.Equals(
+                    normalizedFolder,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            matchingAssets.Add(asset);
+        }
+
+        matchingAssets.Sort(
+            (left, right) =>
+                StringComparer.CurrentCultureIgnoreCase.Compare(left.Id, right.Id));
+
+        var choices = new List<NodeAssetChoice>(matchingAssets.Count + 1)
+        {
+            new(null, "Не выбрано"),
+        };
+        foreach (var asset in matchingAssets)
+        {
+            choices.Add(
+                new NodeAssetChoice(
+                    asset,
+                    $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"));
+        }
         _nodeAssetChoicesCache[key] = choices;
         return choices;
     }
