@@ -70,6 +70,7 @@ var tests = new (string Name, Action Run)[]
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
     ("code cursor cache skips oversized line scans", CodeCursorCacheSkipsOversizedLineScans),
     ("code refresh skips unchanged rich text reset", CodeRefreshSkipsUnchangedRichTextReset),
+    ("code editor plain text replace skips span work", CodeEditorPlainTextReplaceSkipsSpanWork),
     ("code highlighting skips span overflow repaint", CodeHighlightingSkipsSpanOverflowRepaint),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
@@ -2075,6 +2076,35 @@ static void CodeRefreshSkipsUnchangedRichTextReset()
     Assert(
         guardIndex < assignIndex,
         "Code refresh should guard unchanged source before resetting the RichTextBox document.");
+}
+
+static void CodeEditorPlainTextReplaceSkipsSpanWork()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "CodeEditorControl.cs"));
+    var body = ExtractMethodBody(source, "private void ReplaceDocument");
+    var plainTextGuardIndex = body.IndexOf(
+        "if (spans.Count == 0 && !errorStart.HasValue)",
+        StringComparison.Ordinal);
+    var boundaryIndex = body.IndexOf(
+        "new SortedSet<int>",
+        StringComparison.Ordinal);
+    var sortIndex = body.IndexOf(
+        ".OrderBy(span => span.Start)",
+        StringComparison.Ordinal);
+
+    Assert(
+        plainTextGuardIndex >= 0,
+        "Plain text document replacement should have a fast path.");
+    Assert(
+        boundaryIndex > plainTextGuardIndex && sortIndex > plainTextGuardIndex,
+        "Plain text fast path should run before syntax boundary and sorting work.");
+    Assert(
+        body.Contains("AppendText(paragraph, source, null, isError: false)", StringComparison.Ordinal),
+        "Plain text fast path should append the source as a single undecorated run.");
 }
 
 static void CodeHighlightingSkipsSpanOverflowRepaint()

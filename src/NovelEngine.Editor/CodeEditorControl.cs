@@ -683,59 +683,66 @@ public sealed class CodeEditorControl : RichTextBox
             };
             Document.Blocks.Add(paragraph);
 
-            var boundaries = new SortedSet<int> { 0, source.Length };
-            foreach (var span in spans)
+            if (spans.Count == 0 && !errorStart.HasValue)
             {
-                boundaries.Add(Math.Clamp(span.Start, 0, source.Length));
-                boundaries.Add(
-                    Math.Clamp(span.Start + span.Length, 0, source.Length));
+                AppendText(paragraph, source, null, isError: false);
             }
-            var errorEnd = errorStart.HasValue
-                ? Math.Clamp(
-                    errorStart.Value + Math.Max(1, errorLength),
-                    0,
-                    source.Length)
-                : 0;
-            if (errorStart.HasValue)
+            else
             {
-                boundaries.Add(Math.Clamp(errorStart.Value, 0, source.Length));
-                boundaries.Add(errorEnd);
-            }
+                var boundaries = new SortedSet<int> { 0, source.Length };
+                foreach (var span in spans)
+                {
+                    boundaries.Add(Math.Clamp(span.Start, 0, source.Length));
+                    boundaries.Add(
+                        Math.Clamp(span.Start + span.Length, 0, source.Length));
+                }
+                var errorEnd = errorStart.HasValue
+                    ? Math.Clamp(
+                        errorStart.Value + Math.Max(1, errorLength),
+                        0,
+                        source.Length)
+                    : 0;
+                if (errorStart.HasValue)
+                {
+                    boundaries.Add(Math.Clamp(errorStart.Value, 0, source.Length));
+                    boundaries.Add(errorEnd);
+                }
 
-            var positions = boundaries.ToArray();
-            var orderedSpans = spans
-                .OrderBy(span => span.Start)
-                .ThenByDescending(span => span.Length)
-                .ToArray();
-            var spanIndex = 0;
-            for (var index = 0; index < positions.Length - 1; index++)
-            {
-                var start = positions[index];
-                var end = positions[index + 1];
-                if (end <= start)
+                var positions = boundaries.ToArray();
+                var orderedSpans = spans
+                    .OrderBy(span => span.Start)
+                    .ThenByDescending(span => span.Length)
+                    .ToArray();
+                var spanIndex = 0;
+                for (var index = 0; index < positions.Length - 1; index++)
                 {
-                    continue;
+                    var start = positions[index];
+                    var end = positions[index + 1];
+                    if (end <= start)
+                    {
+                        continue;
+                    }
+                    while (spanIndex < orderedSpans.Length
+                        && start >= orderedSpans[spanIndex].Start
+                            + orderedSpans[spanIndex].Length)
+                    {
+                        spanIndex++;
+                    }
+                    var syntax = spanIndex < orderedSpans.Length
+                        && start >= orderedSpans[spanIndex].Start
+                        && start < orderedSpans[spanIndex].Start
+                            + orderedSpans[spanIndex].Length
+                        ? orderedSpans[spanIndex]
+                        : null;
+                    var isError = errorStart.HasValue
+                        && start >= errorStart.Value
+                        && start < errorEnd;
+                    AppendText(
+                        paragraph,
+                        source[start..end],
+                        syntax?.Kind,
+                        isError);
                 }
-                while (spanIndex < orderedSpans.Length
-                    && start >= orderedSpans[spanIndex].Start
-                        + orderedSpans[spanIndex].Length)
-                {
-                    spanIndex++;
-                }
-                var syntax = spanIndex < orderedSpans.Length
-                    && start >= orderedSpans[spanIndex].Start
-                    && start < orderedSpans[spanIndex].Start
-                        + orderedSpans[spanIndex].Length
-                    ? orderedSpans[spanIndex]
-                    : null;
-                var isError = errorStart.HasValue
-                    && start >= errorStart.Value
-                    && start < errorEnd;
-                AppendText(
-                    paragraph,
-                    source[start..end],
-                    syntax?.Kind,
-                    isError);
             }
             Document.PageWidth = 100_000;
             _sourceTextCache = source;
