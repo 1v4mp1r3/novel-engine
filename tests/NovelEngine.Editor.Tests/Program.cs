@@ -47,6 +47,7 @@ var tests = new (string Name, Action Run)[]
     ("asset size cache skips repeated file info reads", AssetSizeCacheSkipsRepeatedFileInfoReads),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
+    ("selected node actions use graph selected node cache", SelectedNodeActionsUseGraphSelectedNodeCache),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
@@ -1268,6 +1269,39 @@ static void AssetBindingsSkipHiddenGraphRefresh()
         Assert(
             body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
             $"{method} should dirty the project without refreshing the graph.");
+    }
+}
+
+static void SelectedNodeActionsUseGraphSelectedNodeCache()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var selectedNodeMethods = new[]
+    {
+        "private void EditNodeScriptBlocks_Click",
+        "internal bool BindVoiceAssetToCharacterForSmoke",
+        "private bool RebuildAssetsContextMenu",
+        "private void BindAssetAsNodeBackground",
+        "private void BindAssetAsNodeMusic",
+        "private void BindAssetAsOutputTransitionSound",
+        "private void AddCharacterFromSpriteToSelectedNode",
+        "private void BindVoiceAssetToCharacter",
+        "private void AddCharacter_Click",
+        "private void AddLibraryCharacter_Click",
+    };
+
+    foreach (var method in selectedNodeMethods)
+    {
+        var body = ExtractMethodBody(source, method);
+        Assert(
+            body.Contains("Graph.SelectedNode", StringComparison.Ordinal),
+            $"{method} should use GraphSurface selected-node cache.");
+        Assert(
+            !body.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
+            $"{method} should not linearly search the selected project node.");
     }
 }
 

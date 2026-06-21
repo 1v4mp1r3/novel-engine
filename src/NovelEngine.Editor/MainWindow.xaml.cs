@@ -792,7 +792,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null)
         {
             return;
@@ -2643,7 +2643,7 @@ public partial class MainWindow : Window
 
         BindVoiceAssetToCharacter(asset, characterId);
         var reference = AssetReference.Create(asset.Id);
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         return node?.Characters
             .FirstOrDefault(character => character.Id == characterId)
             ?.GetVoiceSounds()
@@ -2662,7 +2662,7 @@ public partial class MainWindow : Window
             return false;
         }
 
-        var selectedNode = _project.FindNode(Graph.SelectedNodeId);
+        var selectedNode = Graph.SelectedNode;
         menu.Items.Add(CreateAssetMenuItem(
             "Скопировать ссылку",
             () => CopyAssetReference(view)));
@@ -2958,7 +2958,7 @@ public partial class MainWindow : Window
 
     private void BindAssetAsNodeBackground(NovelAsset asset)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null || asset.Kind != AssetKind.Image)
         {
             return;
@@ -2976,7 +2976,7 @@ public partial class MainWindow : Window
 
     private void BindAssetAsNodeMusic(NovelAsset asset)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null || asset.Kind != AssetKind.Audio)
         {
             return;
@@ -2994,7 +2994,7 @@ public partial class MainWindow : Window
 
     private void BindAssetAsOutputTransitionSound(NovelAsset asset, string? outputId = null)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = outputId is null
             ? SelectedOutput()
             : node?.Outputs.FirstOrDefault(candidate => candidate.Id == outputId);
@@ -3067,7 +3067,7 @@ public partial class MainWindow : Window
 
     private void AddCharacterFromSpriteToSelectedNode(NovelAsset asset)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null || asset.Kind != AssetKind.Image)
         {
             return;
@@ -3097,7 +3097,7 @@ public partial class MainWindow : Window
 
     private void BindVoiceAssetToCharacter(NovelAsset asset, string characterId)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null || asset.Kind != AssetKind.Audio)
         {
             return;
@@ -4553,7 +4553,7 @@ public partial class MainWindow : Window
 
     private void AddCharacter_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (!CanEditSelectedNodeCharacters(node))
         {
             return;
@@ -4578,7 +4578,7 @@ public partial class MainWindow : Window
 
     private void AddLibraryCharacter_Click(object sender, RoutedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (!CanEditSelectedNodeCharacters(node))
         {
             return;
