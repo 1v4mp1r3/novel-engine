@@ -44,6 +44,7 @@ var tests = new (string Name, Action Run)[]
     ("character transforms and voice survive code and JSON", CharacterTransformsRoundTrip),
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
+    ("character voice sounds normalize without linq", CharacterVoiceSoundsNormalizeWithoutLinq),
     ("asset reference lookups avoid linq pipelines", AssetReferenceLookupsAvoidLinqPipelines),
     ("removed voice assets are cleared from characters", RemovedVoiceAssetsAreClearedFromCharacters),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
@@ -1922,6 +1923,80 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
             && !usagesBody.Contains(".Where(", StringComparison.Ordinal)
             && !usagesBody.Contains(".Select(", StringComparison.Ordinal),
         "Asset usage lookup should build results in one direct pass.");
+}
+
+static void CharacterVoiceSoundsNormalizeWithoutLinq()
+{
+    var character = new CharacterPlacement
+    {
+        Id = "hero",
+        VoiceSound = " voices/hero-main.wav ",
+        VoiceSounds =
+        [
+            "voices/hero-a.wav",
+            "",
+            "VOICES/HERO-A.WAV",
+            "voices/hero-b.wav",
+            "   ",
+        ],
+    };
+
+    var sounds = character.GetVoiceSounds();
+
+    Assert(
+        sounds.SequenceEqual(
+            [
+                "voices/hero-a.wav",
+                "voices/hero-b.wav",
+                " voices/hero-main.wav ",
+            ]),
+        "Character voice sounds should keep first-seen unique values and append the primary voice.");
+
+    character.SetVoiceSounds(
+        [
+            " voices/hero-c.wav ",
+            "voices/hero-c.wav",
+            "",
+            "voices/hero-d.wav",
+        ]);
+
+    Assert(character.VoiceSound == " voices/hero-c.wav ", "Primary voice should be the first normalized sound.");
+    Assert(
+        character.VoiceSounds.SequenceEqual(
+            [
+                " voices/hero-c.wav ",
+                "voices/hero-c.wav",
+                "voices/hero-d.wav",
+            ]),
+        "SetVoiceSounds should keep unique non-blank values without changing text.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var getBody = ExtractMethodBody(source, "public List<string> GetVoiceSounds");
+    var setBody = ExtractMethodBody(source, "public void SetVoiceSounds");
+    var collectBody = ExtractMethodBody(
+        source,
+        "private static List<string> CollectDistinctVoiceSounds");
+
+    Assert(
+        getBody.Contains("CollectDistinctVoiceSounds(VoiceSounds)", StringComparison.Ordinal)
+            && !getBody.Contains(".Where(", StringComparison.Ordinal)
+            && !getBody.Contains(".Distinct(", StringComparison.Ordinal)
+            && !getBody.Contains(".ToList(", StringComparison.Ordinal),
+        "GetVoiceSounds should use the direct normalizer instead of LINQ pipelines.");
+    Assert(
+        setBody.Contains("CollectDistinctVoiceSounds(sounds)", StringComparison.Ordinal)
+            && setBody.Contains("VoiceSounds.Count == 0 ? string.Empty : VoiceSounds[0]", StringComparison.Ordinal)
+            && !setBody.Contains(".Where(", StringComparison.Ordinal)
+            && !setBody.Contains(".Distinct(", StringComparison.Ordinal)
+            && !setBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "SetVoiceSounds should use the direct normalizer and index the primary voice.");
+    Assert(
+        collectBody.Contains("foreach (var sound in sounds)", StringComparison.Ordinal),
+        "Voice sound normalization should use one direct pass.");
 }
 
 static void RemovedVoiceAssetsAreClearedFromCharacters()

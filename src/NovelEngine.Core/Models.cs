@@ -195,27 +195,39 @@ public sealed class CharacterPlacement
 
     public List<string> GetVoiceSounds()
     {
-        var values = VoiceSounds
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        if (!string.IsNullOrWhiteSpace(VoiceSound)
-            && !values.Contains(VoiceSound, StringComparer.OrdinalIgnoreCase))
+        var values = CollectDistinctVoiceSounds(VoiceSounds);
+        if (!string.IsNullOrWhiteSpace(VoiceSound))
         {
-            values.Add(VoiceSound);
+            AddDistinctVoiceSound(values, VoiceSound);
         }
         return values;
     }
 
     public void SetVoiceSounds(IEnumerable<string> sounds)
     {
-        var values = sounds
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var values = CollectDistinctVoiceSounds(sounds);
         VoiceSounds.Clear();
         VoiceSounds.AddRange(values);
-        VoiceSound = VoiceSounds.FirstOrDefault() ?? string.Empty;
+        VoiceSound = VoiceSounds.Count == 0 ? string.Empty : VoiceSounds[0];
+    }
+
+    private static List<string> CollectDistinctVoiceSounds(IEnumerable<string> sounds)
+    {
+        var values = new List<string>();
+        foreach (var sound in sounds)
+        {
+            AddDistinctVoiceSound(values, sound);
+        }
+        return values;
+    }
+
+    private static void AddDistinctVoiceSound(List<string> values, string sound)
+    {
+        if (!string.IsNullOrWhiteSpace(sound)
+            && !values.Contains(sound, StringComparer.OrdinalIgnoreCase))
+        {
+            values.Add(sound);
+        }
     }
 }
 
