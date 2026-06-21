@@ -36,6 +36,7 @@ public partial class PreviewWindow : Window
     private readonly MediaPlayer _transitionPlayer = new();
     private readonly Dictionary<string, List<MediaPlayer>> _voicePlayerPools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _voicePlayerIndexes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _resolvedAssetCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly BoundedCache<string, BitmapImage?> _bitmapCache =
         new(MaxCachedPreviewBitmaps, StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<string> _voicePoolLru = [];
@@ -529,12 +530,22 @@ public partial class PreviewWindow : Window
 
     private string ResolveAsset(string path)
     {
-        path = _project.ResolveAssetReference(path);
-        if (path.Length == 0 || Path.IsPathRooted(path))
+        if (path.Length == 0)
         {
-            return path;
+            return string.Empty;
         }
-        return Path.GetFullPath(Path.Combine(_assetDirectory, path));
+        if (_resolvedAssetCache.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        var resolved = _project.ResolveAssetReference(path);
+        if (resolved.Length > 0 && !Path.IsPathRooted(resolved))
+        {
+            resolved = Path.GetFullPath(Path.Combine(_assetDirectory, resolved));
+        }
+        _resolvedAssetCache[path] = resolved;
+        return resolved;
     }
 
     private BitmapImage? LoadBitmapCached(string path)

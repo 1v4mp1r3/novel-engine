@@ -52,6 +52,7 @@ var tests = new (string Name, Action Run)[]
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
+    ("preview asset resolution caches references", PreviewAssetResolutionCachesReferences),
     ("output editor copy is output neutral", OutputEditorCopyIsOutputNeutral),
     ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
@@ -1398,6 +1399,32 @@ static void AssetTransitionSoundMenuListsNodeOutputs()
     Assert(
         MainWindow.GetBindableTransitionSoundOutputs(audio, null).Count == 0,
         "Transition sound target listing should require a selected node.");
+}
+
+static void PreviewAssetResolutionCachesReferences()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "PreviewWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private string ResolveAsset");
+    var cacheIndex = body.IndexOf(
+        "_resolvedAssetCache.TryGetValue(path, out var cached)",
+        StringComparison.Ordinal);
+    var resolveIndex = body.IndexOf(
+        "_project.ResolveAssetReference(path)",
+        StringComparison.Ordinal);
+
+    Assert(
+        source.Contains("_resolvedAssetCache", StringComparison.Ordinal),
+        "Preview window should keep a resolved asset cache.");
+    Assert(
+        cacheIndex >= 0 && resolveIndex > cacheIndex,
+        "Preview asset resolution should check the cache before scanning project assets.");
+    Assert(
+        body.Contains("_resolvedAssetCache[path] = resolved;", StringComparison.Ordinal),
+        "Preview asset resolution should cache resolved paths.");
 }
 
 static void OutputEditorCopyIsOutputNeutral()
