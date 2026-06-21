@@ -52,6 +52,7 @@ var tests = new (string Name, Action Run)[]
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
+    ("asset usage navigation uses node id directly", AssetUsageNavigationUsesNodeIdDirectly),
     ("preview asset resolution caches references", PreviewAssetResolutionCachesReferences),
     ("editor asset preview windows cache resolved references", EditorAssetPreviewWindowsCacheResolvedReferences),
     ("output editor copy is output neutral", OutputEditorCopyIsOutputNeutral),
@@ -1285,6 +1286,24 @@ static void TransitionEditsRefreshAssetUsage()
     Assert(
         resetBody.Contains("RefreshAssetUsageAfterBinding();", StringComparison.Ordinal),
         "Resetting transition sound should refresh asset usage state.");
+}
+
+static void AssetUsageNavigationUsesNodeIdDirectly()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private void NavigateToAssetUsage");
+
+    Assert(
+        body.Contains("Graph.SelectNode(usage.NodeId);", StringComparison.Ordinal)
+            && body.Contains("Graph.SelectedNodeId == usage.NodeId", StringComparison.Ordinal),
+        "Asset usage navigation should select usage node ids through Graph directly.");
+    Assert(
+        !body.Contains("_project.FindNode(usage.NodeId)", StringComparison.Ordinal),
+        "Asset usage navigation should not linearly search project nodes.");
 }
 
 static void EditorAssetMutationsSkipDiskSyncRefreshes()

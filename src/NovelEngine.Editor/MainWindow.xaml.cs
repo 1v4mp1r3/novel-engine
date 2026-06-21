@@ -3296,15 +3296,16 @@ public partial class MainWindow : Window
 
     private void NavigateToAssetUsage(AssetUsage usage)
     {
-        if (usage.NodeId is not null
-            && _project.FindNode(usage.NodeId) is { } node)
+        if (usage.NodeId is not null)
         {
-            Graph.SelectNode(node.Id);
-            WorkspaceTabs.SelectedItem = GraphTab;
-            SelectAssetUsageDetail(usage.Location);
-            StatusText.Text =
-                $"Ассет используется в ноде «{DiagnosticNodeDisplay(node)}»";
-            return;
+            Graph.SelectNode(usage.NodeId);
+            if (Graph.SelectedNodeId == usage.NodeId)
+            {
+                WorkspaceTabs.SelectedItem = GraphTab;
+                SelectAssetUsageDetail(usage.Location);
+                StatusText.Text = $"Ассет используется в ноде: {usage.Location}";
+                return;
+            }
         }
 
         if (usage.Location.StartsWith("главное меню", StringComparison.OrdinalIgnoreCase))
