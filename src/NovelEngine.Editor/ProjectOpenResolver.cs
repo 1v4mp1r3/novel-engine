@@ -41,7 +41,14 @@ internal static class ProjectOpenResolver
         directory = Path.GetFullPath(directory);
         var projectFiles = new List<string>();
         var novelProjectFiles = new List<string>();
-        AddJsonProjectFiles(directory, projectFiles, novelProjectFiles);
+        var directoryName = Path.GetFileName(directory.TrimEnd(
+            Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar));
+        var preferredProject = AddJsonProjectFiles(
+            directory,
+            directoryName,
+            projectFiles,
+            novelProjectFiles);
         if (projectFiles.Count == 0)
         {
             return new ProjectOpenResult(
@@ -50,10 +57,6 @@ internal static class ProjectOpenResolver
                 CreatedEmptyWorkspace: true);
         }
 
-        var directoryName = Path.GetFileName(directory.TrimEnd(
-            Path.DirectorySeparatorChar,
-            Path.AltDirectorySeparatorChar));
-        var preferredProject = PreferredProject(projectFiles, directoryName);
         if (preferredProject is not null)
         {
             return new ProjectOpenResult(
@@ -84,54 +87,43 @@ internal static class ProjectOpenResolver
             CreatedEmptyWorkspace: true);
     }
 
-    private static void AddJsonProjectFiles(
+    private static string? AddJsonProjectFiles(
         string directory,
+        string directoryName,
         List<string> projectFiles,
         List<string> novelProjectFiles)
     {
+        var preferredNovelName = $"{directoryName}.novel.json";
+        var preferredJsonName = $"{directoryName}.json";
+        string? preferredNovelProject = null;
+        string? preferredJsonProject = null;
         foreach (var path in Directory.EnumerateFiles(
             directory,
             "*.json",
             SearchOption.TopDirectoryOnly))
         {
             projectFiles.Add(path);
+            var fileName = Path.GetFileName(path);
+            if (fileName.Equals(
+                    preferredNovelName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                preferredNovelProject = path;
+            }
+            else if (fileName.Equals(
+                         preferredJsonName,
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                preferredJsonProject = path;
+            }
+
             if (IsNovelProjectFile(path))
             {
                 novelProjectFiles.Add(path);
             }
         }
 
-        projectFiles.Sort(StringComparer.OrdinalIgnoreCase);
-        novelProjectFiles.Sort(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string? PreferredProject(
-        IReadOnlyList<string> projectFiles,
-        string directoryName)
-    {
-        var preferredNovelName = $"{directoryName}.novel.json";
-        foreach (var path in projectFiles)
-        {
-            if (Path.GetFileName(path).Equals(
-                preferredNovelName,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return path;
-            }
-        }
-
-        var preferredJsonName = $"{directoryName}.json";
-        foreach (var path in projectFiles)
-        {
-            if (Path.GetFileName(path).Equals(
-                preferredJsonName,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return path;
-            }
-        }
-
-        return null;
+        return preferredNovelProject ?? preferredJsonProject;
     }
 
     private static bool IsNovelProjectFile(string path) =>

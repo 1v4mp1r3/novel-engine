@@ -21,6 +21,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver treats empty folder as workspace", ProjectResolverTreatsEmptyFolderAsWorkspace),
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver prefers folder-named json project", ProjectResolverPrefersFolderNamedJsonProject),
+    ("project resolver prefers novel project over folder json", ProjectResolverPrefersNovelProjectOverFolderJson),
     ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("project resolver scans json projects once", ProjectResolverScansJsonProjectsOnce),
@@ -467,6 +468,33 @@ static void ProjectResolverPrefersFolderNamedJsonProject()
     }
 }
 
+static void ProjectResolverPrefersNovelProjectOverFolderJson()
+{
+    var directory = CreateTempDirectory();
+    try
+    {
+        var preferredNovelPath = Path.Combine(
+            directory,
+            $"{Path.GetFileName(directory)}.novel.json");
+        var preferredJsonPath = Path.Combine(
+            directory,
+            $"{Path.GetFileName(directory)}.json");
+        File.WriteAllText(preferredJsonPath, "{}");
+        File.WriteAllText(preferredNovelPath, "{}");
+
+        var result = ProjectOpenResolver.Resolve(directory);
+
+        Assert(
+            result.ProjectPath == preferredNovelPath,
+            "Resolver should prefer folder-named .novel.json over folder-named .json.");
+        Assert(!result.CreatedEmptyWorkspace, "Resolver marked a preferred novel project folder as empty.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
 static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
 {
     var directory = CreateTempDirectory();
@@ -523,14 +551,11 @@ static void ProjectResolverScansJsonProjectsOnce()
         "private static ProjectOpenResult ResolveProjectFromDirectory");
     var addFilesBody = ExtractMethodBody(
         source,
-        "private static void AddJsonProjectFiles");
-    var preferredBody = ExtractMethodBody(
-        source,
-        "private static string? PreferredProject");
+        "private static string? AddJsonProjectFiles");
 
     Assert(
         resolveBody.Contains(
-            "AddJsonProjectFiles(directory, projectFiles, novelProjectFiles)",
+            "var preferredProject = AddJsonProjectFiles(",
             StringComparison.Ordinal)
             && !resolveBody.Contains(".Concat(", StringComparison.Ordinal)
             && !resolveBody.Contains(".Distinct(", StringComparison.Ordinal)
@@ -539,15 +564,14 @@ static void ProjectResolverScansJsonProjectsOnce()
     Assert(
         Regex.Matches(addFilesBody, Regex.Escape("Directory.EnumerateFiles(")).Count == 1
             && addFilesBody.Contains("\"*.json\"", StringComparison.Ordinal)
+            && addFilesBody.Contains("preferredNovelProject", StringComparison.Ordinal)
+            && addFilesBody.Contains("preferredJsonProject", StringComparison.Ordinal)
             && addFilesBody.Contains("IsNovelProjectFile(path)", StringComparison.Ordinal)
-            && addFilesBody.Contains("projectFiles.Sort(StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal)
-            && addFilesBody.Contains("novelProjectFiles.Sort(StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
-        "Project resolver should enumerate JSON files once and sort both result lists.");
-    Assert(
-        preferredBody.Contains("foreach (var path in projectFiles)", StringComparison.Ordinal)
-            && !preferredBody.Contains("FirstOrDefault", StringComparison.Ordinal)
-            && !preferredBody.Contains("new[]", StringComparison.Ordinal),
-        "Preferred project selection should use direct passes without LINQ allocations.");
+            && addFilesBody.Contains("return preferredNovelProject ?? preferredJsonProject;", StringComparison.Ordinal)
+            && !addFilesBody.Contains(".Sort(", StringComparison.Ordinal)
+            && !addFilesBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !addFilesBody.Contains(".OrderBy(", StringComparison.Ordinal),
+        "Project resolver should enumerate JSON files once and detect preferred files without sorting.");
 }
 
 static void AutoSaveSnapshotPathsAvoidSameSecondCollisions()
