@@ -87,6 +87,7 @@ var tests = new (string Name, Action Run)[]
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
     ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
+    ("node property panel uses cached target title lookup", NodePropertyPanelUsesCachedTargetTitleLookup),
     ("node asset picker cache invalidates property panel", NodeAssetPickerCacheInvalidatesPropertyPanel),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
     ("main menu property guard separates rendered changes", MainMenuPropertyGuardSeparatesRenderedChanges),
@@ -2834,6 +2835,42 @@ static void NodePropertyPanelStampTracksVisibleState()
             changedAssetsProject,
             changedAssetsNode),
         "Node property panel stamp should leave asset picker inputs to explicit cache invalidation.");
+}
+
+static void NodePropertyPanelUsesCachedTargetTitleLookup()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var refreshBody = ExtractMethodBody(source, "private void RefreshProperties");
+    var stampBody = ExtractMethodBody(
+        source,
+        "internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp");
+    var lookupBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup");
+    var resolveBody = ExtractMethodBody(
+        source,
+        "private static string ResolveNodeTitle");
+
+    Assert(
+        refreshBody.Contains("BuildNodeTitleLookup(_project)", StringComparison.Ordinal),
+        "Node property refresh should build output target title lookup once.");
+    Assert(
+        stampBody.Contains("BuildNodeTitleLookup(project)", StringComparison.Ordinal),
+        "Node property stamp should build output target title lookup once.");
+    Assert(
+        !refreshBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal)
+            && !stampBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal),
+        "Node property output rows should not linearly find target nodes per output.");
+    Assert(
+        lookupBody.Contains("lookup[node.Id] = node.Title;", StringComparison.Ordinal),
+        "Node target title lookup should index titles by node id.");
+    Assert(
+        resolveBody.Contains("nodeTitlesById.TryGetValue", StringComparison.Ordinal),
+        "Node target title resolution should use the lookup dictionary.");
 }
 
 static void NodeAssetPickerCacheInvalidatesPropertyPanel()

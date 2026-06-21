@@ -620,10 +620,14 @@ public partial class MainWindow : Window
             CharactersGrid.ItemsSource = node.Characters
                 .Select(character => new CharacterView(character))
                 .ToList();
+            var nodeTitlesById = BuildNodeTitleLookup(_project);
             OutputsGrid.ItemsSource = node.Outputs
                 .Select(output => new OutputView(
                     output,
-                    _project.FindNode(output.TargetNodeId)?.Title ?? "не подключено"))
+                    ResolveNodeTitle(
+                        nodeTitlesById,
+                        output.TargetNodeId,
+                        "не подключено")))
                 .ToList();
 
             SetCharacterButtons(CanEditNodeCharacters(node, node.InheritCharacters));
@@ -930,6 +934,7 @@ public partial class MainWindow : Window
         hash.Add(node.InheritCharacters);
         hash.Add(node.Script, StringComparer.Ordinal);
         hash.Add(node.ScriptBlocks.Count);
+        var nodeTitlesById = BuildNodeTitleLookup(project);
         foreach (var character in node.Characters)
         {
             hash.Add(character.Id, StringComparer.Ordinal);
@@ -950,7 +955,7 @@ public partial class MainWindow : Window
             hash.Add(output.Condition, StringComparer.Ordinal);
             hash.Add(output.TargetNodeId, StringComparer.Ordinal);
             hash.Add(
-                project.FindNode(output.TargetNodeId)?.Title ?? string.Empty,
+                ResolveNodeTitle(nodeTitlesById, output.TargetNodeId, string.Empty),
                 StringComparer.Ordinal);
             hash.Add(output.TransitionSound, StringComparer.Ordinal);
             hash.Add(output.FadeDurationMs);
@@ -958,6 +963,27 @@ public partial class MainWindow : Window
         }
 
         return new NodePropertyPanelStamp(node.Id, hash.ToHashCode());
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup(
+        NovelProject project)
+    {
+        var lookup = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var node in project.Nodes)
+        {
+            lookup[node.Id] = node.Title;
+        }
+        return lookup;
+    }
+
+    private static string ResolveNodeTitle(
+        IReadOnlyDictionary<string, string> nodeTitlesById,
+        string? nodeId,
+        string fallback)
+    {
+        return nodeId is not null && nodeTitlesById.TryGetValue(nodeId, out var title)
+            ? title
+            : fallback;
     }
 
     private void MarkDirty(bool refreshGraph = true)
