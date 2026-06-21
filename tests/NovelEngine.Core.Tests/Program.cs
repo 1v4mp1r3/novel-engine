@@ -1955,24 +1955,38 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
     var validateBody = ExtractMethodBody(
         source,
         "public void Validate");
+    var visitorBody = ExtractMethodBody(
+        source,
+        "private void VisitTypedAssetValues");
+    var voiceVisitorBody = ExtractMethodBody(
+        source,
+        "private static void VisitCharacterVoiceValues");
 
     Assert(
         !source.Contains("private IEnumerable<string> EnumerateAssetValues", StringComparison.Ordinal),
         "Asset reference lookups should not allocate a string-only enumerable wrapper.");
     Assert(
+        !source.Contains("IEnumerable<AssetValue>", StringComparison.Ordinal)
+            && !source.Contains("yield return", StringComparison.Ordinal)
+            && !source.Contains("new AssetValue(", StringComparison.Ordinal)
+            && !source.Contains("private sealed record AssetValue", StringComparison.Ordinal),
+        "Asset reference traversal should not allocate iterator or AssetValue objects.");
+    Assert(
         !source.Contains("Nodes.SelectMany", StringComparison.Ordinal),
         "Core graph paths should not allocate SelectMany iterator chains over node outputs.");
     Assert(
-        countBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
+        countBody.Contains("VisitTypedAssetValues((value, _, _, _) =>", StringComparison.Ordinal)
             && !countBody.Contains(".Count(", StringComparison.Ordinal),
-        "Single asset reference counts should use a direct typed-value loop.");
+        "Single asset reference counts should use the direct typed-value visitor.");
     Assert(
-        batchBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
-            && batchBody.Contains("AssetReference.TryGetId(value.Value", StringComparison.Ordinal),
-        "Batch asset reference counts should reuse typed values directly.");
+        batchBody.Contains("VisitTypedAssetValues((value, _, _, _) =>", StringComparison.Ordinal)
+            && batchBody.Contains("AssetReference.TryGetId(value, out var id)", StringComparison.Ordinal),
+        "Batch asset reference counts should reuse the direct typed-value visitor.");
     Assert(
         usagesBody.Contains("var usages = new List<AssetUsage>();", StringComparison.Ordinal)
-            && usagesBody.Contains("foreach (var value in EnumerateTypedAssetValues())", StringComparison.Ordinal)
+            && usagesBody.Contains(
+                "VisitTypedAssetValues((value, expectedKind, owner, nodeId) =>",
+                StringComparison.Ordinal)
             && !usagesBody.Contains(".Where(", StringComparison.Ordinal)
             && !usagesBody.Contains(".Select(", StringComparison.Ordinal),
         "Asset usage lookup should build results in one direct pass.");
@@ -1984,6 +1998,25 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
         validateBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal)
             && validateBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal),
         "Project validation should inspect output targets through direct nested loops.");
+    Assert(
+        validateBody.Contains(
+            "VisitTypedAssetValues((value, expectedKind, owner, _) =>",
+            StringComparison.Ordinal),
+        "Project validation should validate asset references through the direct visitor.");
+    Assert(
+        visitorBody.Contains("foreach (var character in Characters)", StringComparison.Ordinal)
+            && visitorBody.Contains("foreach (var type in NodeTypes)", StringComparison.Ordinal)
+            && visitorBody.Contains("foreach (var element in MainMenu.Elements)", StringComparison.Ordinal)
+            && visitorBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal)
+            && visitorBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && visitorBody.Contains("VisitCharacterAssetValues(", StringComparison.Ordinal),
+        "Typed asset traversal should walk project collections directly.");
+    Assert(
+        voiceVisitorBody.Contains(
+            "for (var index = 0; index < character.VoiceSounds.Count; index++)",
+            StringComparison.Ordinal)
+            && !voiceVisitorBody.Contains("GetVoiceSounds", StringComparison.Ordinal),
+        "Character voice traversal should not allocate a normalized sound list.");
 }
 
 static void CharacterVoiceSoundsNormalizeWithoutLinq()
@@ -2387,7 +2420,7 @@ static void ProjectValidationCachesAssetLookup()
         "Project validation should build a single asset lookup dictionary.");
     Assert(
         normalizedValidateBody.Contains(
-            "ValidateAssetReference(\n                value.Value,\n                value.ExpectedKind,\n                value.Owner,\n                assetsById)",
+            "ValidateAssetReference(\n                value,\n                expectedKind,\n                owner,\n                assetsById)",
             StringComparison.Ordinal),
         "Project validation should pass the lookup into asset reference validation.");
     Assert(

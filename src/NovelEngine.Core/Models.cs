@@ -345,28 +345,32 @@ public sealed class NovelProject
     {
         var reference = AssetReference.Create(assetId);
         var count = 0;
-        foreach (var value in EnumerateTypedAssetValues())
+
+        VisitTypedAssetValues((value, _, _, _) =>
         {
-            if (value.Value.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            if (value.Equals(reference, StringComparison.OrdinalIgnoreCase))
             {
                 count++;
             }
-        }
+        });
+
         return count;
     }
 
     public IReadOnlyDictionary<string, int> CountAssetReferencesById()
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var value in EnumerateTypedAssetValues())
+
+        VisitTypedAssetValues((value, _, _, _) =>
         {
-            if (!AssetReference.TryGetId(value.Value, out var id))
+            if (!AssetReference.TryGetId(value, out var id))
             {
-                continue;
+                return;
             }
 
             counts[id] = counts.GetValueOrDefault(id) + 1;
-        }
+        });
+
         return counts;
     }
 
@@ -374,19 +378,21 @@ public sealed class NovelProject
     {
         var reference = AssetReference.Create(assetId);
         var usages = new List<AssetUsage>();
-        foreach (var value in EnumerateTypedAssetValues())
+
+        VisitTypedAssetValues((value, expectedKind, owner, nodeId) =>
         {
-            if (!value.Value.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            if (!value.Equals(reference, StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                return;
             }
 
             usages.Add(new AssetUsage(
-                value.Owner,
-                value.ExpectedKind,
-                value.Value,
-                value.NodeId));
-        }
+                owner,
+                expectedKind,
+                value,
+                nodeId));
+        });
+
         return usages;
     }
 
@@ -1007,14 +1013,14 @@ public sealed class NovelProject
             }
         }
 
-        foreach (var value in EnumerateTypedAssetValues())
+        VisitTypedAssetValues((value, expectedKind, owner, _) =>
         {
             ValidateAssetReference(
-                value.Value,
-                value.ExpectedKind,
-                value.Owner,
+                value,
+                expectedKind,
+                owner,
                 assetsById);
-        }
+        });
     }
 
     private static void ValidateCharacterTransform(CharacterPlacement character)
@@ -1322,104 +1328,102 @@ public sealed class NovelProject
         }
     }
 
-    private IEnumerable<AssetValue> EnumerateTypedAssetValues()
+    private void VisitTypedAssetValues(AssetValueVisitor visitor)
     {
         foreach (var character in Characters)
         {
-            yield return new AssetValue(
-                character.Sprite,
-                AssetKind.Image,
-                $"библиотека персонажей, персонаж {character.Name}");
-            foreach (var voice in CharacterVoiceValues(character))
-            {
-                yield return new AssetValue(
-                    voice,
-                    AssetKind.Audio,
-                    $"библиотека персонажей, голос персонажа {character.Name}");
-            }
+            VisitCharacterAssetValues(
+                character,
+                $"библиотека персонажей, персонаж {character.Name}",
+                $"библиотека персонажей, голос персонажа {character.Name}",
+                null,
+                visitor);
         }
 
         foreach (var type in NodeTypes)
         {
             if (type.Defaults.Background is not null)
             {
-                yield return new AssetValue(
+                visitor(
                     type.Defaults.Background,
                     AssetKind.Image,
-                    $"тип {type.Name}, фон");
+                    $"тип {type.Name}, фон",
+                    null);
             }
             if (type.Defaults.Music is not null)
             {
-                yield return new AssetValue(
+                visitor(
                     type.Defaults.Music,
                     AssetKind.Audio,
-                    $"тип {type.Name}, музыка");
+                    $"тип {type.Name}, музыка",
+                    null);
             }
             foreach (var character in type.Defaults.Characters)
             {
-                yield return new AssetValue(
-                    character.Sprite,
-                    AssetKind.Image,
-                    $"тип {type.Name}, персонаж {character.Name}");
-                foreach (var voice in CharacterVoiceValues(character))
-                {
-                    yield return new AssetValue(
-                        voice,
-                        AssetKind.Audio,
-                        $"тип {type.Name}, голос персонажа {character.Name}");
-                }
+                VisitCharacterAssetValues(
+                    character,
+                    $"тип {type.Name}, персонаж {character.Name}",
+                    $"тип {type.Name}, голос персонажа {character.Name}",
+                    null,
+                    visitor);
             }
         }
 
-        yield return new AssetValue(
+        visitor(
             MainMenu.Background,
             AssetKind.Image,
-            "главное меню, фон");
+            "главное меню, фон",
+            null);
         foreach (var element in MainMenu.Elements)
         {
-            yield return new AssetValue(
+            visitor(
                 element.Image,
                 AssetKind.Image,
-                $"главное меню, элемент {element.Id}");
+                $"главное меню, элемент {element.Id}",
+                null);
         }
 
         foreach (var node in Nodes)
         {
-            yield return new AssetValue(
+            visitor(
                 node.Background,
                 AssetKind.Image,
                 $"нода {node.Title}, фон",
                 node.Id);
-            yield return new AssetValue(
+            visitor(
                 node.Music,
                 AssetKind.Audio,
                 $"нода {node.Title}, музыка",
                 node.Id);
             foreach (var character in node.Characters)
             {
-                yield return new AssetValue(
-                    character.Sprite,
-                    AssetKind.Image,
+                VisitCharacterAssetValues(
+                    character,
                     $"нода {node.Title}, персонаж {character.Name}",
-                    node.Id);
-                foreach (var voice in CharacterVoiceValues(character))
-                {
-                    yield return new AssetValue(
-                        voice,
-                        AssetKind.Audio,
-                        $"нода {node.Title}, голос персонажа {character.Name}",
-                        node.Id);
-                }
+                    $"нода {node.Title}, голос персонажа {character.Name}",
+                    node.Id,
+                    visitor);
             }
             foreach (var output in node.Outputs)
             {
-                yield return new AssetValue(
+                visitor(
                     output.TransitionSound,
                     AssetKind.Audio,
                     $"нода {node.Title}, переход {output.Label}",
                     node.Id);
             }
         }
+    }
+
+    private static void VisitCharacterAssetValues(
+        CharacterPlacement character,
+        string spriteOwner,
+        string voiceOwner,
+        string? nodeId,
+        AssetValueVisitor visitor)
+    {
+        visitor(character.Sprite, AssetKind.Image, spriteOwner, nodeId);
+        VisitCharacterVoiceValues(character, voiceOwner, nodeId, visitor);
     }
 
     private static void ValidateAssetReference(
@@ -1461,6 +1465,50 @@ public sealed class NovelProject
         }
     }
 
+    private static void VisitCharacterVoiceValues(
+        CharacterPlacement character,
+        string owner,
+        string? nodeId,
+        AssetValueVisitor visitor)
+    {
+        for (var index = 0; index < character.VoiceSounds.Count; index++)
+        {
+            var sound = character.VoiceSounds[index];
+            if (string.IsNullOrWhiteSpace(sound)
+                || ContainsVoiceSound(character.VoiceSounds, sound, index))
+            {
+                continue;
+            }
+
+            visitor(sound, AssetKind.Audio, owner, nodeId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(character.VoiceSound)
+            && !ContainsVoiceSound(
+                character.VoiceSounds,
+                character.VoiceSound,
+                character.VoiceSounds.Count))
+        {
+            visitor(character.VoiceSound, AssetKind.Audio, owner, nodeId);
+        }
+    }
+
+    private static bool ContainsVoiceSound(
+        IReadOnlyList<string> values,
+        string value,
+        int beforeIndex)
+    {
+        for (var index = 0; index < beforeIndex; index++)
+        {
+            if (values[index].Equals(value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static void ReplaceCharacterAssetValues(
         CharacterPlacement character,
         string reference,
@@ -1473,9 +1521,6 @@ public sealed class NovelProject
             replacement);
         ReplaceAssetReferences(character.VoiceSounds, reference, replacement);
     }
-
-    private static IReadOnlyList<string> CharacterVoiceValues(CharacterPlacement character)
-        => character.GetVoiceSounds();
 
     private static void ReplaceAssetReferences(
         List<string> values,
@@ -1524,11 +1569,11 @@ public sealed class NovelProject
             ? replacement
             : value ?? string.Empty;
 
-    private sealed record AssetValue(
-        string Value,
-        AssetKind ExpectedKind,
-        string Owner,
-        string? NodeId = null);
+    private delegate void AssetValueVisitor(
+        string value,
+        AssetKind expectedKind,
+        string owner,
+        string? nodeId);
 }
 
 public static class AssetReference
