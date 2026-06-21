@@ -805,7 +805,7 @@ public partial class PreviewWindow : Window
             {
                 continue;
             }
-            if (pool.Any(_activeVoicePlayers.Contains))
+            if (HasActiveVoicePlayer(pool))
             {
                 _voicePoolLru.AddLast(soundPath);
                 continue;
@@ -821,14 +821,29 @@ public partial class PreviewWindow : Window
         }
     }
 
+    private bool HasActiveVoicePlayer(IReadOnlyList<MediaPlayer> pool)
+    {
+        foreach (var player in pool)
+        {
+            if (_activeVoicePlayers.Contains(player))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void StopAllVoicePlayers(bool close)
     {
-        foreach (var player in _voicePlayerPools.Values.SelectMany(pool => pool))
+        foreach (var pool in _voicePlayerPools.Values)
         {
-            player.Stop();
-            if (close)
+            foreach (var player in pool)
             {
-                player.Close();
+                player.Stop();
+                if (close)
+                {
+                    player.Close();
+                }
             }
         }
 
@@ -906,7 +921,7 @@ public partial class PreviewWindow : Window
         {
             _musicPlayer.Pause();
             _transitionPlayer.Pause();
-            foreach (var player in _activeVoicePlayers.ToList())
+            foreach (var player in _activeVoicePlayers)
             {
                 player.Pause();
             }
@@ -918,7 +933,7 @@ public partial class PreviewWindow : Window
                 _musicPlayer.Play();
             }
             _transitionPlayer.Play();
-            foreach (var player in _activeVoicePlayers.ToList())
+            foreach (var player in _activeVoicePlayers)
             {
                 player.Play();
             }
@@ -946,9 +961,12 @@ public partial class PreviewWindow : Window
         _settings.TextDelayMs = Math.Clamp(_settings.TextDelayMs, 0, 120);
         _musicPlayer.Volume = _settings.MusicVolume;
         _transitionPlayer.Volume = _settings.EffectsVolume;
-        foreach (var player in _voicePlayerPools.Values.SelectMany(pool => pool))
+        foreach (var pool in _voicePlayerPools.Values)
         {
-            player.Volume = _settings.VoiceVolume;
+            foreach (var player in pool)
+            {
+                player.Volume = _settings.VoiceVolume;
+            }
         }
     }
 
@@ -1136,18 +1154,38 @@ public partial class PreviewWindow : Window
 
         if (TryGetChoiceShortcutIndex(e.Key, out var index))
         {
-            var buttons = ChoicesPanel.Children.OfType<Button>().ToList();
+            var button = FindChoiceButton(index, out var buttonCount);
             if (ChoiceAvailability.CanChooseByShortcut(
                     _choicesReady,
                     _paused,
                     _transitioning,
                     index,
-                    buttons.Count))
+                    buttonCount)
+                && button is not null)
             {
-                buttons[index].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 e.Handled = true;
             }
         }
+    }
+
+    private Button? FindChoiceButton(int targetIndex, out int buttonCount)
+    {
+        buttonCount = 0;
+        Button? target = null;
+        foreach (UIElement child in ChoicesPanel.Children)
+        {
+            if (child is not Button button)
+            {
+                continue;
+            }
+            if (buttonCount == targetIndex)
+            {
+                target = button;
+            }
+            buttonCount++;
+        }
+        return target;
     }
 
     private static bool TryGetChoiceShortcutIndex(Key key, out int index)

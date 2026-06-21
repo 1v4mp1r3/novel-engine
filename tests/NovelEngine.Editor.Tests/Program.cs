@@ -109,6 +109,7 @@ var tests = new (string Name, Action Run)[]
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
+    ("preview playback avoids transient lists", PreviewPlaybackAvoidsTransientLists),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
@@ -3777,6 +3778,49 @@ static void SceneEditorCharacterListStampTracksVisibleRows()
     Assert(
         baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
         "Scene character list stamp should track added rows.");
+}
+
+static void PreviewPlaybackAvoidsTransientLists()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "PreviewWindow.xaml.cs"));
+    var trimBody = ExtractMethodBody(source, "private void TrimVoicePools");
+    var hasActiveBody = ExtractMethodBody(
+        source,
+        "private bool HasActiveVoicePlayer");
+    var stopBody = ExtractMethodBody(source, "private void StopAllVoicePlayers");
+    var pauseBody = ExtractMethodBody(source, "private void SetPaused");
+    var settingsBody = ExtractMethodBody(source, "private void ApplyRuntimeSettings");
+    var keyBody = ExtractMethodBody(source, "private void Window_KeyDown");
+
+    Assert(
+        trimBody.Contains("HasActiveVoicePlayer(pool)", StringComparison.Ordinal)
+            && !trimBody.Contains(".Any(", StringComparison.Ordinal),
+        "Voice pool trimming should avoid LINQ delegates on active player checks.");
+    Assert(
+        hasActiveBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
+            && hasActiveBody.Contains("_activeVoicePlayers.Contains(player)", StringComparison.Ordinal),
+        "Active voice player checks should use a direct loop.");
+    Assert(
+        stopBody.Contains("foreach (var pool in _voicePlayerPools.Values)", StringComparison.Ordinal)
+            && stopBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
+            && !stopBody.Contains("SelectMany", StringComparison.Ordinal),
+        "Stopping voice players should avoid SelectMany iterator chains.");
+    Assert(
+        settingsBody.Contains("foreach (var pool in _voicePlayerPools.Values)", StringComparison.Ordinal)
+            && settingsBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
+            && !settingsBody.Contains("SelectMany", StringComparison.Ordinal),
+        "Applying runtime settings should avoid SelectMany iterator chains.");
+    Assert(
+        !pauseBody.Contains("_activeVoicePlayers.ToList()", StringComparison.Ordinal),
+        "Pause toggles should not allocate a temporary active player list.");
+    Assert(
+        keyBody.Contains("FindChoiceButton(index, out var buttonCount)", StringComparison.Ordinal)
+            && !keyBody.Contains("ChoicesPanel.Children.OfType<Button>().ToList()", StringComparison.Ordinal),
+        "Choice shortcuts should find buttons without allocating a temporary list.");
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()
