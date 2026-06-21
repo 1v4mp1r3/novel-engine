@@ -86,6 +86,7 @@ var tests = new (string Name, Action Run)[]
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("output rendered property guard skips hidden graph refresh", OutputRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
+    ("project explorer selection uses sync-only path", ProjectExplorerSelectionUsesSyncOnlyPath),
     ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
     ("node property panel uses cached target title lookup", NodePropertyPanelUsesCachedTargetTitleLookup),
@@ -2778,6 +2779,31 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
     Assert(
         baseline == MainWindow.CreateProjectExplorerStamp(changedPositionProject, "scene"),
         "Project explorer stamp should ignore node position-only changes.");
+}
+
+static void ProjectExplorerSelectionUsesSyncOnlyPath()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var selectionBody = ExtractMethodBody(source, "private void HandleGraphSelection");
+    var syncOnlyBody = ExtractMethodBody(source, "private void RefreshExplorerSelection");
+
+    Assert(
+        selectionBody.Contains("RefreshExplorerSelection();", StringComparison.Ordinal),
+        "Graph selection should use the lightweight project explorer selection path.");
+    Assert(
+        !selectionBody.Contains("RefreshExplorer();", StringComparison.Ordinal),
+        "Graph selection should not recompute the project explorer stamp.");
+    Assert(
+        syncOnlyBody.Contains("SyncProjectTreeSelection(Graph.SelectedNodeId);", StringComparison.Ordinal),
+        "Selection-only explorer refresh should reuse the existing node item lookup.");
+    Assert(
+        syncOnlyBody.Contains("if (ProjectTree.Items.Count == 0)", StringComparison.Ordinal)
+            && syncOnlyBody.Contains("RefreshExplorer();", StringComparison.Ordinal),
+        "Selection-only explorer refresh should fall back to a full build when the tree is empty.");
 }
 
 static void ProjectExplorerSelectionSkipsUnchangedSync()

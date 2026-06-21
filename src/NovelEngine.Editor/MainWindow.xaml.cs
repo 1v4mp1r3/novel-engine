@@ -408,8 +408,27 @@ public partial class MainWindow : Window
 
     private void HandleGraphSelection()
     {
-        RefreshExplorer();
+        RefreshExplorerSelection();
         RefreshProperties();
+    }
+
+    private void RefreshExplorerSelection()
+    {
+        if (ProjectTree.Items.Count == 0)
+        {
+            RefreshExplorer();
+            return;
+        }
+
+        _syncingSelection = true;
+        try
+        {
+            SyncProjectTreeSelection(Graph.SelectedNodeId);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
     }
 
     private void RefreshExplorer()
