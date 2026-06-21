@@ -438,22 +438,7 @@ public static class ProjectLanguage
         }
 
         var normalizedPrefix = prefix.TrimStart('@');
-        var items = candidates
-            .Where(
-                item => normalizedPrefix.Length == 0
-                    || item.Label.TrimStart('@').StartsWith(
-                        normalizedPrefix,
-                        StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(item => item.InsertText, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(
-                item => item.Label.StartsWith(
-                    normalizedPrefix,
-                    StringComparison.OrdinalIgnoreCase)
-                        ? 0
-                        : 1)
-            .ThenBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
-            .Take(40)
-            .ToList();
+        var items = BuildCompletionItems(candidates, normalizedPrefix);
         return new ProjectLanguageCompletionContext(
             replacementStart,
             caretOffset - replacementStart,
@@ -1421,6 +1406,69 @@ public static class ProjectLanguage
                     value,
                     description,
                     ProjectLanguageCompletionKind.Value));
+        }
+    }
+
+    private static IReadOnlyList<ProjectLanguageCompletion> BuildCompletionItems(
+        IReadOnlyList<ProjectLanguageCompletion> candidates,
+        string normalizedPrefix)
+    {
+        const int limit = 40;
+        var seenInsertText = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var directMatches = new List<ProjectLanguageCompletion>();
+        var normalizedMatches = new List<ProjectLanguageCompletion>();
+
+        foreach (var item in candidates)
+        {
+            var normalizedLabel = item.Label.TrimStart('@');
+            if (normalizedPrefix.Length > 0
+                && !normalizedLabel.StartsWith(
+                    normalizedPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!seenInsertText.Add(item.InsertText))
+            {
+                continue;
+            }
+
+            if (item.Label.StartsWith(
+                normalizedPrefix,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                directMatches.Add(item);
+            }
+            else
+            {
+                normalizedMatches.Add(item);
+            }
+        }
+
+        directMatches.Sort(CompareCompletionLabels);
+        normalizedMatches.Sort(CompareCompletionLabels);
+
+        var items = new List<ProjectLanguageCompletion>(
+            Math.Min(limit, directMatches.Count + normalizedMatches.Count));
+        AddCompletionItems(items, directMatches, limit);
+        AddCompletionItems(items, normalizedMatches, limit);
+        return items;
+    }
+
+    private static int CompareCompletionLabels(
+        ProjectLanguageCompletion left,
+        ProjectLanguageCompletion right) =>
+        StringComparer.OrdinalIgnoreCase.Compare(left.Label, right.Label);
+
+    private static void AddCompletionItems(
+        List<ProjectLanguageCompletion> target,
+        IReadOnlyList<ProjectLanguageCompletion> source,
+        int limit)
+    {
+        for (var index = 0; index < source.Count && target.Count < limit; index++)
+        {
+            target.Add(source[index]);
         }
     }
 

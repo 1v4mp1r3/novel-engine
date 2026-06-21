@@ -3083,11 +3083,31 @@ static void ProjectLanguageCompletesNoisyScopesQuickly()
     var ignoredBody = ExtractMethodBody(
         projectLanguageSource,
         "private static IReadOnlyList<ProjectLanguageSyntaxSpan> GetIgnoredSyntaxSpans");
+    var completionItemsBody = ExtractMethodBody(
+        projectLanguageSource,
+        "private static IReadOnlyList<ProjectLanguageCompletion> BuildCompletionItems");
 
     Assert(
         completionBody.Contains("GetIgnoredSyntaxSpans(source)", StringComparison.Ordinal)
-            && !completionBody.Contains("GetSyntaxSpans(source)", StringComparison.Ordinal),
+            && completionBody.Contains("BuildCompletionItems(candidates, normalizedPrefix)", StringComparison.Ordinal)
+            && !completionBody.Contains("GetSyntaxSpans(source)", StringComparison.Ordinal)
+            && !completionBody.Contains(".DistinctBy(", StringComparison.Ordinal)
+            && !completionBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !completionBody.Contains(".Take(", StringComparison.Ordinal),
         "Completions should scan ignored text directly instead of running full syntax highlighting.");
+    Assert(
+        completionItemsBody.Contains(
+            "new HashSet<string>(StringComparer.OrdinalIgnoreCase)",
+            StringComparison.Ordinal)
+            && completionItemsBody.Contains("directMatches.Sort(CompareCompletionLabels)", StringComparison.Ordinal)
+            && completionItemsBody.Contains("normalizedMatches.Sort(CompareCompletionLabels)", StringComparison.Ordinal)
+            && completionItemsBody.Contains("AddCompletionItems(items, directMatches, limit)", StringComparison.Ordinal)
+            && completionItemsBody.Contains("AddCompletionItems(items, normalizedMatches, limit)", StringComparison.Ordinal)
+            && !completionItemsBody.Contains(".Where(", StringComparison.Ordinal)
+            && !completionItemsBody.Contains(".DistinctBy(", StringComparison.Ordinal)
+            && !completionItemsBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !completionItemsBody.Contains(".Take(", StringComparison.Ordinal),
+        "Completion items should be filtered, deduplicated, and limited without LINQ pipelines.");
     Assert(
         ignoredBody.Contains("while (index < source.Length)", StringComparison.Ordinal)
             && ignoredBody.Contains("ProjectLanguageSyntaxKind.Comment", StringComparison.Ordinal)
