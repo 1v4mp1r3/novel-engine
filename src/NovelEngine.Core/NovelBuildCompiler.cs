@@ -130,10 +130,18 @@ public static class NovelBuildCompiler
         NovelProject source,
         NovelProject destination)
     {
+        var destinationNodesById = new Dictionary<string, NovelNode>(
+            StringComparer.Ordinal);
+        foreach (var destinationNode in destination.Nodes)
+        {
+            destinationNodesById.TryAdd(destinationNode.Id, destinationNode);
+        }
+
         foreach (var sourceNode in source.Nodes)
         {
-            var destinationNode = destination.FindNode(sourceNode.Id);
-            if (destinationNode is null)
+            if (!destinationNodesById.TryGetValue(
+                    sourceNode.Id,
+                    out var destinationNode))
             {
                 continue;
             }

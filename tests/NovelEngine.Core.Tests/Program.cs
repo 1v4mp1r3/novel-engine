@@ -63,6 +63,7 @@ var tests = new (string Name, Action Run)[]
     ("project language completes noisy scopes quickly", ProjectLanguageCompletesNoisyScopesQuickly),
     ("project language finds nested code scopes", ProjectLanguageFindsScopes),
     ("build compiler preserves visual script blocks", BuildCompilerPreservesVisualScriptBlocks),
+    ("build compiler copies visual blocks with node lookup", BuildCompilerCopiesVisualBlocksWithNodeLookup),
     ("build compiler emits runnable package", BuildCompilerEmitsPackage),
 };
 
@@ -2676,6 +2677,32 @@ static void BuildCompilerPreservesVisualScriptBlocks()
     }
 }
 
+static void BuildCompilerCopiesVisualBlocksWithNodeLookup()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "NovelBuildCompiler.cs"));
+    var body = ExtractMethodBody(source, "private static void CopyVisualScriptBlocks");
+    var dictionaryIndex = body.IndexOf(
+        "var destinationNodesById = new Dictionary<string, NovelNode>",
+        StringComparison.Ordinal);
+    var loopIndex = body.IndexOf(
+        "foreach (var sourceNode in source.Nodes)",
+        StringComparison.Ordinal);
+
+    Assert(
+        dictionaryIndex >= 0 && loopIndex > dictionaryIndex,
+        "Build compiler should prepare destination node lookup before copying blocks.");
+    Assert(
+        body.Contains("destinationNodesById.TryGetValue", StringComparison.Ordinal),
+        "Build compiler should use the destination node lookup while copying blocks.");
+    Assert(
+        !body.Contains("destination.FindNode", StringComparison.Ordinal),
+        "Build compiler should not linearly search destination nodes for every source node.");
+}
+
 static void BuildCompilerEmitsPackage()
 {
     var directory = Path.Combine(
@@ -2934,6 +2961,34 @@ static string FindRepositoryRoot()
     }
 
     return directory;
+}
+
+static string ExtractMethodBody(string source, string methodName)
+{
+    var methodIndex = source.IndexOf(methodName, StringComparison.Ordinal);
+    Assert(methodIndex >= 0, $"Method was not found: {methodName}.");
+
+    var openBrace = source.IndexOf('{', methodIndex);
+    Assert(openBrace >= 0, $"Method body was not found: {methodName}.");
+
+    var depth = 0;
+    for (var index = openBrace; index < source.Length; index++)
+    {
+        if (source[index] == '{')
+        {
+            depth++;
+        }
+        else if (source[index] == '}')
+        {
+            depth--;
+            if (depth == 0)
+            {
+                return source[(openBrace + 1)..index];
+            }
+        }
+    }
+
+    throw new InvalidOperationException($"Method body was not closed: {methodName}.");
 }
 
 static void Assert(bool condition, string message)
