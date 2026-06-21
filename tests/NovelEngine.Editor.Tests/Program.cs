@@ -1134,10 +1134,16 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
             && listBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
         "Asset list runtime stamp should use catalog counts and revision.");
     Assert(
-        listBody.Contains("AssetsGrid.SelectedItem = assetViews", StringComparison.Ordinal)
+        listBody.Contains("foreach (var asset in filtered.Assets)", StringComparison.Ordinal)
+            && listBody.Contains("var view = new AssetView(", StringComparison.Ordinal)
+            && listBody.Contains("selectedView = view;", StringComparison.Ordinal)
+            && listBody.Contains("AssetsGrid.SelectedItem = selectedView;", StringComparison.Ordinal)
+            && !listBody.Contains(".Select(", StringComparison.Ordinal)
+            && !listBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !listBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
             && !listBody.Contains("AssetsGrid.Items\r\n                .OfType<AssetView>()", StringComparison.Ordinal)
             && !listBody.Contains("AssetsGrid.Items\n                .OfType<AssetView>()", StringComparison.Ordinal),
-        "Asset list should restore selection from freshly built views instead of walking grid items.");
+        "Asset list should build view models and restore selection in one direct pass.");
     Assert(
         folderBody.Contains("_project.AssetFolders.Count", StringComparison.Ordinal)
             && folderBody.Contains("_project.Assets.Count", StringComparison.Ordinal)

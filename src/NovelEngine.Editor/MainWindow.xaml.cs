@@ -2078,24 +2078,29 @@ public partial class MainWindow : Window
             _selectedAssetFolder,
             AssetSearchBox.Text);
         var usageCounts = GetAssetUsageCounts();
-        var assetViews = filtered.Assets
-            .Select(
-                asset => new AssetView(
-                    asset,
-                    usageCounts.GetValueOrDefault(asset.Id),
-                    AssetSize(asset)))
-            .ToList();
+        var assetViews = new List<AssetView>(filtered.Assets.Count);
+        AssetView? selectedView = null;
+        foreach (var asset in filtered.Assets)
+        {
+            var view = new AssetView(
+                asset,
+                usageCounts.GetValueOrDefault(asset.Id),
+                AssetSize(asset));
+            assetViews.Add(view);
+            if (selectedId is not null
+                && view.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedView = view;
+            }
+        }
+
         AssetsGrid.ItemsSource = assetViews;
         AssetSearchSummaryText.Text = filtered.Query.Length == 0
             ? string.Empty
             : $"Найдено {assetViews.Count} из {filtered.FolderAssetCount}";
-        if (selectedId is not null)
+        if (selectedView is not null)
         {
-            AssetsGrid.SelectedItem = assetViews
-                .FirstOrDefault(
-                    view => view.Id.Equals(
-                        selectedId,
-                        StringComparison.OrdinalIgnoreCase));
+            AssetsGrid.SelectedItem = selectedView;
         }
         RefreshAssetPreview();
     }
