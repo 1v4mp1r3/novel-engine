@@ -29,6 +29,9 @@ public partial class MainWindow : Window
     private const int MaxProjectHistoryEntries = 100;
     private const int MaxCachedAssetPreviewImages = 48;
 
+    private static readonly IReadOnlyDictionary<string, string> EmptyNodeTitleLookup =
+        new Dictionary<string, string>(0, StringComparer.Ordinal);
+
     private NovelProject _project = NovelProject.CreateDefault();
     private string? _projectPath;
     private bool _dirty;
@@ -585,7 +588,8 @@ public partial class MainWindow : Window
     private void RefreshProperties()
     {
         var node = Graph.SelectedNode;
-        var stamp = CreateNodePropertyPanelStamp(_project, node);
+        var nodeTitlesById = BuildOutputTargetTitleLookup(_project, node);
+        var stamp = CreateNodePropertyPanelStamp(_project, node, nodeTitlesById);
         if (_nodePropertyPanelStamp == stamp)
         {
             return;
@@ -641,7 +645,6 @@ public partial class MainWindow : Window
             CharactersGrid.ItemsSource = node.Characters
                 .Select(character => new CharacterView(character))
                 .ToList();
-            var nodeTitlesById = BuildNodeTitleLookup(_project);
             OutputsGrid.ItemsSource = node.Outputs
                 .Select(output => new OutputView(
                     output,
@@ -933,7 +936,8 @@ public partial class MainWindow : Window
 
     internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp(
         NovelProject project,
-        NovelNode? node)
+        NovelNode? node,
+        IReadOnlyDictionary<string, string>? nodeTitlesById = null)
     {
         var hash = new HashCode();
         hash.Add(project.Characters.Count);
@@ -955,7 +959,7 @@ public partial class MainWindow : Window
         hash.Add(node.InheritCharacters);
         hash.Add(node.Script, StringComparer.Ordinal);
         hash.Add(node.ScriptBlocks.Count);
-        var nodeTitlesById = BuildNodeTitleLookup(project);
+        nodeTitlesById ??= BuildOutputTargetTitleLookup(project, node);
         foreach (var character in node.Characters)
         {
             hash.Add(character.Id, StringComparer.Ordinal);
@@ -984,6 +988,19 @@ public partial class MainWindow : Window
         }
 
         return new NodePropertyPanelStamp(node.Id, hash.ToHashCode());
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildOutputTargetTitleLookup(
+        NovelProject project,
+        NovelNode? node)
+    {
+        if (node is null
+            || !node.Outputs.Any(output => output.TargetNodeId is not null))
+        {
+            return EmptyNodeTitleLookup;
+        }
+
+        return BuildNodeTitleLookup(project);
     }
 
     private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup(

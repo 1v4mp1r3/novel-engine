@@ -3088,6 +3088,9 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
     var stampBody = ExtractMethodBody(
         source,
         "internal static NodePropertyPanelStamp CreateNodePropertyPanelStamp");
+    var outputLookupBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyDictionary<string, string> BuildOutputTargetTitleLookup");
     var lookupBody = ExtractMethodBody(
         source,
         "private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup");
@@ -3096,11 +3099,27 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
         "private static string ResolveNodeTitle");
 
     Assert(
-        refreshBody.Contains("BuildNodeTitleLookup(_project)", StringComparison.Ordinal),
-        "Node property refresh should build output target title lookup once.");
+        refreshBody.Contains(
+            "var nodeTitlesById = BuildOutputTargetTitleLookup(_project, node);",
+            StringComparison.Ordinal),
+        "Node property refresh should build the output target title lookup before stamping.");
     Assert(
-        stampBody.Contains("BuildNodeTitleLookup(project)", StringComparison.Ordinal),
-        "Node property stamp should build output target title lookup once.");
+        refreshBody.Contains(
+            "CreateNodePropertyPanelStamp(_project, node, nodeTitlesById)",
+            StringComparison.Ordinal),
+        "Node property refresh should pass the target title lookup into the stamp.");
+    Assert(
+        !refreshBody.Contains("BuildNodeTitleLookup(_project)", StringComparison.Ordinal),
+        "Node property refresh should not build the target title lookup twice.");
+    Assert(
+        stampBody.Contains(
+            "nodeTitlesById ??= BuildOutputTargetTitleLookup(project, node);",
+            StringComparison.Ordinal),
+        "Node property stamp should reuse a provided target title lookup.");
+    Assert(
+        outputLookupBody.Contains("TargetNodeId is not null", StringComparison.Ordinal)
+            && outputLookupBody.Contains("EmptyNodeTitleLookup", StringComparison.Ordinal),
+        "Output target title lookup should skip full graph indexing when no outputs are connected.");
     Assert(
         !refreshBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal)
             && !stampBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal),
