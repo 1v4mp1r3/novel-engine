@@ -14,24 +14,26 @@ internal static class AssetListFilter
         var normalizedFolder = selectedFolder is null
             ? null
             : ProjectAssets.NormalizeFolder(selectedFolder);
-        var filteredByFolder = new List<NovelAsset>();
+        var tokens = SplitSearchQuery(normalizedQuery);
+        var visibleAssets = new List<NovelAsset>();
+        var folderAssetCount = 0;
         foreach (var asset in assets)
         {
-            if (normalizedFolder is null
-                || asset.Folder.Equals(
+            if (normalizedFolder is not null
+                && !asset.Folder.Equals(
                     normalizedFolder,
                     StringComparison.OrdinalIgnoreCase))
             {
-                filteredByFolder.Add(asset);
+                continue;
+            }
+
+            folderAssetCount++;
+            if (tokens.Length == 0 || MatchesSearch(asset, tokens))
+            {
+                visibleAssets.Add(asset);
             }
         }
 
-        var folderAssetCount = filteredByFolder.Count;
-        var visibleAssets = normalizedQuery.Length == 0
-            ? filteredByFolder
-            : filteredByFolder
-                .Where(asset => MatchesSearch(asset, normalizedQuery))
-                .ToList();
         visibleAssets.Sort(CompareAssets);
         return new AssetListFilterResult(
             normalizedQuery,
@@ -47,19 +49,19 @@ internal static class AssetListFilter
             : StringComparer.CurrentCultureIgnoreCase.Compare(left.Id, right.Id);
     }
 
-    private static bool MatchesSearch(NovelAsset asset, string query)
-    {
-        var tokens = query.Split(
+    private static string[] SplitSearchQuery(string query) =>
+        query.Split(
             ' ',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return tokens.Length == 0 || tokens.All(token =>
+
+    private static bool MatchesSearch(NovelAsset asset, IReadOnlyList<string> tokens) =>
+        tokens.All(token =>
             ContainsSearchToken(asset.Id, token)
             || ContainsSearchToken(asset.Path, token)
             || ContainsSearchToken(asset.Folder, token)
             || ContainsSearchToken(Path.GetFileName(asset.Path), token)
             || ContainsSearchToken(asset.Kind.ToString(), token)
             || ContainsSearchToken(AssetKindLabel(asset.Kind), token));
-    }
 
     private static bool ContainsSearchToken(string value, string token) =>
         value.Contains(token, StringComparison.CurrentCultureIgnoreCase);

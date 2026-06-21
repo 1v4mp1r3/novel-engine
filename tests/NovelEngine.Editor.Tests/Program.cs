@@ -36,6 +36,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
+    ("asset list filter searches in one pass", AssetListFilterSearchesInOnePass),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
     ("asset catalog runtime stamps avoid full scans", AssetCatalogRuntimeStampsAvoidFullScans),
@@ -925,6 +926,34 @@ static void AssetListFilterSearchesWithinSelectedFolder()
     Assert(result.FolderAssetCount == 2, "Asset folder count ignored the selected folder.");
     Assert(result.Assets.Count == 1, "Asset search did not filter the selected folder.");
     Assert(result.Assets[0].Id == "mount_fuji", "Asset search returned the wrong asset.");
+
+    var allFoldersResult = AssetListFilter.Apply(assets, null, "voice");
+    Assert(allFoldersResult.FolderAssetCount == 3, "Asset search across all folders should count all assets.");
+    Assert(allFoldersResult.Assets.Count == 1, "Asset search across all folders returned the wrong count.");
+    Assert(allFoldersResult.Assets[0].Id == "hero_voice", "Asset search across all folders returned the wrong asset.");
+}
+
+static void AssetListFilterSearchesInOnePass()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "AssetListFilter.cs"));
+    var applyBody = ExtractMethodBody(source, "public static AssetListFilterResult Apply");
+    var matchesBody = ExtractMethodBody(source, "private static bool MatchesSearch");
+
+    Assert(
+        applyBody.Contains("var tokens = SplitSearchQuery(normalizedQuery);", StringComparison.Ordinal),
+        "Asset list filtering should tokenize the query once before scanning assets.");
+    Assert(
+        !matchesBody.Contains(".Split(", StringComparison.Ordinal),
+        "Asset search matching should not split the query per asset.");
+    Assert(
+        !applyBody.Contains("filteredByFolder", StringComparison.Ordinal)
+            && !applyBody.Contains(".Where(", StringComparison.Ordinal)
+            && !applyBody.Contains(".ToList()", StringComparison.Ordinal),
+        "Asset list filtering should avoid separate folder and search passes.");
 }
 
 static void AssetListStampTracksVisibleInputState()
