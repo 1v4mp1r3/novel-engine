@@ -6582,9 +6582,7 @@ public partial class MainWindow : Window
         }
 
         _diagnosticsPanelStamp = stamp;
-        var diagnostics = report.Diagnostics
-            .Select(diagnostic => new DiagnosticView(diagnostic))
-            .ToList();
+        var diagnostics = CreateDiagnosticViews(report.Diagnostics);
         DiagnosticsGrid.ItemsSource = diagnostics;
         DiagnosticsSummaryText.Text =
             $"Диагностика: {report.ErrorCount} ошибок, "
@@ -6619,6 +6617,18 @@ public partial class MainWindow : Window
                     : $"Проверка проекта: заметок {report.InfoCount}";
         }
         return report;
+    }
+
+    private static List<DiagnosticView> CreateDiagnosticViews(
+        IReadOnlyList<ProjectDiagnostic> diagnostics)
+    {
+        var views = new List<DiagnosticView>(diagnostics.Count);
+        for (var index = 0; index < diagnostics.Count; index++)
+        {
+            views.Add(new DiagnosticView(diagnostics[index]));
+        }
+
+        return views;
     }
 
     private ProjectDiagnosticReport GetProjectDiagnostics() =>

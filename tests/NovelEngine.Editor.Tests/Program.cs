@@ -2241,12 +2241,29 @@ static void DiagnosticPanelStampTracksVisibleDiagnostics()
     var body = ExtractMethodBody(
         source,
         "internal static DiagnosticPanelStamp CreateDiagnosticPanelStamp");
+    var refreshBody = ExtractMethodBody(
+        source,
+        "private ProjectDiagnosticReport RefreshProjectDiagnostics");
+    var viewBody = ExtractMethodBody(
+        source,
+        "private static List<DiagnosticView> CreateDiagnosticViews");
     Assert(
         body.Contains("report.Fingerprint", StringComparison.Ordinal),
         "Diagnostic panel stamp should use the report fingerprint.");
     Assert(
         !body.Contains("foreach", StringComparison.Ordinal),
         "Diagnostic panel stamp should not rescan diagnostics.");
+    Assert(
+        refreshBody.Contains("var diagnostics = CreateDiagnosticViews(report.Diagnostics);", StringComparison.Ordinal)
+            && !refreshBody.Contains(".Select(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Diagnostic refresh should build rows without LINQ pipelines.");
+    Assert(
+        viewBody.Contains("var views = new List<DiagnosticView>(diagnostics.Count);", StringComparison.Ordinal)
+            && viewBody.Contains("for (var index = 0; index < diagnostics.Count; index++)", StringComparison.Ordinal)
+            && !viewBody.Contains(".Select(", StringComparison.Ordinal)
+            && !viewBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Diagnostic rows should be built with one direct pass.");
 }
 
 static void AppCollectionStylesEnableVirtualization()
