@@ -16,19 +16,43 @@ public sealed class ProjectDiagnosticReport
 {
     public ProjectDiagnosticReport(IReadOnlyList<ProjectDiagnostic> diagnostics)
     {
-        Diagnostics = diagnostics;
+        Diagnostics = diagnostics.ToArray();
+        var hash = new HashCode();
+        foreach (var diagnostic in Diagnostics)
+        {
+            hash.Add(diagnostic.Severity);
+            hash.Add(diagnostic.Location, StringComparer.Ordinal);
+            hash.Add(diagnostic.Message, StringComparer.Ordinal);
+            switch (diagnostic.Severity)
+            {
+                case ProjectDiagnosticSeverity.Error:
+                    ErrorCount++;
+                    break;
+                case ProjectDiagnosticSeverity.Warning:
+                    WarningCount++;
+                    break;
+                case ProjectDiagnosticSeverity.Info:
+                    InfoCount++;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(diagnostic.Severity),
+                        diagnostic.Severity,
+                        null);
+            }
+        }
+        Fingerprint = hash.ToHashCode();
     }
 
     public IReadOnlyList<ProjectDiagnostic> Diagnostics { get; }
 
-    public int ErrorCount =>
-        Diagnostics.Count(diagnostic => diagnostic.Severity == ProjectDiagnosticSeverity.Error);
+    public int ErrorCount { get; }
 
-    public int WarningCount =>
-        Diagnostics.Count(diagnostic => diagnostic.Severity == ProjectDiagnosticSeverity.Warning);
+    public int WarningCount { get; }
 
-    public int InfoCount =>
-        Diagnostics.Count(diagnostic => diagnostic.Severity == ProjectDiagnosticSeverity.Info);
+    public int InfoCount { get; }
+
+    public int Fingerprint { get; }
 
     public bool HasErrors => ErrorCount > 0;
 }

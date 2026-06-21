@@ -6319,21 +6319,13 @@ public partial class MainWindow : Window
         ProjectDiagnosticReport report,
         bool showPanel)
     {
-        var hash = new HashCode();
-        foreach (var diagnostic in report.Diagnostics)
-        {
-            hash.Add(diagnostic.Severity);
-            hash.Add(diagnostic.Location, StringComparer.Ordinal);
-            hash.Add(diagnostic.Message, StringComparer.Ordinal);
-        }
-
         return new DiagnosticPanelStamp(
             showPanel,
             report.ErrorCount,
             report.WarningCount,
             report.InfoCount,
             report.Diagnostics.Count,
-            hash.ToHashCode());
+            report.Fingerprint);
     }
 
     private void HideDiagnostics_Click(object sender, RoutedEventArgs e)

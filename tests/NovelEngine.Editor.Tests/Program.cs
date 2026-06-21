@@ -1754,6 +1754,21 @@ static void DiagnosticPanelStampTracksVisibleDiagnostics()
             new ProjectDiagnosticReport(diagnostics[..1]),
             showPanel: false),
         "Diagnostic panel stamp should track changed diagnostics.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(
+        source,
+        "internal static DiagnosticPanelStamp CreateDiagnosticPanelStamp");
+    Assert(
+        body.Contains("report.Fingerprint", StringComparison.Ordinal),
+        "Diagnostic panel stamp should use the report fingerprint.");
+    Assert(
+        !body.Contains("foreach", StringComparison.Ordinal),
+        "Diagnostic panel stamp should not rescan diagnostics.");
 }
 
 static void AppCollectionStylesEnableVirtualization()

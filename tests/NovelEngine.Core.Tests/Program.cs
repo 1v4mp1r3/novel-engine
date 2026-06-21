@@ -6,6 +6,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics report authoring issues", ProjectDiagnosticsReportAuthoringIssues),
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("project diagnostics check character voice references", ProjectDiagnosticsCheckCharacterVoiceReferences),
+    ("project diagnostics report caches summary", ProjectDiagnosticsReportCachesSummary),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
@@ -213,6 +214,34 @@ static void ProjectDiagnosticsCheckCharacterVoiceReferences()
                 && diagnostic.Message.Contains("@missing_voice", StringComparison.Ordinal)
                 && diagnostic.Message.Contains("библиотека персонажей", StringComparison.Ordinal)),
         "Missing character voice diagnostic did not point to the library character.");
+}
+
+static void ProjectDiagnosticsReportCachesSummary()
+{
+    var diagnostics = new List<ProjectDiagnostic>
+    {
+        new(ProjectDiagnosticSeverity.Error, "Нода «start»", "Нет выхода."),
+        new(ProjectDiagnosticSeverity.Warning, "Ассет @bg", "Не используется."),
+        new(ProjectDiagnosticSeverity.Info, "Ассет @voice", "Можно удалить."),
+    };
+    var report = new ProjectDiagnosticReport(diagnostics);
+    var same = new ProjectDiagnosticReport(diagnostics);
+    var changed = new ProjectDiagnosticReport(
+    [
+        new ProjectDiagnostic(ProjectDiagnosticSeverity.Error, "Нода «start»", "Нет выхода."),
+        new ProjectDiagnostic(ProjectDiagnosticSeverity.Warning, "Ассет @bg", "Не используется."),
+        new ProjectDiagnostic(ProjectDiagnosticSeverity.Info, "Ассет @voice", "Другое сообщение."),
+    ]);
+
+    diagnostics.Add(
+        new ProjectDiagnostic(ProjectDiagnosticSeverity.Error, "Позднее", "Не должно попасть."));
+
+    Assert(report.ErrorCount == 1, "Report should cache error count.");
+    Assert(report.WarningCount == 1, "Report should cache warning count.");
+    Assert(report.InfoCount == 1, "Report should cache info count.");
+    Assert(report.Diagnostics.Count == 3, "Report diagnostics should be snapshot-stable.");
+    Assert(report.Fingerprint == same.Fingerprint, "Same diagnostics should keep the same fingerprint.");
+    Assert(report.Fingerprint != changed.Fingerprint, "Changed diagnostics should change fingerprint.");
 }
 
 static void CharacterLibraryRoundTrip()
