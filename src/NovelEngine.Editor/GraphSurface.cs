@@ -175,18 +175,16 @@ public sealed class GraphSurface : FrameworkElement
 
     public void CenterGraph()
     {
-        if (Project.Nodes.Count == 0 || ActualWidth <= 0 || ActualHeight <= 0)
+        if (ActualWidth <= 0
+            || ActualHeight <= 0
+            || !TryCalculateGraphBounds(Project.Nodes, out var graphBounds))
         {
             return;
         }
 
-        var left = Project.Nodes.Min(node => node.X);
-        var right = Project.Nodes.Max(node => node.X + NodeWidth);
-        var top = Project.Nodes.Min(node => node.Y);
-        var bottom = Project.Nodes.Max(node => node.Y + GetNodeHeight(node));
         _viewOffset = new Vector(
-            ActualWidth / 2 - (left + right) / 2,
-            ActualHeight / 2 - (top + bottom) / 2);
+            ActualWidth / 2 - (graphBounds.Left + graphBounds.Right) / 2,
+            ActualHeight / 2 - (graphBounds.Top + graphBounds.Bottom) / 2);
         _needsInitialCenter = false;
         ResetHoverHitCache();
         RequestRender();
@@ -1400,6 +1398,34 @@ public sealed class GraphSurface : FrameworkElement
 
     internal static Rect GetWorldNodeRectangle(NovelNode node) =>
         new(node.X, node.Y, NodeWidth, GetNodeHeight(node));
+
+    internal static bool TryCalculateGraphBounds(
+        IReadOnlyList<NovelNode> nodes,
+        out Rect bounds)
+    {
+        if (nodes.Count == 0)
+        {
+            bounds = Rect.Empty;
+            return false;
+        }
+
+        var first = GetWorldNodeRectangle(nodes[0]);
+        var left = first.Left;
+        var right = first.Right;
+        var top = first.Top;
+        var bottom = first.Bottom;
+        for (var index = 1; index < nodes.Count; index++)
+        {
+            var rectangle = GetWorldNodeRectangle(nodes[index]);
+            left = Math.Min(left, rectangle.Left);
+            right = Math.Max(right, rectangle.Right);
+            top = Math.Min(top, rectangle.Top);
+            bottom = Math.Max(bottom, rectangle.Bottom);
+        }
+
+        bounds = new Rect(left, top, right - left, bottom - top);
+        return true;
+    }
 
     private Rect GetNodeRectangle(NovelNode node) =>
         OffsetRectangle(GetWorldNodeRectangle(node), _viewOffset);

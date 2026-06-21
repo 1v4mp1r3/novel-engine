@@ -103,6 +103,7 @@ var tests = new (string Name, Action Run)[]
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph surface uses cached node lookup", GraphSurfaceUsesCachedNodeLookup),
+    ("graph centering calculates bounds in one pass", GraphCenteringCalculatesBoundsInOnePass),
     ("graph inheritance menu caches incoming nodes", GraphInheritanceMenuCachesIncomingNodes),
     ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
     ("graph inheritance render skips selected node", GraphInheritanceRenderSkipsSelectedNode),
@@ -3450,6 +3451,60 @@ static void GraphSurfaceUsesCachedNodeLookup()
     Assert(
         outputPortBody.Contains("FindNode(nodeId)", StringComparison.Ordinal),
         "Graph output-port rendering should use the cached node helper.");
+}
+
+static void GraphCenteringCalculatesBoundsInOnePass()
+{
+    var first = new NovelNode
+    {
+        Id = "first",
+        Kind = NodeKind.Scene,
+        X = -30,
+        Y = 80,
+    };
+    var second = new NovelNode
+    {
+        Id = "second",
+        Kind = NodeKind.Dialogue,
+        X = 10,
+        Y = -20,
+    };
+    second.Outputs.Add(new NodeOutput { Id = "left" });
+    second.Outputs.Add(new NodeOutput { Id = "middle" });
+    second.Outputs.Add(new NodeOutput { Id = "right" });
+
+    Assert(
+        GraphSurface.TryCalculateGraphBounds([first, second], out var bounds),
+        "Graph bounds should be calculated for non-empty node lists.");
+    Assert(Math.Abs(bounds.Left - -30) < 0.001, "Graph bounds left edge is wrong.");
+    Assert(Math.Abs(bounds.Top - -20) < 0.001, "Graph bounds top edge is wrong.");
+    Assert(Math.Abs(bounds.Right - 230) < 0.001, "Graph bounds right edge is wrong.");
+    Assert(Math.Abs(bounds.Bottom - 235) < 0.001, "Graph bounds bottom edge is wrong.");
+    Assert(
+        !GraphSurface.TryCalculateGraphBounds([], out _),
+        "Graph bounds should report empty input without work.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var centerBody = ExtractMethodBody(source, "public void CenterGraph");
+    var boundsBody = ExtractMethodBody(
+        source,
+        "internal static bool TryCalculateGraphBounds");
+    Assert(
+        centerBody.Contains("TryCalculateGraphBounds(Project.Nodes", StringComparison.Ordinal),
+        "CenterGraph should delegate graph bounds to the one-pass helper.");
+    Assert(
+        !centerBody.Contains(".Min(", StringComparison.Ordinal)
+            && !centerBody.Contains(".Max(", StringComparison.Ordinal),
+        "CenterGraph should not enumerate graph nodes through multiple Min/Max passes.");
+    Assert(
+        boundsBody.Contains("for (var index = 1; index < nodes.Count; index++)", StringComparison.Ordinal)
+            && !boundsBody.Contains("nodes.Min(", StringComparison.Ordinal)
+            && !boundsBody.Contains("nodes.Max(", StringComparison.Ordinal),
+        "Graph bounds helper should use one indexed pass over nodes.");
 }
 
 static void ModalEditorsSkipHiddenGraphRefresh()
