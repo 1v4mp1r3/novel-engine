@@ -18,11 +18,10 @@ public static class ProjectAssets
     public static int EnsureDefaultFolders(NovelProject project)
     {
         var changes = 0;
+        var knownFolders = BuildAssetFolderSet(project);
         foreach (var folder in DefaultProjectFolders)
         {
-            var before = project.AssetFolders.Count;
-            EnsureFolder(project, folder);
-            changes += project.AssetFolders.Count - before;
+            changes += EnsureFolder(project, folder, knownFolders);
         }
         return changes;
     }
@@ -155,6 +154,7 @@ public static class ProjectAssets
         }
 
         var changes = 0;
+        var knownAssetFolders = BuildAssetFolderSet(project);
         foreach (var directory in Directory.EnumerateDirectories(
             root,
             "*",
@@ -162,9 +162,7 @@ public static class ProjectAssets
         {
             var folder = NormalizeFolder(
                 Path.GetRelativePath(root, directory).Replace('\\', '/'));
-            var before = project.AssetFolders.Count;
-            EnsureFolder(project, folder);
-            changes += project.AssetFolders.Count - before;
+            changes += EnsureFolder(project, folder, knownAssetFolders);
         }
 
         var projectDirectory = GetProjectDirectory(projectPath);
@@ -199,7 +197,8 @@ public static class ProjectAssets
                 fullPath,
                 relativeProjectPath,
                 relativeFolder,
-                knownAssetIds);
+                knownAssetIds,
+                knownAssetFolders);
             knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
             knownFullPaths.Add(ResolvePath(projectPath, imported));
             changes += project.Assets.Count - before;
@@ -213,10 +212,11 @@ public static class ProjectAssets
         string fullPath,
         string relativeProjectPath,
         string relativeFolder,
-        HashSet<string> knownAssetIds)
+        HashSet<string> knownAssetIds,
+        HashSet<string> knownAssetFolders)
     {
         var folder = NormalizeFolder(relativeFolder);
-        EnsureFolder(project, folder);
+        EnsureFolder(project, folder, knownAssetFolders);
 
         var id = CreateUniqueAssetId(
             MakeId(Path.GetFileNameWithoutExtension(fullPath)),
@@ -237,6 +237,9 @@ public static class ProjectAssets
         project.Assets
             .Select(asset => asset.Id)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static HashSet<string> BuildAssetFolderSet(NovelProject project) =>
+        project.AssetFolders.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static string CreateUniqueAssetId(
         string baseId,
@@ -466,24 +469,29 @@ public static class ProjectAssets
             relativeFolder);
     }
 
-    private static void EnsureFolder(NovelProject project, string folder)
+    private static int EnsureFolder(
+        NovelProject project,
+        string folder,
+        HashSet<string>? knownFolders = null)
     {
         folder = NormalizeFolder(folder);
         if (folder.Length == 0)
         {
-            return;
+            return 0;
         }
+        knownFolders ??= BuildAssetFolderSet(project);
+        var changes = 0;
         var current = string.Empty;
         foreach (var segment in folder.Split('/'))
         {
             current = current.Length == 0 ? segment : $"{current}/{segment}";
-            if (!project.AssetFolders.Contains(
-                current,
-                StringComparer.OrdinalIgnoreCase))
+            if (knownFolders.Add(current))
             {
                 project.AssetFolders.Add(current);
+                changes++;
             }
         }
+        return changes;
     }
 
     private static string ParentFolder(string folder)

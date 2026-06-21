@@ -57,7 +57,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
-    ("project asset sync caches generated ids", ProjectAssetSyncCachesGeneratedIds),
+    ("project asset sync caches generated lookups", ProjectAssetSyncCachesGeneratedLookups),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
@@ -2471,7 +2471,7 @@ static void ProjectAssetSyncNormalizesExistingPathSeparators()
     }
 }
 
-static void ProjectAssetSyncCachesGeneratedIds()
+static void ProjectAssetSyncCachesGeneratedLookups()
 {
     var source = File.ReadAllText(Path.Combine(
         FindRepositoryRoot(),
@@ -2482,6 +2482,9 @@ static void ProjectAssetSyncCachesGeneratedIds()
     var registerBody = ExtractMethodBody(
         source,
         "private static NovelAsset RegisterManagedFile");
+    var ensureFolderBody = ExtractMethodBody(
+        source,
+        "private static int EnsureFolder");
     var createBody = ExtractMethodBody(
         source,
         "private static string CreateUniqueAssetId");
@@ -2490,9 +2493,13 @@ static void ProjectAssetSyncCachesGeneratedIds()
         syncBody.Contains("BuildAssetIdSet(project)", StringComparison.Ordinal),
         "Asset sync should build the known id set once.");
     Assert(
+        syncBody.Contains("BuildAssetFolderSet(project)", StringComparison.Ordinal),
+        "Asset sync should build the known folder set once.");
+    Assert(
         syncBody.Contains("knownAssetIds", StringComparison.Ordinal)
+            && syncBody.Contains("knownAssetFolders", StringComparison.Ordinal)
             && syncBody.Contains("RegisterManagedFile(", StringComparison.Ordinal),
-        "Asset sync should pass the known id set through file registration.");
+        "Asset sync should pass known lookup sets through file registration.");
     Assert(
         registerBody.Contains(
             "CreateUniqueAssetId(\r\n            MakeId(Path.GetFileNameWithoutExtension(fullPath)),\r\n            knownAssetIds)",
@@ -2502,12 +2509,23 @@ static void ProjectAssetSyncCachesGeneratedIds()
                 StringComparison.Ordinal),
         "Managed file registration should use the shared id set.");
     Assert(
+        registerBody.Contains(
+            "EnsureFolder(project, folder, knownAssetFolders)",
+            StringComparison.Ordinal),
+        "Managed file registration should use the shared folder set.");
+    Assert(
         !syncBody.Contains("FindAsset(", StringComparison.Ordinal)
             && !registerBody.Contains("FindAsset(", StringComparison.Ordinal),
         "Asset sync should not use linear asset lookup while registering files.");
     Assert(
+        !ensureFolderBody.Contains("AssetFolders.Contains", StringComparison.Ordinal),
+        "Folder registration should use the cached folder set.");
+    Assert(
         createBody.Contains("knownAssetIds.Add(id)", StringComparison.Ordinal),
         "Unique asset id creation should claim ids through the hash set.");
+    Assert(
+        ensureFolderBody.Contains("knownFolders.Add(current)", StringComparison.Ordinal),
+        "Folder registration should claim folders through the hash set.");
 }
 
 static void AssetFoldersMoveFiles()
