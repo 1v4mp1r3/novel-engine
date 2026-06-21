@@ -584,7 +584,7 @@ public partial class MainWindow : Window
 
     private void RefreshProperties()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var stamp = CreateNodePropertyPanelStamp(_project, node);
         if (_nodePropertyPanelStamp == stamp)
         {
@@ -684,7 +684,7 @@ public partial class MainWindow : Window
 
     private bool ApplyProperties()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         if (node is null)
         {
             return true;

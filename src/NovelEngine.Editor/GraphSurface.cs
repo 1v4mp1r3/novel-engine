@@ -75,6 +75,7 @@ public sealed class GraphSurface : FrameworkElement
 
     public NovelProject Project { get; private set; } = NovelProject.CreateDefault();
     public string? SelectedNodeId { get; private set; }
+    public NovelNode? SelectedNode => FindNode(SelectedNodeId);
 
     public event EventHandler? SelectionChanged;
     public event EventHandler? ProjectChanged;

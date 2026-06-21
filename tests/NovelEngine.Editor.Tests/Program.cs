@@ -90,6 +90,7 @@ var tests = new (string Name, Action Run)[]
     ("project explorer selection uses sync-only path", ProjectExplorerSelectionUsesSyncOnlyPath),
     ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
+    ("node property panel uses graph selected node cache", NodePropertyPanelUsesGraphSelectedNodeCache),
     ("node property panel uses cached target title lookup", NodePropertyPanelUsesCachedTargetTitleLookup),
     ("node asset picker cache invalidates property panel", NodeAssetPickerCacheInvalidatesPropertyPanel),
     ("main menu drag position clamps and skips micro moves", MainMenuDragPositionClampsAndSkipsMicroMoves),
@@ -2948,6 +2949,36 @@ static void NodePropertyPanelStampTracksVisibleState()
             changedAssetsProject,
             changedAssetsNode),
         "Node property panel stamp should leave asset picker inputs to explicit cache invalidation.");
+}
+
+static void NodePropertyPanelUsesGraphSelectedNodeCache()
+{
+    var windowSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var graphSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var refreshBody = ExtractMethodBody(windowSource, "private void RefreshProperties");
+    var applyBody = ExtractMethodBody(windowSource, "private bool ApplyProperties");
+
+    Assert(
+        graphSource.Contains("public NovelNode? SelectedNode => FindNode(SelectedNodeId);", StringComparison.Ordinal),
+        "GraphSurface should expose selected nodes through its cached node lookup.");
+    Assert(
+        refreshBody.Contains("var node = Graph.SelectedNode;", StringComparison.Ordinal),
+        "Node property refresh should use GraphSurface selected-node cache.");
+    Assert(
+        applyBody.Contains("var node = Graph.SelectedNode;", StringComparison.Ordinal),
+        "Node property apply should use GraphSurface selected-node cache.");
+    Assert(
+        !refreshBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal)
+            && !applyBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
+        "Hot node property paths should not linearly search the selected project node.");
 }
 
 static void NodePropertyPanelUsesCachedTargetTitleLookup()
