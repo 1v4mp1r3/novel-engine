@@ -97,7 +97,7 @@ public sealed class GraphSurface : FrameworkElement
 
     public void SelectNode(string? nodeId)
     {
-        if (nodeId is not null && Project.FindNode(nodeId) is null)
+        if (nodeId is not null && FindNode(nodeId) is null)
         {
             nodeId = null;
         }
@@ -336,7 +336,7 @@ public sealed class GraphSurface : FrameworkElement
             return;
         }
 
-        var node = Project.FindNode(_dragNodeId);
+        var node = FindNode(_dragNodeId);
         if (node is null)
         {
             return;
@@ -461,7 +461,7 @@ public sealed class GraphSurface : FrameworkElement
     private void AddConnectedNodeFromSelected(NodeKind kind)
     {
         if (SelectedNodeId is null
-            || Project.FindNode(SelectedNodeId) is not { } source)
+            || FindNode(SelectedNodeId) is not { } source)
         {
             System.Media.SystemSounds.Beep.Play();
             return;
@@ -485,7 +485,7 @@ public sealed class GraphSurface : FrameworkElement
     private void AddConnectedNodeTemplateFromSelected(NodeTemplateKind template)
     {
         if (SelectedNodeId is null
-            || Project.FindNode(SelectedNodeId) is not { } source)
+            || FindNode(SelectedNodeId) is not { } source)
         {
             System.Media.SystemSounds.Beep.Play();
             return;
@@ -546,7 +546,7 @@ public sealed class GraphSurface : FrameworkElement
 
         var outputPort = HitOutputPort(position);
         var node = outputPort is not null
-            ? Project.FindNode(outputPort.Value.NodeId)
+            ? FindNode(outputPort.Value.NodeId)
             : HitNode(position);
         if (node is not null)
         {
@@ -1027,6 +1027,16 @@ public sealed class GraphSurface : FrameworkElement
         }
     }
 
+    private NovelNode? FindNode(string? nodeId)
+    {
+        if (nodeId is null)
+        {
+            return null;
+        }
+        EnsureNodeLookup();
+        return _nodesById.TryGetValue(nodeId, out var node) ? node : null;
+    }
+
     private static void DrawCurve(
         DrawingContext drawingContext,
         Point start,
@@ -1282,7 +1292,7 @@ public sealed class GraphSurface : FrameworkElement
 
     private GraphOutputPortHitArea? GetOutputPort(string nodeId, string outputId)
     {
-        var node = Project.FindNode(nodeId);
+        var node = FindNode(nodeId);
         if (node is null)
         {
             return null;

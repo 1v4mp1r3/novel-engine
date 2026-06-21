@@ -99,6 +99,7 @@ var tests = new (string Name, Action Run)[]
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
+    ("graph surface uses cached node lookup", GraphSurfaceUsesCachedNodeLookup),
     ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
     ("graph inheritance render skips selected node", GraphInheritanceRenderSkipsSelectedNode),
     ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
@@ -3311,6 +3312,38 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void GraphSurfaceUsesCachedNodeLookup()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var helperBody = ExtractMethodBody(source, "private NovelNode? FindNode");
+    var selectBody = ExtractMethodBody(source, "public void SelectNode");
+    var dragBody = ExtractMethodBody(source, "protected override void OnMouseMove");
+    var outputPortBody = ExtractMethodBody(
+        source,
+        "private GraphOutputPortHitArea? GetOutputPort");
+
+    Assert(
+        !source.Contains("Project.FindNode(", StringComparison.Ordinal),
+        "GraphSurface should use its node lookup cache instead of linear project lookup.");
+    Assert(
+        helperBody.Contains("EnsureNodeLookup();", StringComparison.Ordinal)
+            && helperBody.Contains("_nodesById.TryGetValue", StringComparison.Ordinal),
+        "GraphSurface cached node helper should use the node dictionary.");
+    Assert(
+        selectBody.Contains("FindNode(nodeId)", StringComparison.Ordinal),
+        "Graph selection should use the cached node helper.");
+    Assert(
+        dragBody.Contains("FindNode(_dragNodeId)", StringComparison.Ordinal),
+        "Graph drag should use the cached node helper.");
+    Assert(
+        outputPortBody.Contains("FindNode(nodeId)", StringComparison.Ordinal),
+        "Graph output-port rendering should use the cached node helper.");
 }
 
 static void ModalEditorsSkipHiddenGraphRefresh()
