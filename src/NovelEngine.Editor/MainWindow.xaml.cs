@@ -87,6 +87,9 @@ public partial class MainWindow : Window
         _nodeAssetChoicesCache = [];
     private readonly Dictionary<string, NovelAsset> _nodeAssetByIdCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<NovelAsset>? _characterSpriteAssetsCache;
+    private IReadOnlyList<NovelAsset>? _voiceBlipAssetsCache;
+    private IReadOnlyList<NovelAsset>? _sortedVoiceBlipAssetsCache;
     private bool _nodeAssetPickerCachesDirty = true;
     private ProjectDiagnosticReport? _projectDiagnosticsCache;
     private DiagnosticPanelStamp? _diagnosticsPanelStamp;
@@ -1958,6 +1961,9 @@ public partial class MainWindow : Window
         _nodeAssetFolderOptionsCache.Clear();
         _nodeAssetChoicesCache.Clear();
         _nodeAssetByIdCache.Clear();
+        _characterSpriteAssetsCache = null;
+        _voiceBlipAssetsCache = null;
+        _sortedVoiceBlipAssetsCache = null;
         _nodeAssetPickerCachesDirty = true;
         unchecked
         {
@@ -2830,11 +2836,7 @@ public partial class MainWindow : Window
 
     private MenuItem CreateCharacterAssetVoiceMenu(NovelAsset asset, NovelNode? node)
     {
-        var voices = _project.Assets
-            .Where(candidate => candidate.Kind == AssetKind.Audio)
-            .Where(candidate => IsInAssetFolder(candidate, "voices"))
-            .OrderBy(candidate => candidate.Id, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        var voices = GetSortedVoiceBlipAssets();
         if (voices.Count == 0)
         {
             return CreateDisabledAssetMenuItem("Подвязать voice-блип: в voices нет аудио");
@@ -2921,7 +2923,7 @@ public partial class MainWindow : Window
             return CreateDisabledAssetMenuItem("Привязать voice-блип: выберите ноду");
         }
 
-        var characters = GetEffectiveCharacters(node).ToList();
+        var characters = GetEffectiveCharacters(node);
         if (characters.Count == 0)
         {
             return CreateDisabledAssetMenuItem("Привязать voice-блип: в ноде нет персонажей");
@@ -2936,9 +2938,9 @@ public partial class MainWindow : Window
         }
 
         var menu = CreateHoverSubmenu("Добавить voice-блип к персонажу");
-        foreach (var character in characters.OrderBy(
-            character => character.Name,
-            StringComparer.CurrentCultureIgnoreCase))
+        var sortedCharacters = new List<CharacterPlacement>(characters);
+        sortedCharacters.Sort(CompareCharactersByName);
+        foreach (var character in sortedCharacters)
         {
             menu.Items.Add(CreateAssetMenuItem(
                 $"Персонаж «{CharacterLabel(character)}»",
@@ -2965,9 +2967,9 @@ public partial class MainWindow : Window
         }
 
         var menu = CreateHoverSubmenu("Добавить voice-блип в библиотеку");
-        foreach (var character in _project.Characters.OrderBy(
-            character => CharacterLabel(character),
-            StringComparer.CurrentCultureIgnoreCase))
+        var sortedCharacters = new List<CharacterPlacement>(_project.Characters);
+        sortedCharacters.Sort(CompareCharactersByLabel);
+        foreach (var character in sortedCharacters)
         {
             menu.Items.Add(CreateAssetMenuItem(
                 $"Персонаж «{CharacterLabel(character)}»",
@@ -3022,18 +3024,48 @@ public partial class MainWindow : Window
             ? character.Id
             : character.Name;
 
+    private static int CompareCharactersByName(
+        CharacterPlacement left,
+        CharacterPlacement right) =>
+        StringComparer.CurrentCultureIgnoreCase.Compare(left.Name, right.Name);
+
+    private static int CompareCharactersByLabel(
+        CharacterPlacement left,
+        CharacterPlacement right) =>
+        StringComparer.CurrentCultureIgnoreCase.Compare(
+            CharacterLabel(left),
+            CharacterLabel(right));
+
     private static List<string> CharacterVoiceReferences(CharacterPlacement character)
         => character.GetVoiceSounds();
 
     private CharacterPlacement? FindEffectiveCharacterBySprite(
         NovelNode node,
-        NovelAsset asset) =>
-        GetEffectiveCharacters(node).FirstOrDefault(
-            character => ReferencesAsset(character.Sprite, asset));
+        NovelAsset asset)
+    {
+        foreach (var character in GetEffectiveCharacters(node))
+        {
+            if (ReferencesAsset(character.Sprite, asset))
+            {
+                return character;
+            }
+        }
 
-    private CharacterPlacement? FindLibraryCharacterBySprite(NovelAsset asset) =>
-        _project.Characters.FirstOrDefault(
-            character => ReferencesAsset(character.Sprite, asset));
+        return null;
+    }
+
+    private CharacterPlacement? FindLibraryCharacterBySprite(NovelAsset asset)
+    {
+        foreach (var character in _project.Characters)
+        {
+            if (ReferencesAsset(character.Sprite, asset))
+            {
+                return character;
+            }
+        }
+
+        return null;
+    }
 
     private static bool ReferencesAsset(string value, NovelAsset asset)
     {
@@ -3057,9 +3089,14 @@ public partial class MainWindow : Window
         {
             var player = new NovelPlayer(_project);
             _ = player.StartAt(node.Id);
-            return player.State.CurrentCharacters
-                .Select(character => character.Clone())
-                .ToList();
+            var characters = new List<CharacterPlacement>(
+                player.State.CurrentCharacters.Count);
+            foreach (var character in player.State.CurrentCharacters)
+            {
+                characters.Add(character.Clone());
+            }
+
+            return characters;
         }
         catch (Exception error) when (
             error is InvalidDataException
@@ -5163,16 +5200,42 @@ public partial class MainWindow : Window
     }
 
     private IReadOnlyList<NovelAsset> GetCharacterSpriteAssets() =>
-        _project.Assets
-            .Where(asset => asset.Kind == AssetKind.Image)
-            .Where(asset => IsInAssetFolder(asset, "characters"))
-            .ToList();
+        _characterSpriteAssetsCache ??=
+            GetAssetsInFolder(AssetKind.Image, "characters", sortById: false);
 
     private IReadOnlyList<NovelAsset> GetVoiceBlipAssets() =>
-        _project.Assets
-            .Where(asset => asset.Kind == AssetKind.Audio)
-            .Where(asset => IsInAssetFolder(asset, "voices"))
-            .ToList();
+        _voiceBlipAssetsCache ??=
+            GetAssetsInFolder(AssetKind.Audio, "voices", sortById: false);
+
+    private IReadOnlyList<NovelAsset> GetSortedVoiceBlipAssets() =>
+        _sortedVoiceBlipAssetsCache ??=
+            GetAssetsInFolder(AssetKind.Audio, "voices", sortById: true);
+
+    private IReadOnlyList<NovelAsset> GetAssetsInFolder(
+        AssetKind kind,
+        string folder,
+        bool sortById)
+    {
+        var assets = new List<NovelAsset>();
+        foreach (var asset in _project.Assets)
+        {
+            if (asset.Kind == kind && IsInAssetFolder(asset, folder))
+            {
+                assets.Add(asset);
+            }
+        }
+
+        if (sortById)
+        {
+            assets.Sort(
+                (left, right) =>
+                    StringComparer.CurrentCultureIgnoreCase.Compare(
+                        left.Id,
+                        right.Id));
+        }
+
+        return assets;
+    }
 
     private void CharactersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

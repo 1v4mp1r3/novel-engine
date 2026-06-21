@@ -51,6 +51,7 @@ var tests = new (string Name, Action Run)[]
     ("asset size cache skips repeated file info reads", AssetSizeCacheSkipsRepeatedFileInfoReads),
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
+    ("character asset menus reuse filtered asset caches", CharacterAssetMenusReuseFilteredAssetCaches),
     ("selected node actions use graph selected node cache", SelectedNodeActionsUseGraphSelectedNodeCache),
     ("property selection uses row model references", PropertySelectionUsesRowModelReferences),
     ("property row lookup uses visible items source", PropertyRowLookupUsesVisibleItemsSource),
@@ -1413,6 +1414,82 @@ static void AssetBindingsSkipHiddenGraphRefresh()
             body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
             $"{method} should dirty the project without refreshing the graph.");
     }
+}
+
+static void CharacterAssetMenusReuseFilteredAssetCaches()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var assetFolderBody = ExtractMethodBody(
+        source,
+        "private IReadOnlyList<NovelAsset> GetAssetsInFolder");
+    var characterAssetMenuBody = ExtractMethodBody(
+        source,
+        "private MenuItem CreateCharacterAssetVoiceMenu");
+    var voiceBindingMenuBody = ExtractMethodBody(
+        source,
+        "private MenuItem CreateVoiceBindingMenu");
+    var libraryVoiceBindingMenuBody = ExtractMethodBody(
+        source,
+        "private MenuItem CreateLibraryVoiceBindingMenu");
+    var effectiveCharactersBody = ExtractMethodBody(
+        source,
+        "private IReadOnlyList<CharacterPlacement> GetEffectiveCharacters");
+    var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
+
+    Assert(
+        source.Contains("_characterSpriteAssetsCache ??=", StringComparison.Ordinal)
+            && source.Contains(
+                "GetAssetsInFolder(AssetKind.Image, \"characters\", sortById: false)",
+                StringComparison.Ordinal),
+        "Character sprite asset list should reuse a cached filtered list.");
+    Assert(
+        source.Contains("_voiceBlipAssetsCache ??=", StringComparison.Ordinal)
+            && source.Contains(
+                "GetAssetsInFolder(AssetKind.Audio, \"voices\", sortById: false)",
+                StringComparison.Ordinal)
+            && source.Contains("_sortedVoiceBlipAssetsCache ??=", StringComparison.Ordinal)
+            && source.Contains(
+                "GetAssetsInFolder(AssetKind.Audio, \"voices\", sortById: true)",
+                StringComparison.Ordinal),
+        "Voice asset lists should reuse cached filtered lists.");
+    Assert(
+        clearBody.Contains("_characterSpriteAssetsCache = null;", StringComparison.Ordinal)
+            && clearBody.Contains("_voiceBlipAssetsCache = null;", StringComparison.Ordinal)
+            && clearBody.Contains("_sortedVoiceBlipAssetsCache = null;", StringComparison.Ordinal),
+        "Asset catalog invalidation should clear character and voice asset caches.");
+    Assert(
+        assetFolderBody.Contains("foreach (var asset in _project.Assets)", StringComparison.Ordinal)
+            && assetFolderBody.Contains("IsInAssetFolder(asset, folder)", StringComparison.Ordinal)
+            && assetFolderBody.Contains("assets.Sort(", StringComparison.Ordinal)
+            && !assetFolderBody.Contains(".Where(", StringComparison.Ordinal)
+            && !assetFolderBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !assetFolderBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Character and voice asset caches should be built with a direct filter pass.");
+    Assert(
+        characterAssetMenuBody.Contains("var voices = GetSortedVoiceBlipAssets();", StringComparison.Ordinal)
+            && !characterAssetMenuBody.Contains("_project.Assets", StringComparison.Ordinal)
+            && !characterAssetMenuBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !characterAssetMenuBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Character sprite context menu should reuse sorted voice asset cache.");
+    Assert(
+        voiceBindingMenuBody.Contains("var characters = GetEffectiveCharacters(node);", StringComparison.Ordinal)
+            && voiceBindingMenuBody.Contains("sortedCharacters.Sort(CompareCharactersByName)", StringComparison.Ordinal)
+            && !voiceBindingMenuBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !voiceBindingMenuBody.Contains(".OrderBy(", StringComparison.Ordinal),
+        "Voice binding menu should avoid LINQ allocations for effective characters.");
+    Assert(
+        libraryVoiceBindingMenuBody.Contains("sortedCharacters.Sort(CompareCharactersByLabel)", StringComparison.Ordinal)
+            && !libraryVoiceBindingMenuBody.Contains(".OrderBy(", StringComparison.Ordinal),
+        "Library voice binding menu should sort characters without LINQ.");
+    Assert(
+        effectiveCharactersBody.Contains("foreach (var character in player.State.CurrentCharacters)", StringComparison.Ordinal)
+            && !effectiveCharactersBody.Contains(".Select(", StringComparison.Ordinal)
+            && !effectiveCharactersBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Inherited effective characters should be cloned without LINQ pipelines.");
 }
 
 static void SelectedNodeActionsUseGraphSelectedNodeCache()
