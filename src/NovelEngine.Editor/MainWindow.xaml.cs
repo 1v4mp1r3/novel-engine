@@ -1501,15 +1501,26 @@ public partial class MainWindow : Window
 
     private static int[] BuildLineStarts(string source)
     {
-        var starts = new List<int> { 0 };
+        var lineCount = 1;
         for (var index = 0; index < source.Length; index++)
         {
             if (source[index] == '\n' && index + 1 < source.Length)
             {
-                starts.Add(index + 1);
+                lineCount++;
             }
         }
-        return starts.ToArray();
+
+        var starts = new int[lineCount];
+        starts[0] = 0;
+        var lineIndex = 1;
+        for (var index = 0; index < source.Length; index++)
+        {
+            if (source[index] == '\n' && index + 1 < source.Length)
+            {
+                starts[lineIndex++] = index + 1;
+            }
+        }
+        return starts;
     }
 
     private void AnalyzeCode()

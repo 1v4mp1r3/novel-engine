@@ -2455,6 +2455,7 @@ static void CodeCursorCacheSkipsOversizedLineScans()
         "NovelEngine.Editor",
         "MainWindow.xaml.cs"));
     var body = ExtractMethodBody(source, "private void SetCodeCursorCache");
+    var buildBody = ExtractMethodBody(source, "private static int[] BuildLineStarts");
     var guardIndex = body.IndexOf(
         "ShouldReadCodeCursorSource(source.Length)",
         StringComparison.Ordinal);
@@ -2477,6 +2478,13 @@ static void CodeCursorCacheSkipsOversizedLineScans()
     Assert(
         body.Contains("_codeCursorCacheDirty = false;", StringComparison.Ordinal),
         "Oversized code cursor cache should avoid repeated scan attempts until the source changes.");
+    Assert(
+        buildBody.Contains("var lineCount = 1;", StringComparison.Ordinal)
+            && buildBody.Contains("var starts = new int[lineCount];", StringComparison.Ordinal)
+            && buildBody.Contains("starts[lineIndex++] = index + 1;", StringComparison.Ordinal)
+            && !buildBody.Contains("new List<int>", StringComparison.Ordinal)
+            && !buildBody.Contains(".ToArray()", StringComparison.Ordinal),
+        "Code cursor line starts should allocate the exact array without List/ToArray churn.");
 }
 
 static void CodeRefreshSkipsUnchangedRichTextReset()
