@@ -15,11 +15,17 @@ public sealed class RuntimeSaveState
 public sealed class NovelPlayer
 {
     private readonly NovelProject _project;
+    private readonly IReadOnlyDictionary<string, NovelNode> _nodesById;
+    private readonly NovelNode _startNode;
 
     public NovelPlayer(NovelProject project)
     {
         project.Validate();
         _project = project;
+        _nodesById = project.Nodes.ToDictionary(
+            node => node.Id,
+            StringComparer.Ordinal);
+        _startNode = project.Nodes.Single(node => node.Kind == NodeKind.Start);
         State = new ScriptState();
     }
 
@@ -29,28 +35,26 @@ public sealed class NovelPlayer
     public NovelNode Start()
     {
         State.Reset();
-        var start = _project.Nodes.Single(node => node.Kind == NodeKind.Start);
-        return Enter(start);
+        return Enter(_startNode);
     }
 
     public NovelNode StartAt(string nodeId)
     {
         State.Reset();
-        var target = _project.FindNode(nodeId)
+        var target = FindNode(nodeId)
             ?? throw new InvalidOperationException("Нода для предпросмотра не найдена.");
-        var start = _project.Nodes.Single(node => node.Kind == NodeKind.Start);
-        if (target.Id == start.Id)
+        if (target.Id == _startNode.Id)
         {
-            return Enter(start);
+            return Enter(_startNode);
         }
 
-        var path = FindPath(start.Id, target.Id);
+        var path = FindPath(_startNode.Id, target.Id);
         if (path is null)
         {
             return Enter(target);
         }
 
-        Enter(start);
+        Enter(_startNode);
         foreach (var step in path)
         {
             VisualScriptCompiler.Execute(
@@ -91,7 +95,7 @@ public sealed class NovelPlayer
 
     public NovelNode Restore(RuntimeSaveState saveState)
     {
-        var node = _project.FindNode(saveState.NodeId)
+        var node = FindNode(saveState.NodeId)
             ?? throw new InvalidOperationException("Сохранённая нода не найдена.");
         State.Reset();
         State.CurrentBackground = saveState.CurrentBackground;
@@ -117,7 +121,7 @@ public sealed class NovelPlayer
             throw new InvalidOperationException("Условие выбранного выхода не выполнено.");
         }
 
-        var target = _project.FindNode(output.TargetNodeId)
+        var target = FindNode(output.TargetNodeId)
             ?? throw new InvalidOperationException("Выход не подключён к ноде.");
         VisualScriptCompiler.Execute(output.Script, output.ScriptBlocks, State);
         return Enter(target);
@@ -168,7 +172,7 @@ public sealed class NovelPlayer
 
         while (queue.Count > 0)
         {
-            var node = _project.FindNode(queue.Dequeue());
+            var node = FindNode(queue.Dequeue());
             if (node is null)
             {
                 continue;
@@ -176,7 +180,7 @@ public sealed class NovelPlayer
 
             foreach (var output in node.Outputs)
             {
-                var target = _project.FindNode(output.TargetNodeId);
+                var target = FindNode(output.TargetNodeId);
                 if (target is null || !visited.Add(target.Id))
                 {
                     continue;
@@ -194,6 +198,11 @@ public sealed class NovelPlayer
 
         return null;
     }
+
+    private NovelNode? FindNode(string? nodeId) =>
+        nodeId is not null && _nodesById.TryGetValue(nodeId, out var node)
+            ? node
+            : null;
 
     private static List<PathStep> BuildPath(
         Dictionary<string, PathStep> previous,

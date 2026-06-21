@@ -36,6 +36,7 @@ var tests = new (string Name, Action Run)[]
     ("transition settings survive JSON round trip", TransitionSettingsRoundTrip),
     ("node preview restores inherited state", NodePreviewRestoresState),
     ("choice availability waits for dialogue typing", ChoiceAvailabilityWaitsForDialogueTyping),
+    ("novel player follows large graph quickly", NovelPlayerFollowsLargeGraphQuickly),
     ("removing a node disconnects incoming outputs", RemovingNodeDisconnectsOutputs),
     ("project language compiles graph and inherited types", ProjectLanguageCompilesGraph),
     ("project language formatter round trips", ProjectLanguageFormatterRoundTrips),
@@ -1390,6 +1391,75 @@ static void ChoiceAvailabilityWaitsForDialogueTyping()
             choiceIndex: 1,
             choiceCount: 2),
         "Choice shortcuts did not accept a ready in-range choice.");
+}
+
+static void NovelPlayerFollowsLargeGraphQuickly()
+{
+    const int sceneCount = 3_000;
+    var project = new NovelProject { Title = "Large runtime graph" };
+    project.Nodes.Add(
+        new NovelNode
+        {
+            Id = "start",
+            Kind = NodeKind.Start,
+            TypeName = "start",
+            Title = "Start",
+            Outputs =
+            {
+                new NodeOutput
+                {
+                    Id = "out-start",
+                    TargetNodeId = "scene-0",
+                },
+            },
+        });
+    for (var index = 0; index < sceneCount; index++)
+    {
+        project.Nodes.Add(
+            new NovelNode
+            {
+                Id = $"scene-{index}",
+                Kind = NodeKind.Scene,
+                TypeName = "scene",
+                Title = $"Scene {index}",
+                Outputs =
+                {
+                    new NodeOutput
+                    {
+                        Id = $"out-scene-{index}",
+                        TargetNodeId = index + 1 < sceneCount
+                            ? $"scene-{index + 1}"
+                            : null,
+                    },
+                },
+            });
+    }
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "NovelPlayer.cs"));
+    Assert(
+        source.Contains("_nodesById", StringComparison.Ordinal),
+        "NovelPlayer should build a node lookup for runtime transitions.");
+    Assert(
+        !source.Contains("_project.FindNode", StringComparison.Ordinal),
+        "NovelPlayer runtime paths should not use linear project node lookup.");
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    var player = new NovelPlayer(project);
+    var node = player.Start();
+    while (node.Outputs[0].TargetNodeId is not null)
+    {
+        node = player.Choose(node.Outputs[0].Id);
+    }
+    stopwatch.Stop();
+
+    Assert(node.Id == $"scene-{sceneCount - 1}", "Runtime did not reach the final scene.");
+    Assert(
+        stopwatch.ElapsedMilliseconds < 2_000,
+        $"Large graph runtime traversal is too slow: {stopwatch.ElapsedMilliseconds}ms.");
 }
 
 static void InheritedMusicDoesNotChangeTrack()
@@ -2852,6 +2922,18 @@ static int CountOccurrences(string source, string value)
         offset += value.Length;
     }
     return count;
+}
+
+static string FindRepositoryRoot()
+{
+    var directory = AppContext.BaseDirectory;
+    while (!File.Exists(Path.Combine(directory, "NovelEngine.sln")))
+    {
+        directory = Directory.GetParent(directory)?.FullName
+            ?? throw new DirectoryNotFoundException("Could not locate repository root.");
+    }
+
+    return directory;
 }
 
 static void Assert(bool condition, string message)
