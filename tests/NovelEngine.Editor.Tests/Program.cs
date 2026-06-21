@@ -1111,8 +1111,12 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
         "src",
         "NovelEngine.Editor",
         "MainWindow.xaml.cs"));
+    var normalizedSource = source.Replace("\r\n", "\n", StringComparison.Ordinal);
     var listBody = ExtractMethodBody(source, "private void RefreshAssetList");
     var folderBody = ExtractMethodBody(source, "private void RefreshAssetFolders");
+    var folderStampBody = ExtractMethodBody(
+        normalizedSource,
+        "internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(\n        IEnumerable<string> folders");
     var countFoldersBody = ExtractMethodBody(
         source,
         "private static IReadOnlyDictionary<string, int> CountAssetsByFolder");
@@ -1165,6 +1169,18 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
             && !folderBody.Contains(".OrderBy(", StringComparison.Ordinal)
             && !folderBody.Contains(".Split(", StringComparison.Ordinal),
         "Asset folder refresh should sort directly and avoid per-folder split arrays.");
+    Assert(
+        folderStampBody.Contains("foreach (var folder in folders)", StringComparison.Ordinal)
+            && folderStampBody.Contains("foreach (var asset in assets)", StringComparison.Ordinal)
+            && folderStampBody.Contains("normalizedFolders.Sort(StringComparer.OrdinalIgnoreCase);", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".Select(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".Where(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".Distinct(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".GroupBy(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".ToDictionary(", StringComparison.Ordinal)
+            && !folderStampBody.Contains(".ToArray(", StringComparison.Ordinal),
+        "Asset folder tree stamps should avoid LINQ pipelines while hashing visible folder state.");
     Assert(
         addFolderTreePathBody.Contains("folder.IndexOf('/', segmentStart)", StringComparison.Ordinal)
             && addFolderTreePathBody.Contains("while (segmentStart < folder.Length)", StringComparison.Ordinal)

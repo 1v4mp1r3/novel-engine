@@ -2353,35 +2353,38 @@ public partial class MainWindow : Window
         var normalizedSelectedFolder = selectedFolder is null
             ? null
             : ProjectAssets.NormalizeFolder(selectedFolder.Trim());
-        var normalizedFolders = folders
-            .Select(ProjectAssets.NormalizeFolder)
-            .Where(folder => folder.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(folder => folder, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var folderCounts = assets
-            .GroupBy(
-                asset => ProjectAssets.NormalizeFolder(asset.Folder),
-                StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Count(),
-                StringComparer.OrdinalIgnoreCase);
+        var normalizedFolderSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var folder in folders)
+        {
+            var normalizedFolder = ProjectAssets.NormalizeFolder(folder);
+            if (normalizedFolder.Length > 0)
+            {
+                normalizedFolderSet.Add(normalizedFolder);
+            }
+        }
+
+        var folderCounts = new Dictionary<string, int>(
+            StringComparer.OrdinalIgnoreCase);
         var assetCount = 0;
+        foreach (var asset in assets)
+        {
+            var folder = ProjectAssets.NormalizeFolder(asset.Folder);
+            folderCounts[folder] = folderCounts.GetValueOrDefault(folder) + 1;
+            assetCount++;
+        }
+
+        var normalizedFolders = new List<string>(normalizedFolderSet);
+        normalizedFolders.Sort(StringComparer.OrdinalIgnoreCase);
         var hash = new HashCode();
         foreach (var folder in normalizedFolders)
         {
             hash.Add(folder, StringComparer.OrdinalIgnoreCase);
             hash.Add(folderCounts.GetValueOrDefault(folder));
         }
-        foreach (var count in folderCounts.Values)
-        {
-            assetCount += count;
-        }
 
         return new AssetFolderTreeStamp(
             normalizedSelectedFolder,
-            normalizedFolders.Length,
+            normalizedFolders.Count,
             assetCount,
             hash.ToHashCode());
     }
