@@ -676,28 +676,33 @@ public sealed class GraphSurface : FrameworkElement
     private MenuItem CreateInheritanceMenu(NovelNode node)
     {
         var menu = new MenuItem { Header = "Наследовать" };
+        var incomingNodesByTargetId = BuildIncomingNodesByTargetId();
         menu.Items.Add(CreateInheritanceResourceMenu(
             node,
             InheritanceResource.Music,
-            "Наследовать музыку"));
+            "Наследовать музыку",
+            incomingNodesByTargetId));
         menu.Items.Add(CreateInheritanceResourceMenu(
             node,
             InheritanceResource.Background,
-            "Наследовать задний фон"));
+            "Наследовать задний фон",
+            incomingNodesByTargetId));
         menu.Items.Add(CreateInheritanceResourceMenu(
             node,
             InheritanceResource.Characters,
-            "Наследовать персонажей"));
+            "Наследовать персонажей",
+            incomingNodesByTargetId));
         return menu;
     }
 
     private MenuItem CreateInheritanceResourceMenu(
         NovelNode node,
         InheritanceResource resource,
-        string header)
+        string header,
+        IReadOnlyDictionary<string, List<NovelNode>> incomingNodesByTargetId)
     {
         var item = new MenuItem { Header = header };
-        var sources = GetIncomingNodes(node).ToList();
+        var sources = GetIncomingNodes(node, incomingNodesByTargetId);
         if (sources.Count == 0)
         {
             item.IsEnabled = false;
@@ -712,26 +717,74 @@ public sealed class GraphSurface : FrameworkElement
         foreach (var source in sources)
         {
             item.Items.Add(CreateMenuItem(
-                $"Если прийти из «{source.Title}»: {DescribeInheritanceSource(source, resource)}",
+                $"Если прийти из «{source.Title}»: {DescribeInheritanceSource(source, resource, incomingNodesByTargetId)}",
                 () => ApplyInheritance(node, resource)));
         }
 
         return item;
     }
 
-    private IEnumerable<NovelNode> GetIncomingNodes(NovelNode node) =>
-        Project.Nodes
-            .Where(candidate => candidate.Outputs.Any(output => output.TargetNodeId == node.Id))
-            .OrderBy(candidate => candidate.Title, StringComparer.CurrentCulture);
+    private Dictionary<string, List<NovelNode>> BuildIncomingNodesByTargetId()
+    {
+        var incomingNodesByTargetId = new Dictionary<string, List<NovelNode>>(
+            StringComparer.Ordinal);
+        foreach (var node in Project.Nodes)
+        {
+            HashSet<string>? seenTargetsForNode = null;
+            foreach (var output in node.Outputs)
+            {
+                if (output.TargetNodeId is null)
+                {
+                    continue;
+                }
+
+                seenTargetsForNode ??= new HashSet<string>(StringComparer.Ordinal);
+                if (!seenTargetsForNode.Add(output.TargetNodeId))
+                {
+                    continue;
+                }
+
+                if (!incomingNodesByTargetId.TryGetValue(
+                        output.TargetNodeId,
+                        out var sources))
+                {
+                    sources = [];
+                    incomingNodesByTargetId[output.TargetNodeId] = sources;
+                }
+                sources.Add(node);
+            }
+        }
+
+        foreach (var sources in incomingNodesByTargetId.Values)
+        {
+            sources.Sort(
+                (left, right) => StringComparer.CurrentCulture.Compare(
+                    left.Title,
+                    right.Title));
+        }
+
+        return incomingNodesByTargetId;
+    }
+
+    private static IReadOnlyList<NovelNode> GetIncomingNodes(
+        NovelNode node,
+        IReadOnlyDictionary<string, List<NovelNode>> incomingNodesByTargetId)
+    {
+        return incomingNodesByTargetId.TryGetValue(node.Id, out var sources)
+            ? sources
+            : [];
+    }
 
     private string DescribeInheritanceSource(
         NovelNode source,
-        InheritanceResource resource)
+        InheritanceResource resource,
+        IReadOnlyDictionary<string, List<NovelNode>> incomingNodesByTargetId)
     {
         var resolved = ResolveInheritanceSource(
             source,
             resource,
-            new HashSet<string>(StringComparer.Ordinal));
+            new HashSet<string>(StringComparer.Ordinal),
+            incomingNodesByTargetId);
         if (resolved is null)
         {
             return "источник не найден";
@@ -746,7 +799,8 @@ public sealed class GraphSurface : FrameworkElement
     private InheritanceSourceDescription? ResolveInheritanceSource(
         NovelNode node,
         InheritanceResource resource,
-        HashSet<string> visited)
+        HashSet<string> visited,
+        IReadOnlyDictionary<string, List<NovelNode>> incomingNodesByTargetId)
     {
         if (!visited.Add(node.Id))
         {
@@ -761,7 +815,7 @@ public sealed class GraphSurface : FrameworkElement
                 DescribeExplicitInheritanceValue(node, resource));
         }
 
-        var sources = GetIncomingNodes(node).ToList();
+        var sources = GetIncomingNodes(node, incomingNodesByTargetId);
         if (sources.Count == 0)
         {
             return new InheritanceSourceDescription(
@@ -775,7 +829,11 @@ public sealed class GraphSurface : FrameworkElement
                 $"источник зависит от ветки: {string.Join(", ", sources.Select(source => $"«{source.Title}»"))}");
         }
 
-        return ResolveInheritanceSource(sources[0], resource, visited);
+        return ResolveInheritanceSource(
+            sources[0],
+            resource,
+            visited,
+            incomingNodesByTargetId);
     }
 
     private static bool NodeInheritsResource(

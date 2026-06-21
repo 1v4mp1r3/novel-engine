@@ -103,6 +103,7 @@ var tests = new (string Name, Action Run)[]
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph surface uses cached node lookup", GraphSurfaceUsesCachedNodeLookup),
+    ("graph inheritance menu caches incoming nodes", GraphInheritanceMenuCachesIncomingNodes),
     ("graph inheritance menu skips unchanged apply", GraphInheritanceMenuSkipsUnchangedApply),
     ("graph inheritance render skips selected node", GraphInheritanceRenderSkipsSelectedNode),
     ("dirty change graph refresh policy skips graph-originated changes", DirtyChangeGraphRefreshPolicySkipsGraphOriginatedChanges),
@@ -3471,6 +3472,46 @@ static void ModalEditorsSkipHiddenGraphRefresh()
             body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
             $"{method} should dirty modal editor changes without refreshing the graph.");
     }
+}
+
+static void GraphInheritanceMenuCachesIncomingNodes()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var menuBody = ExtractMethodBody(source, "private MenuItem CreateInheritanceMenu");
+    var resourceBody = ExtractMethodBody(
+        source,
+        "private MenuItem CreateInheritanceResourceMenu");
+    var buildBody = ExtractMethodBody(
+        source,
+        "private Dictionary<string, List<NovelNode>> BuildIncomingNodesByTargetId");
+    var incomingBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyList<NovelNode> GetIncomingNodes");
+    var resolveBody = ExtractMethodBody(
+        source,
+        "private InheritanceSourceDescription? ResolveInheritanceSource");
+
+    Assert(
+        menuBody.Contains("BuildIncomingNodesByTargetId();", StringComparison.Ordinal),
+        "Inheritance menu should build incoming node lookup once.");
+    Assert(
+        resourceBody.Contains("GetIncomingNodes(node, incomingNodesByTargetId)", StringComparison.Ordinal),
+        "Inheritance resource menu should use cached incoming lookup.");
+    Assert(
+        buildBody.Contains("foreach (var node in Project.Nodes)", StringComparison.Ordinal)
+            && buildBody.Contains("sources.Sort(", StringComparison.Ordinal),
+        "Incoming lookup should scan the graph once and keep source ordering stable.");
+    Assert(
+        incomingBody.Contains("incomingNodesByTargetId.TryGetValue", StringComparison.Ordinal)
+            && !incomingBody.Contains("Project.Nodes", StringComparison.Ordinal),
+        "Incoming node reads should not rescan the graph.");
+    Assert(
+        resolveBody.Contains("GetIncomingNodes(node, incomingNodesByTargetId)", StringComparison.Ordinal),
+        "Recursive inheritance resolution should reuse the cached incoming lookup.");
 }
 
 static void GraphInheritanceMenuSkipsUnchangedApply()
