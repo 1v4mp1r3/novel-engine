@@ -600,9 +600,12 @@ public partial class PreviewWindow : Window
 
     private void SetChoicesEnabled(bool enabled)
     {
-        foreach (var button in ChoicesPanel.Children.OfType<Button>())
+        foreach (UIElement child in ChoicesPanel.Children)
         {
-            button.IsEnabled = enabled;
+            if (child is Button button)
+            {
+                button.IsEnabled = enabled;
+            }
         }
     }
 
@@ -710,11 +713,7 @@ public partial class PreviewWindow : Window
         {
             return null;
         }
-        var sounds = character.GetVoiceSounds()
-            .Select(ResolveAsset)
-            .Where(sound => sound.Length > 0 && File.Exists(sound))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var sounds = ResolveVoiceSoundPaths(character);
         if (sounds.Count == 0)
         {
             return null;
@@ -723,6 +722,23 @@ public partial class PreviewWindow : Window
             sounds,
             Math.Clamp(character.VoicePitch, 0.25, 4),
             Math.Clamp(character.VoiceEveryNthCharacter, 1, 12));
+    }
+
+    private List<string> ResolveVoiceSoundPaths(CharacterPlacement character)
+    {
+        var sounds = new List<string>();
+        foreach (var reference in character.GetVoiceSounds())
+        {
+            var sound = ResolveAsset(reference);
+            if (sound.Length == 0
+                || !File.Exists(sound)
+                || sounds.Contains(sound, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            sounds.Add(sound);
+        }
+        return sounds;
     }
 
     private void PlayCharacterVoice(CharacterVoice voice)

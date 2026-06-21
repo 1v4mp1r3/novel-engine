@@ -3791,6 +3791,11 @@ static void PreviewPlaybackAvoidsTransientLists()
     var hasActiveBody = ExtractMethodBody(
         source,
         "private bool HasActiveVoicePlayer");
+    var choicesBody = ExtractMethodBody(source, "private void SetChoicesEnabled");
+    var resolveVoiceBody = ExtractMethodBody(source, "private CharacterVoice? ResolveVoice");
+    var resolveVoicePathsBody = ExtractMethodBody(
+        source,
+        "private List<string> ResolveVoiceSoundPaths");
     var stopBody = ExtractMethodBody(source, "private void StopAllVoicePlayers");
     var pauseBody = ExtractMethodBody(source, "private void SetPaused");
     var settingsBody = ExtractMethodBody(source, "private void ApplyRuntimeSettings");
@@ -3804,6 +3809,19 @@ static void PreviewPlaybackAvoidsTransientLists()
         hasActiveBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
             && hasActiveBody.Contains("_activeVoicePlayers.Contains(player)", StringComparison.Ordinal),
         "Active voice player checks should use a direct loop.");
+    Assert(
+        choicesBody.Contains("foreach (UIElement child in ChoicesPanel.Children)", StringComparison.Ordinal)
+            && !choicesBody.Contains("OfType<Button>", StringComparison.Ordinal),
+        "Choice availability toggles should avoid LINQ iterators.");
+    Assert(
+        resolveVoiceBody.Contains("ResolveVoiceSoundPaths(character)", StringComparison.Ordinal)
+            && !resolveVoiceBody.Contains(".Select(ResolveAsset)", StringComparison.Ordinal)
+            && !resolveVoiceBody.Contains(".Distinct(", StringComparison.Ordinal),
+        "Voice resolution should delegate runtime path collection without LINQ chains.");
+    Assert(
+        resolveVoicePathsBody.Contains("foreach (var reference in character.GetVoiceSounds())", StringComparison.Ordinal)
+            && resolveVoicePathsBody.Contains("sounds.Contains(sound, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
+        "Voice sound path collection should preserve first-seen unique paths in a direct loop.");
     Assert(
         stopBody.Contains("foreach (var pool in _voicePlayerPools.Values)", StringComparison.Ordinal)
             && stopBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
