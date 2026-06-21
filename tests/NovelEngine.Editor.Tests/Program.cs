@@ -2534,8 +2534,20 @@ static void CodeEditorPlainTextReplaceSkipsSpanWork()
         "new SortedSet<int>",
         StringComparison.Ordinal);
     var sortIndex = body.IndexOf(
-        ".OrderBy(span => span.Start)",
+        "Array.Sort(orderedSpans, CompareSyntaxSpans);",
         StringComparison.Ordinal);
+    var streamingBoundaryIndex = body.IndexOf(
+        "foreach (var position in boundaries)",
+        StringComparison.Ordinal);
+    var renderedCopyIndex = body.IndexOf(
+        "_renderedSpans = CopySyntaxSpans(spans);",
+        StringComparison.Ordinal);
+    var copyBody = ExtractMethodBody(
+        source,
+        "private static ProjectLanguageSyntaxSpan[] CopySyntaxSpans");
+    var comparerBody = ExtractMethodBody(
+        source,
+        "private static int CompareSyntaxSpans");
 
     Assert(
         plainTextGuardIndex >= 0,
@@ -2546,6 +2558,22 @@ static void CodeEditorPlainTextReplaceSkipsSpanWork()
     Assert(
         boundaryIndex > plainTextGuardIndex && sortIndex > plainTextGuardIndex,
         "Plain text fast path should run before syntax boundary and sorting work.");
+    Assert(
+        streamingBoundaryIndex > sortIndex
+            && renderedCopyIndex > streamingBoundaryIndex
+            && !body.Contains("boundaries.ToArray()", StringComparison.Ordinal)
+            && !body.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !body.Contains(".ToArray()", StringComparison.Ordinal),
+        "Highlighted document replacement should stream boundaries and avoid LINQ array copies.");
+    Assert(
+        copyBody.Contains("var copy = new ProjectLanguageSyntaxSpan[spans.Count];", StringComparison.Ordinal)
+            && copyBody.Contains("for (var index = 0; index < spans.Count; index++)", StringComparison.Ordinal)
+            && !copyBody.Contains(".ToArray()", StringComparison.Ordinal),
+        "Rendered syntax span copies should use a direct indexed copy.");
+    Assert(
+        comparerBody.Contains("left.Start.CompareTo(right.Start)", StringComparison.Ordinal)
+            && comparerBody.Contains("right.Length.CompareTo(left.Length)", StringComparison.Ordinal),
+        "Syntax span sorting should preserve start ascending and length descending ordering.");
     Assert(
         body.Contains("AppendText(", StringComparison.Ordinal)
             && body.Contains("source,", StringComparison.Ordinal)

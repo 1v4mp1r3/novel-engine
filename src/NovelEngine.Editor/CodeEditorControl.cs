@@ -723,18 +723,24 @@ public sealed class CodeEditorControl : RichTextBox
                     boundaries.Add(errorEnd);
                 }
 
-                var positions = boundaries.ToArray();
-                var orderedSpans = spans
-                    .OrderBy(span => span.Start)
-                    .ThenByDescending(span => span.Length)
-                    .ToArray();
+                var orderedSpans = CopySyntaxSpans(spans);
+                Array.Sort(orderedSpans, CompareSyntaxSpans);
                 var spanIndex = 0;
-                for (var index = 0; index < positions.Length - 1; index++)
+                var hasStart = false;
+                var start = 0;
+                foreach (var position in boundaries)
                 {
-                    var start = positions[index];
-                    var end = positions[index + 1];
+                    if (!hasStart)
+                    {
+                        start = position;
+                        hasStart = true;
+                        continue;
+                    }
+
+                    var end = position;
                     if (end <= start)
                     {
+                        start = end;
                         continue;
                     }
                     while (spanIndex < orderedSpans.Length
@@ -758,6 +764,7 @@ public sealed class CodeEditorControl : RichTextBox
                         syntax?.Kind,
                         isError,
                         defaultForeground);
+                    start = end;
                 }
             }
             Document.PageWidth = 100_000;
@@ -765,7 +772,7 @@ public sealed class CodeEditorControl : RichTextBox
             _estimatedSourceLength = source.Length;
             _caretPointerCache = null;
             _renderedSource = source;
-            _renderedSpans = spans.ToArray();
+            _renderedSpans = CopySyntaxSpans(spans);
             _renderedErrorStart = errorStart;
             _renderedErrorLength = errorLength;
         }
@@ -773,6 +780,33 @@ public sealed class CodeEditorControl : RichTextBox
         {
             _updatingDocument = false;
         }
+    }
+
+    private static ProjectLanguageSyntaxSpan[] CopySyntaxSpans(
+        IReadOnlyList<ProjectLanguageSyntaxSpan> spans)
+    {
+        if (spans.Count == 0)
+        {
+            return [];
+        }
+
+        var copy = new ProjectLanguageSyntaxSpan[spans.Count];
+        for (var index = 0; index < spans.Count; index++)
+        {
+            copy[index] = spans[index];
+        }
+
+        return copy;
+    }
+
+    private static int CompareSyntaxSpans(
+        ProjectLanguageSyntaxSpan left,
+        ProjectLanguageSyntaxSpan right)
+    {
+        var startComparison = left.Start.CompareTo(right.Start);
+        return startComparison != 0
+            ? startComparison
+            : right.Length.CompareTo(left.Length);
     }
 
     private void InvalidateRenderedSyntax()
