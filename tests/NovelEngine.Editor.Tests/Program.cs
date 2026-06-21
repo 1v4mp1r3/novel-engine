@@ -1110,6 +1110,9 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
     var countFoldersBody = ExtractMethodBody(
         source,
         "private static IReadOnlyDictionary<string, int> CountAssetsByFolder");
+    var addFolderTreePathBody = ExtractMethodBody(
+        source,
+        "private static void AddAssetFolderTreePath");
     var clearPickerBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
     var listStampIndex = listBody.IndexOf(
         "var stamp = CreateAssetListStamp(",
@@ -1150,6 +1153,17 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
             && folderBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
             && folderBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
         "Asset folder runtime stamp should use catalog counts and revision.");
+    Assert(
+        folderBody.Contains("sortedFolders.Sort(StringComparer.CurrentCultureIgnoreCase);", StringComparison.Ordinal)
+            && folderBody.Contains("AddAssetFolderTreePath(", StringComparison.Ordinal)
+            && !folderBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !folderBody.Contains(".Split(", StringComparison.Ordinal),
+        "Asset folder refresh should sort directly and avoid per-folder split arrays.");
+    Assert(
+        addFolderTreePathBody.Contains("folder.IndexOf('/', segmentStart)", StringComparison.Ordinal)
+            && addFolderTreePathBody.Contains("while (segmentStart < folder.Length)", StringComparison.Ordinal)
+            && !addFolderTreePathBody.Contains(".Split(", StringComparison.Ordinal),
+        "Asset folder tree paths should be walked without allocating split arrays.");
     Assert(
         countFoldersBody.Contains("foreach (var asset in assets)", StringComparison.Ordinal)
             && countFoldersBody.Contains("folderCounts[folder] = folderCounts.GetValueOrDefault(folder) + 1;", StringComparison.Ordinal)

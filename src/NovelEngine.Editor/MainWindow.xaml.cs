@@ -2194,42 +2194,16 @@ public partial class MainWindow : Window
 
             var items = new Dictionary<string, TreeViewItem>(
                 StringComparer.OrdinalIgnoreCase);
-            foreach (var folder in _project.AssetFolders
-                .OrderBy(path => path, StringComparer.CurrentCultureIgnoreCase))
+            var sortedFolders = new List<string>(_project.AssetFolders);
+            sortedFolders.Sort(StringComparer.CurrentCultureIgnoreCase);
+            foreach (var folder in sortedFolders)
             {
-                var parentPath = string.Empty;
-                TreeViewItem? parent = null;
-                foreach (var segment in folder.Split('/'))
-                {
-                    var path = parentPath.Length == 0
-                        ? segment
-                        : $"{parentPath}/{segment}";
-                    if (!items.TryGetValue(path, out var item))
-                    {
-                        item = new TreeViewItem
-                        {
-                            Header = CreateFolderHeader(
-                                segment,
-                                folderCounts.GetValueOrDefault(path)),
-                            Tag = path,
-                            IsExpanded = true,
-                            IsSelected = path.Equals(
-                                _selectedAssetFolder,
-                                StringComparison.OrdinalIgnoreCase),
-                        };
-                        if (parent is null)
-                        {
-                            AssetFoldersTree.Items.Add(item);
-                        }
-                        else
-                        {
-                            parent.Items.Add(item);
-                        }
-                        items[path] = item;
-                    }
-                    parent = item;
-                    parentPath = path;
-                }
+                AddAssetFolderTreePath(
+                    folder,
+                    items,
+                    AssetFoldersTree.Items,
+                    folderCounts,
+                    _selectedAssetFolder);
             }
         }
         finally
@@ -2239,6 +2213,61 @@ public partial class MainWindow : Window
         var hasFolder = _selectedAssetFolder is not null;
         RenameFolderButton.IsEnabled = hasFolder;
         DeleteFolderButton.IsEnabled = hasFolder;
+    }
+
+    private static void AddAssetFolderTreePath(
+        string folder,
+        IDictionary<string, TreeViewItem> items,
+        ItemCollection rootItems,
+        IReadOnlyDictionary<string, int> folderCounts,
+        string? selectedFolder)
+    {
+        var parentPath = string.Empty;
+        TreeViewItem? parent = null;
+        var segmentStart = 0;
+        while (segmentStart < folder.Length)
+        {
+            var slashIndex = folder.IndexOf('/', segmentStart);
+            var segmentEnd = slashIndex < 0 ? folder.Length : slashIndex;
+            if (segmentEnd > segmentStart)
+            {
+                var segment = folder[segmentStart..segmentEnd];
+                var path = parentPath.Length == 0
+                    ? segment
+                    : $"{parentPath}/{segment}";
+                if (!items.TryGetValue(path, out var item))
+                {
+                    item = new TreeViewItem
+                    {
+                        Header = CreateFolderHeader(
+                            segment,
+                            folderCounts.GetValueOrDefault(path)),
+                        Tag = path,
+                        IsExpanded = true,
+                        IsSelected = path.Equals(
+                            selectedFolder,
+                            StringComparison.OrdinalIgnoreCase),
+                    };
+                    if (parent is null)
+                    {
+                        rootItems.Add(item);
+                    }
+                    else
+                    {
+                        parent.Items.Add(item);
+                    }
+                    items[path] = item;
+                }
+                parent = item;
+                parentPath = path;
+            }
+
+            if (slashIndex < 0)
+            {
+                break;
+            }
+            segmentStart = slashIndex + 1;
+        }
     }
 
     internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(
