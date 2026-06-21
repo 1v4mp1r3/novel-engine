@@ -51,6 +51,7 @@ var tests = new (string Name, Action Run)[]
     ("project language rejects cyclic inheritance", ProjectLanguageRejectsCycles),
     ("project language resolves asset references", ProjectLanguageResolvesAssets),
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
+    ("project validation caches asset lookup", ProjectValidationCachesAssetLookup),
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
     ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
@@ -2143,6 +2144,92 @@ static void ProjectLanguageRejectsWrongAssetKind()
             error.Message.Contains("требуется image", StringComparison.Ordinal),
             "Wrong asset kind diagnostic was not specific.");
     }
+}
+
+static void ProjectValidationCachesAssetLookup()
+{
+    const int sceneCount = 2_000;
+    var project = new NovelProject { Title = "Large asset validation" };
+    project.Nodes.Add(
+        new NovelNode
+        {
+            Id = "start",
+            Kind = NodeKind.Start,
+            TypeName = "start",
+            Title = "Start",
+            Outputs =
+            {
+                new NodeOutput
+                {
+                    Id = "out-start",
+                    TargetNodeId = "scene-0",
+                },
+            },
+        });
+
+    for (var index = 0; index < sceneCount; index++)
+    {
+        var assetId = $"bg-{index}";
+        project.Assets.Add(
+            new NovelAsset
+            {
+                Id = assetId,
+                Kind = AssetKind.Image,
+                Path = $"files/backgrounds/{assetId}.png",
+            });
+        project.Nodes.Add(
+            new NovelNode
+            {
+                Id = $"scene-{index}",
+                Kind = NodeKind.Scene,
+                TypeName = "scene",
+                Title = $"Scene {index}",
+                Background = AssetReference.Create(assetId),
+                Outputs =
+                {
+                    new NodeOutput
+                    {
+                        Id = $"out-scene-{index}",
+                        TargetNodeId = index + 1 < sceneCount
+                            ? $"scene-{index + 1}"
+                            : null,
+                    },
+                },
+            });
+    }
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var validateBody = ExtractMethodBody(source, "public void Validate()");
+    var assetReferenceBody = ExtractMethodBody(
+        source,
+        "private static void ValidateAssetReference");
+    var normalizedValidateBody = validateBody.Replace("\r\n", "\n");
+    Assert(
+        validateBody.Contains("assetsById.TryAdd", StringComparison.Ordinal),
+        "Project validation should build a single asset lookup dictionary.");
+    Assert(
+        normalizedValidateBody.Contains(
+            "ValidateAssetReference(\n                value.Value,\n                value.ExpectedKind,\n                value.Owner,\n                assetsById)",
+            StringComparison.Ordinal),
+        "Project validation should pass the lookup into asset reference validation.");
+    Assert(
+        assetReferenceBody.Contains("assetsById.TryGetValue", StringComparison.Ordinal),
+        "Asset reference validation should use dictionary lookup.");
+    Assert(
+        !assetReferenceBody.Contains("FindAsset(", StringComparison.Ordinal),
+        "Asset reference validation should not use linear asset lookup.");
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    project.Validate();
+    stopwatch.Stop();
+
+    Assert(
+        stopwatch.ElapsedMilliseconds < 2_000,
+        $"Large asset validation is too slow: {stopwatch.ElapsedMilliseconds}ms.");
 }
 
 static void ProjectAssetImportCopiesFiles()

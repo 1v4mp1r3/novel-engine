@@ -778,7 +778,8 @@ public sealed class NovelProject
             throw new InvalidDataException("Проект должен содержать ровно одну стартовую ноду.");
         }
 
-        var assetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var assetsById = new Dictionary<string, NovelAsset>(
+            StringComparer.OrdinalIgnoreCase);
         var assetFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var folder in AssetFolders)
         {
@@ -791,7 +792,8 @@ public sealed class NovelProject
         }
         foreach (var asset in Assets)
         {
-            if (!AssetReference.IsValidId(asset.Id) || !assetIds.Add(asset.Id))
+            if (!AssetReference.IsValidId(asset.Id)
+                || !assetsById.TryAdd(asset.Id, asset))
             {
                 throw new InvalidDataException(
                     $"Повторяющийся или некорректный id ассета: {asset.Id}");
@@ -976,7 +978,11 @@ public sealed class NovelProject
 
         foreach (var value in EnumerateTypedAssetValues())
         {
-            ValidateAssetReference(value.Value, value.ExpectedKind, value.Owner);
+            ValidateAssetReference(
+                value.Value,
+                value.ExpectedKind,
+                value.Owner,
+                assetsById);
         }
     }
 
@@ -1388,18 +1394,21 @@ public sealed class NovelProject
         }
     }
 
-    private void ValidateAssetReference(
+    private static void ValidateAssetReference(
         string value,
         AssetKind expectedKind,
-        string owner)
+        string owner,
+        IReadOnlyDictionary<string, NovelAsset> assetsById)
     {
         if (!AssetReference.TryGetId(value, out var id))
         {
             return;
         }
-        var asset = FindAsset(id)
-            ?? throw new InvalidDataException(
+        if (!assetsById.TryGetValue(id, out var asset))
+        {
+            throw new InvalidDataException(
                 $"Неизвестный ассет «@{id}» используется: {owner}.");
+        }
         if (asset.Kind != expectedKind)
         {
             throw new InvalidDataException(
