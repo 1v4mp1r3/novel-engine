@@ -2121,14 +2121,7 @@ public partial class MainWindow : Window
         _refreshingAssetFolders = true;
         try
         {
-            var folderCounts = _project.Assets
-                .GroupBy(
-                    asset => ProjectAssets.NormalizeFolder(asset.Folder),
-                    StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Count(),
-                    StringComparer.OrdinalIgnoreCase);
+            var folderCounts = CountAssetsByFolder(_project.Assets);
             AssetFoldersTree.Items.Clear();
             var all = new TreeViewItem
             {
@@ -2202,6 +2195,20 @@ public partial class MainWindow : Window
             folderCount,
             assetCount,
             assetCatalogRevision);
+    }
+
+    private static IReadOnlyDictionary<string, int> CountAssetsByFolder(
+        IEnumerable<NovelAsset> assets)
+    {
+        var folderCounts = new Dictionary<string, int>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var asset in assets)
+        {
+            var folder = ProjectAssets.NormalizeFolder(asset.Folder);
+            folderCounts[folder] = folderCounts.GetValueOrDefault(folder) + 1;
+        }
+
+        return folderCounts;
     }
 
     internal static AssetFolderTreeStamp CreateAssetFolderTreeStamp(

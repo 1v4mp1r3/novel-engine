@@ -1060,6 +1060,9 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
         "MainWindow.xaml.cs"));
     var listBody = ExtractMethodBody(source, "private void RefreshAssetList");
     var folderBody = ExtractMethodBody(source, "private void RefreshAssetFolders");
+    var countFoldersBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyDictionary<string, int> CountAssetsByFolder");
     var clearPickerBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
     var listStampIndex = listBody.IndexOf(
         "var stamp = CreateAssetListStamp(",
@@ -1070,16 +1073,16 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
     var folderStampIndex = folderBody.IndexOf(
         "var stamp = CreateAssetFolderTreeStamp(",
         StringComparison.Ordinal);
-    var folderGroupIndex = folderBody.IndexOf(
-        "var folderCounts = _project.Assets",
+    var folderCountIndex = folderBody.IndexOf(
+        "var folderCounts = CountAssetsByFolder(_project.Assets);",
         StringComparison.Ordinal);
 
     Assert(
         listStampIndex >= 0 && listFilterIndex > listStampIndex,
         "Asset list should check a cheap stamp before filtering assets.");
     Assert(
-        folderStampIndex >= 0 && folderGroupIndex > folderStampIndex,
-        "Asset folders should check a cheap stamp before grouping assets.");
+        folderStampIndex >= 0 && folderCountIndex > folderStampIndex,
+        "Asset folders should check a cheap stamp before counting folders.");
     Assert(
         listBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
             && listBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
@@ -1094,6 +1097,12 @@ static void AssetCatalogRuntimeStampsAvoidFullScans()
             && folderBody.Contains("_project.Assets.Count", StringComparison.Ordinal)
             && folderBody.Contains("_assetCatalogRevision", StringComparison.Ordinal),
         "Asset folder runtime stamp should use catalog counts and revision.");
+    Assert(
+        countFoldersBody.Contains("foreach (var asset in assets)", StringComparison.Ordinal)
+            && countFoldersBody.Contains("folderCounts[folder] = folderCounts.GetValueOrDefault(folder) + 1;", StringComparison.Ordinal)
+            && !countFoldersBody.Contains(".GroupBy(", StringComparison.Ordinal)
+            && !countFoldersBody.Contains(".ToDictionary(", StringComparison.Ordinal),
+        "Asset folder counts should be accumulated in one pass without LINQ grouping.");
     Assert(
         clearPickerBody.Contains("_assetCatalogRevision++", StringComparison.Ordinal),
         "Asset catalog invalidation should advance runtime stamp revision.");
