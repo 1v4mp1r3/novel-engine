@@ -2965,6 +2965,12 @@ static void NodePropertyPanelUsesGraphSelectedNodeCache()
         "GraphSurface.cs"));
     var refreshBody = ExtractMethodBody(windowSource, "private void RefreshProperties");
     var applyBody = ExtractMethodBody(windowSource, "private bool ApplyProperties");
+    var characterSelectionBody = ExtractMethodBody(
+        windowSource,
+        "private void CharactersGrid_SelectionChanged");
+    var outputSelectionBody = ExtractMethodBody(
+        windowSource,
+        "private void OutputsGrid_SelectionChanged");
 
     Assert(
         graphSource.Contains("public NovelNode? SelectedNode => FindNode(SelectedNodeId);", StringComparison.Ordinal),
@@ -2979,6 +2985,14 @@ static void NodePropertyPanelUsesGraphSelectedNodeCache()
         !refreshBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal)
             && !applyBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
         "Hot node property paths should not linearly search the selected project node.");
+    Assert(
+        characterSelectionBody.Contains("var node = Graph.SelectedNode;", StringComparison.Ordinal)
+            && outputSelectionBody.Contains("var node = Graph.SelectedNode;", StringComparison.Ordinal),
+        "Node property selection handlers should use GraphSurface selected-node cache.");
+    Assert(
+        !characterSelectionBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal)
+            && !outputSelectionBody.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
+        "Node property selection handlers should not linearly search the selected project node.");
 }
 
 static void NodePropertyPanelUsesCachedTargetTitleLookup()

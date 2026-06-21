@@ -5073,7 +5073,7 @@ public partial class MainWindow : Window
 
     private void CharactersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         SetCharacterButtons(CanEditSelectedNodeCharacters(node));
     }
 
@@ -5540,7 +5540,7 @@ public partial class MainWindow : Window
 
     private void OutputsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         SetOutputButtons(
             node?.Kind == NodeKind.Dialogue,
             OutputsGrid.SelectedItem is OutputView);
