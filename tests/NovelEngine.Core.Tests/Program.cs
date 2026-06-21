@@ -61,6 +61,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
     ("project asset sync caches generated lookups", ProjectAssetSyncCachesGeneratedLookups),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
+    ("asset folder delete scans directories once", AssetFolderDeleteScansDirectoriesOnce),
     ("project language preserves asset folders", ProjectLanguagePreservesFolders),
     ("project language exposes syntax and node locations", ProjectLanguageSyntaxAndLocations),
     ("project language syntax spans respect limit", ProjectLanguageSyntaxSpansRespectLimit),
@@ -2762,6 +2763,31 @@ static void AssetFoldersMoveFiles()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void AssetFolderDeleteScansDirectoriesOnce()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectAssets.cs"));
+    var body = ExtractMethodBody(source, "public static void DeleteFolder");
+    var managedDirectoryCalls = CountOccurrences(
+        body,
+        "ManagedFolderDirectories(projectPath, folder)");
+
+    Assert(
+        managedDirectoryCalls == 1,
+        "DeleteFolder should enumerate managed and legacy directories once.");
+    Assert(
+        body.Contains("var directories = new List<string>();", StringComparison.Ordinal)
+            && body.Contains("directories.Add(directory);", StringComparison.Ordinal),
+        "DeleteFolder should collect existing empty directories during validation.");
+    Assert(
+        !body.Contains(".Where(Directory.Exists)", StringComparison.Ordinal)
+            && !body.Contains(".ToList()", StringComparison.Ordinal),
+        "DeleteFolder should not allocate a filtered directory list before validation.");
 }
 
 static void ProjectLanguagePreservesFolders()

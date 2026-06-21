@@ -330,17 +330,19 @@ public static class ProjectAssets
             throw new InvalidOperationException(
                 "Сначала удалите вложенные папки.");
         }
-        var directories = ManagedFolderDirectories(projectPath, folder)
-            .Where(Directory.Exists)
-            .ToList();
+        var directories = new List<string>();
         foreach (var directory in ManagedFolderDirectories(projectPath, folder))
         {
-            if (Directory.Exists(directory)
-                && Directory.EnumerateFileSystemEntries(directory).Any())
+            if (!Directory.Exists(directory))
+            {
+                continue;
+            }
+            if (Directory.EnumerateFileSystemEntries(directory).Any())
             {
                 throw new InvalidOperationException(
                     "Сначала удалите файлы из этой папки.");
             }
+            directories.Add(directory);
         }
         project.AssetFolders.RemoveAll(
             candidate => candidate.Equals(folder, StringComparison.OrdinalIgnoreCase));
