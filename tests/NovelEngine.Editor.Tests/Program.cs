@@ -57,6 +57,7 @@ var tests = new (string Name, Action Run)[]
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
+    ("asset import uses batch import", AssetImportUsesBatchImport),
     ("asset transition sound binding policy requires audio output", AssetTransitionSoundBindingPolicyRequiresAudioOutput),
     ("asset transition sound menu lists node outputs", AssetTransitionSoundMenuListsNodeOutputs),
     ("asset usage navigation uses node id directly", AssetUsageNavigationUsesNodeIdDirectly),
@@ -1620,6 +1621,24 @@ static void AssetImportRefreshPolicySkipsUnchangedImports()
     Assert(
         MainWindow.ShouldRefreshAssetsAfterImport(3, 4),
         "Asset import should refresh after adding a new asset.");
+}
+
+static void AssetImportUsesBatchImport()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private void ImportAssets_Click");
+
+    Assert(
+        body.Contains("ProjectAssets.ImportMany(_project, _projectPath!, dialog.FileNames)", StringComparison.Ordinal),
+        "Bulk asset import should use ProjectAssets.ImportMany.");
+    Assert(
+        !body.Contains("foreach (var file in dialog.FileNames)", StringComparison.Ordinal)
+            && !body.Contains("ImportAssetFile(file)", StringComparison.Ordinal),
+        "Bulk asset import should not rebuild import lookup state for each selected file.");
 }
 
 static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()

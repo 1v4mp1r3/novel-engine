@@ -45,18 +45,62 @@ public static class ProjectAssets
         string sourcePath,
         string? folder = null)
     {
+        var knownAssetIds = BuildAssetIdSet(project);
+        var knownAssetFolders = BuildAssetFolderSet(project);
+        var knownAssetsByFullPath = BuildAssetFullPathMap(project, projectPath);
+        return ImportCore(
+            project,
+            projectPath,
+            sourcePath,
+            folder,
+            knownAssetIds,
+            knownAssetFolders,
+            knownAssetsByFullPath);
+    }
+
+    public static IReadOnlyList<NovelAsset> ImportMany(
+        NovelProject project,
+        string projectPath,
+        IEnumerable<string> sourcePaths,
+        string? folder = null)
+    {
+        ArgumentNullException.ThrowIfNull(sourcePaths);
+
+        var knownAssetIds = BuildAssetIdSet(project);
+        var knownAssetFolders = BuildAssetFolderSet(project);
+        var knownAssetsByFullPath = BuildAssetFullPathMap(project, projectPath);
+        var imported = new List<NovelAsset>();
+        foreach (var sourcePath in sourcePaths)
+        {
+            imported.Add(ImportCore(
+                project,
+                projectPath,
+                sourcePath,
+                folder,
+                knownAssetIds,
+                knownAssetFolders,
+                knownAssetsByFullPath));
+        }
+
+        return imported;
+    }
+
+    private static NovelAsset ImportCore(
+        NovelProject project,
+        string projectPath,
+        string sourcePath,
+        string? folder,
+        HashSet<string> knownAssetIds,
+        HashSet<string> knownAssetFolders,
+        Dictionary<string, NovelAsset> knownAssetsByFullPath)
+    {
         var source = Path.GetFullPath(sourcePath);
         if (!File.Exists(source))
         {
             throw new FileNotFoundException("Файл ассета не найден.", source);
         }
 
-        var existing = project.Assets.FirstOrDefault(
-            asset => string.Equals(
-                ResolvePath(projectPath, asset),
-                source,
-                StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
+        if (knownAssetsByFullPath.TryGetValue(source, out var existing))
         {
             return existing;
         }
@@ -73,7 +117,7 @@ public static class ProjectAssets
                 AssetKind.Audio => "audio",
                 _ => "other",
             });
-        EnsureFolder(project, folder);
+        EnsureFolder(project, folder, knownAssetFolders);
         var targetDirectory = Path.Combine(
             projectDirectory,
             ManagedFilesDirectoryName,
@@ -98,7 +142,7 @@ public static class ProjectAssets
 
         var id = CreateUniqueAssetId(
             MakeId(Path.GetFileNameWithoutExtension(target)),
-            BuildAssetIdSet(project));
+            knownAssetIds);
 
         var asset = new NovelAsset
         {
@@ -109,6 +153,8 @@ public static class ProjectAssets
                 .Replace('\\', '/'),
         };
         project.Assets.Add(asset);
+        knownAssetsByFullPath[source] = asset;
+        knownAssetsByFullPath[Path.GetFullPath(target)] = asset;
         return asset;
     }
 
@@ -169,9 +215,7 @@ public static class ProjectAssets
         var knownRelativePaths = project.Assets
             .Select(asset => NormalizeRelativeAssetPath(asset.Path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var knownFullPaths = project.Assets
-            .Select(asset => ResolvePath(projectPath, asset))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownAssetsByFullPath = BuildAssetFullPathMap(project, projectPath);
         var knownAssetIds = BuildAssetIdSet(project);
         foreach (var file in Directory.EnumerateFiles(
             root,
@@ -182,7 +226,7 @@ public static class ProjectAssets
             var relativeProjectPath = Path.GetRelativePath(projectDirectory, file)
                 .Replace('\\', '/');
             if (knownRelativePaths.Contains(relativeProjectPath)
-                || knownFullPaths.Contains(fullPath))
+                || knownAssetsByFullPath.ContainsKey(fullPath))
             {
                 continue;
             }
@@ -200,7 +244,7 @@ public static class ProjectAssets
                 knownAssetIds,
                 knownAssetFolders);
             knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
-            knownFullPaths.Add(ResolvePath(projectPath, imported));
+            knownAssetsByFullPath[ResolvePath(projectPath, imported)] = imported;
             changes += project.Assets.Count - before;
         }
 
@@ -253,6 +297,20 @@ public static class ProjectAssets
         }
 
         return folders;
+    }
+
+    private static Dictionary<string, NovelAsset> BuildAssetFullPathMap(
+        NovelProject project,
+        string projectPath)
+    {
+        var assetsByFullPath = new Dictionary<string, NovelAsset>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var asset in project.Assets)
+        {
+            assetsByFullPath.TryAdd(ResolvePath(projectPath, asset), asset);
+        }
+
+        return assetsByFullPath;
     }
 
     private static string CreateUniqueAssetId(

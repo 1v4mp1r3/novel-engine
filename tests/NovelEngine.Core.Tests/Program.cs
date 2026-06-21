@@ -55,6 +55,7 @@ var tests = new (string Name, Action Run)[]
     ("project language rejects mismatched asset kinds", ProjectLanguageRejectsWrongAssetKind),
     ("project validation caches asset lookup", ProjectValidationCachesAssetLookup),
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
+    ("project asset import many reuses lookups", ProjectAssetImportManyReusesLookups),
     ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
@@ -2448,6 +2449,65 @@ static void ProjectAssetImportCopiesFiles()
         Assert(
             Directory.GetFiles(Path.Combine(directory, "files", "backgrounds"), "Alice*.png").Length == 0,
             "Importing a managed character file copied it into backgrounds.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void ProjectAssetImportManyReusesLookups()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-assets-many-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var first = Path.Combine(directory, "one.png");
+        var second = Path.Combine(directory, "two.png");
+        File.WriteAllBytes(first, [137, 80, 78, 71]);
+        File.WriteAllBytes(second, [137, 80, 78, 71, 2]);
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+
+        var imported = ProjectAssets.ImportMany(project, projectPath, [first, second, first]);
+
+        Assert(imported.Count == 3, "Batch import did not return one result per requested source.");
+        Assert(project.Assets.Count == 2, "Batch import duplicated a repeated source file.");
+        Assert(
+            ReferenceEquals(imported[0], imported[2]),
+            "Batch import did not reuse the already registered asset for a repeated source.");
+        Assert(
+            project.Assets.Select(asset => asset.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2,
+            "Batch import produced duplicate asset ids.");
+
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Core",
+            "ProjectAssets.cs"));
+        var importManyBody = ExtractMethodBody(
+            source,
+            "public static IReadOnlyList<NovelAsset> ImportMany");
+        var importCoreBody = ExtractMethodBody(
+            source,
+            "private static NovelAsset ImportCore");
+
+        Assert(
+            CountOccurrences(importManyBody, "BuildAssetIdSet(project)") == 1
+                && CountOccurrences(importManyBody, "BuildAssetFolderSet(project)") == 1
+                && CountOccurrences(importManyBody, "BuildAssetFullPathMap(project, projectPath)") == 1
+                && importManyBody.Contains("ImportCore(", StringComparison.Ordinal),
+            "Batch import should build lookup state once and reuse it for all files.");
+        Assert(
+            importCoreBody.Contains("knownAssetsByFullPath.TryGetValue(source, out var existing)", StringComparison.Ordinal)
+                && importCoreBody.Contains("EnsureFolder(project, folder, knownAssetFolders)", StringComparison.Ordinal)
+                && importCoreBody.Contains("CreateUniqueAssetId(", StringComparison.Ordinal)
+                && importCoreBody.Contains("knownAssetIds", StringComparison.Ordinal)
+                && importCoreBody.Contains("knownAssetsByFullPath[source] = asset", StringComparison.Ordinal)
+                && importCoreBody.Contains("knownAssetsByFullPath[Path.GetFullPath(target)] = asset", StringComparison.Ordinal),
+            "Shared import implementation should use cached path, folder, and id lookups.");
     }
     finally
     {

@@ -3516,10 +3516,7 @@ public partial class MainWindow : Window
         try
         {
             var before = _project.Assets.Count;
-            foreach (var file in dialog.FileNames)
-            {
-                _ = ImportAssetFile(file);
-            }
+            _ = ProjectAssets.ImportMany(_project, _projectPath!, dialog.FileNames);
             var after = _project.Assets.Count;
             var importedCount = after - before;
             if (ShouldRefreshAssetsAfterImport(before, after))
