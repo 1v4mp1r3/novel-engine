@@ -111,6 +111,7 @@ var tests = new (string Name, Action Run)[]
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
+    ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
     ("graph surface uses cached node lookup", GraphSurfaceUsesCachedNodeLookup),
     ("graph centering calculates bounds in one pass", GraphCenteringCalculatesBoundsInOnePass),
     ("graph inheritance menu caches incoming nodes", GraphInheritanceMenuCachesIncomingNodes),
@@ -3816,6 +3817,33 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void GraphNodeDragDefersHitCacheRebuild()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var dragBody = ExtractMethodBody(source, "protected override void OnMouseMove");
+    var mouseUpBody = ExtractMethodBody(source, "protected override void OnMouseUp");
+    var nodeDragIndex = dragBody.IndexOf("node.X = nextX;", StringComparison.Ordinal);
+    var nodeDragRenderIndex = dragBody.IndexOf("RequestRender();", nodeDragIndex);
+    var movedIndex = mouseUpBody.IndexOf("if (_dragMoved)", StringComparison.Ordinal);
+    var invalidateIndex = mouseUpBody.IndexOf("InvalidateHitTestCache();", movedIndex);
+    var projectChangedIndex = mouseUpBody.IndexOf("ProjectChanged?.Invoke", movedIndex);
+
+    Assert(nodeDragIndex >= 0, "Graph node drag branch should update node coordinates.");
+    Assert(
+        nodeDragRenderIndex > nodeDragIndex,
+        "Graph node drag should still queue a render after movement.");
+    Assert(
+        !dragBody.Contains("RequestRender(invalidateHitTests: true)", StringComparison.Ordinal),
+        "Graph node drag should not rebuild hit-test state on every mouse move.");
+    Assert(
+        invalidateIndex > movedIndex && invalidateIndex < projectChangedIndex,
+        "Graph node drag should invalidate hit-test state once when the drag ends.");
 }
 
 static void GraphSurfaceUsesCachedNodeLookup()

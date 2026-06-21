@@ -355,7 +355,7 @@ public sealed class GraphSurface : FrameworkElement
             _dragNodeStart.Y,
             node.X,
             node.Y);
-        RequestRender(invalidateHitTests: true);
+        RequestRender();
     }
 
     protected override void OnMouseUp(MouseButtonEventArgs e)
@@ -402,6 +402,7 @@ public sealed class GraphSurface : FrameworkElement
         ResetHoverHitCache();
         if (_dragMoved)
         {
+            InvalidateHitTestCache();
             ProjectChanged?.Invoke(this, EventArgs.Empty);
         }
         _dragMoved = false;
