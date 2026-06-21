@@ -676,17 +676,10 @@ public partial class MainWindow : Window
             ScriptBox.Text = node.Script;
             EditNodeScriptBlocksButton.Content =
                 $"Блоки скрипта ({node.ScriptBlocks.Count})";
-            CharactersGrid.ItemsSource = node.Characters
-                .Select(character => new CharacterView(character))
-                .ToList();
-            OutputsGrid.ItemsSource = node.Outputs
-                .Select(output => new OutputView(
-                    output,
-                    ResolveNodeTitle(
-                        nodeTitlesById,
-                        output.TargetNodeId,
-                        "не подключено")))
-                .ToList();
+            CharactersGrid.ItemsSource = CreateCharacterViews(node.Characters);
+            OutputsGrid.ItemsSource = CreateOutputViews(
+                node.Outputs,
+                nodeTitlesById);
 
             SetCharacterButtons(CanEditNodeCharacters(node, node.InheritCharacters));
             SetOutputButtons(
@@ -697,6 +690,37 @@ public partial class MainWindow : Window
         {
             _refreshingProperties = false;
         }
+    }
+
+    private static List<CharacterView> CreateCharacterViews(
+        IReadOnlyList<CharacterPlacement> characters)
+    {
+        var views = new List<CharacterView>(characters.Count);
+        for (var index = 0; index < characters.Count; index++)
+        {
+            views.Add(new CharacterView(characters[index]));
+        }
+
+        return views;
+    }
+
+    private static List<OutputView> CreateOutputViews(
+        IReadOnlyList<NodeOutput> outputs,
+        IReadOnlyDictionary<string, string> nodeTitlesById)
+    {
+        var views = new List<OutputView>(outputs.Count);
+        for (var index = 0; index < outputs.Count; index++)
+        {
+            var output = outputs[index];
+            views.Add(new OutputView(
+                output,
+                ResolveNodeTitle(
+                    nodeTitlesById,
+                    output.TargetNodeId,
+                    "не подключено")));
+        }
+
+        return views;
     }
 
     private IEnumerable<Control> PropertyControls()

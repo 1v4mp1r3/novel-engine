@@ -3463,6 +3463,12 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
     var resolveBody = ExtractMethodBody(
         source,
         "private static string ResolveNodeTitle");
+    var characterViewsBody = ExtractMethodBody(
+        source,
+        "private static List<CharacterView> CreateCharacterViews");
+    var outputViewsBody = ExtractMethodBody(
+        source,
+        "private static List<OutputView> CreateOutputViews");
 
     Assert(
         refreshBody.Contains(
@@ -3490,6 +3496,25 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
         !refreshBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal)
             && !stampBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal),
         "Node property output rows should not linearly find target nodes per output.");
+    Assert(
+        refreshBody.Contains("CharactersGrid.ItemsSource = CreateCharacterViews(node.Characters);", StringComparison.Ordinal)
+            && refreshBody.Contains("OutputsGrid.ItemsSource = CreateOutputViews(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".Select(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Node property refresh should delegate row creation without LINQ pipelines.");
+    Assert(
+        characterViewsBody.Contains("var views = new List<CharacterView>(characters.Count);", StringComparison.Ordinal)
+            && characterViewsBody.Contains("for (var index = 0; index < characters.Count; index++)", StringComparison.Ordinal)
+            && !characterViewsBody.Contains(".Select(", StringComparison.Ordinal)
+            && !characterViewsBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Node character rows should be built in one direct pass.");
+    Assert(
+        outputViewsBody.Contains("var views = new List<OutputView>(outputs.Count);", StringComparison.Ordinal)
+            && outputViewsBody.Contains("for (var index = 0; index < outputs.Count; index++)", StringComparison.Ordinal)
+            && outputViewsBody.Contains("ResolveNodeTitle(", StringComparison.Ordinal)
+            && !outputViewsBody.Contains(".Select(", StringComparison.Ordinal)
+            && !outputViewsBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Node output rows should be built in one direct pass with cached title lookup.");
     Assert(
         lookupBody.Contains("lookup[node.Id] = node.Title;", StringComparison.Ordinal),
         "Node target title lookup should index titles by node id.");
