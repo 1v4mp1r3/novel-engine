@@ -42,6 +42,7 @@ var tests = new (string Name, Action Run)[]
     ("asset catalog runtime stamps avoid full scans", AssetCatalogRuntimeStampsAvoidFullScans),
     ("asset preview stamp tracks visible input state", AssetPreviewStampTracksVisibleInputState),
     ("asset preview playback stop skips inactive player", AssetPreviewPlaybackStopSkipsInactivePlayer),
+    ("asset selection uses visible items source", AssetSelectionUsesVisibleItemsSource),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
@@ -1158,6 +1159,34 @@ static void AssetPreviewPlaybackStopSkipsInactivePlayer()
     Assert(
         inactiveGuardIndex >= 0 && inactiveGuardIndex < stopIndex,
         "Inactive asset preview audio should skip MediaPlayer.Stop().");
+}
+
+static void AssetSelectionUsesVisibleItemsSource()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var helperBody = ExtractMethodBody(source, "private AssetView? FindVisibleAssetView");
+    var createVoiceBody = ExtractMethodBody(source, "private void CreateVoiceBlip_Click");
+    var renameBody = ExtractMethodBody(source, "private void RenameAsset_Click");
+    var diagnosticBody = ExtractMethodBody(source, "private bool TryNavigateToDiagnosticAsset");
+
+    Assert(
+        helperBody.Contains("AssetsGrid.ItemsSource is IEnumerable<AssetView>", StringComparison.Ordinal),
+        "Visible asset lookup should use the current items source.");
+    Assert(
+        !source.Contains("AssetsGrid.Items\r\n            .OfType<AssetView>()", StringComparison.Ordinal)
+            && !source.Contains("AssetsGrid.Items\n            .OfType<AssetView>()", StringComparison.Ordinal)
+            && !source.Contains("AssetsGrid.Items\r\n                .OfType<AssetView>()", StringComparison.Ordinal)
+            && !source.Contains("AssetsGrid.Items\n                .OfType<AssetView>()", StringComparison.Ordinal),
+        "Asset selection should not walk DataGrid item containers.");
+    Assert(
+        createVoiceBody.Contains("FindVisibleAssetView(asset.Id)", StringComparison.Ordinal)
+            && renameBody.Contains("FindVisibleAssetView(dialog.AssetId)", StringComparison.Ordinal)
+            && diagnosticBody.Contains("FindVisibleAssetView(assetId)", StringComparison.Ordinal),
+        "Asset commands should reuse visible asset lookup.");
 }
 
 static void DispatcherDebounceGateCollapsesPendingRequests()

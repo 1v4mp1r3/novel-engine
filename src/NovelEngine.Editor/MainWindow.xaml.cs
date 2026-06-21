@@ -2105,6 +2105,15 @@ public partial class MainWindow : Window
     private IReadOnlyDictionary<string, int> GetAssetUsageCounts() =>
         _assetUsageCountCache ??= _project.CountAssetReferencesById();
 
+    private AssetView? FindVisibleAssetView(string assetId)
+    {
+        return AssetsGrid.ItemsSource is IEnumerable<AssetView> assetViews
+            ? assetViews.FirstOrDefault(view => view.Id.Equals(
+                assetId,
+                StringComparison.OrdinalIgnoreCase))
+            : null;
+    }
+
     private void RefreshAssetFolders()
     {
         var stamp = CreateAssetFolderTreeStamp(
@@ -3565,9 +3574,7 @@ public partial class MainWindow : Window
             var asset = ProjectAssets.Import(_project, _projectPath!, targetPath, folder);
             _selectedAssetFolder = folder;
             RefreshAssetCatalogAfterEditorChange();
-            AssetsGrid.SelectedItem = AssetsGrid.Items
-                .OfType<AssetView>()
-                .FirstOrDefault(view => view.Id == asset.Id);
+            AssetsGrid.SelectedItem = FindVisibleAssetView(asset.Id);
             StatusText.Text = $"Создан voice-блип @{asset.Id}";
         }
         catch (Exception error) when (
@@ -3797,9 +3804,7 @@ public partial class MainWindow : Window
             AssetReference.Create(dialog.AssetId));
         asset.Id = dialog.AssetId;
         RefreshAssetCatalogAfterEditorChange();
-        AssetsGrid.SelectedItem = AssetsGrid.Items
-            .OfType<AssetView>()
-            .FirstOrDefault(view => view.Id == dialog.AssetId);
+        AssetsGrid.SelectedItem = FindVisibleAssetView(dialog.AssetId);
     }
 
     private void CopyAssetReference_Click(object sender, RoutedEventArgs e)
@@ -6489,11 +6494,7 @@ public partial class MainWindow : Window
 
         WorkspaceTabs.SelectedItem = FilesTab;
         RefreshAssets();
-        var assetView = AssetsGrid.Items
-            .OfType<AssetView>()
-            .FirstOrDefault(view => view.Id.Equals(
-                assetId,
-                StringComparison.OrdinalIgnoreCase));
+        var assetView = FindVisibleAssetView(assetId);
         if (assetView is null)
         {
             StatusText.Text = $"Ассет @{assetId} не найден в менеджере файлов";
