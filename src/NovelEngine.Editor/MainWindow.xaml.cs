@@ -575,8 +575,18 @@ public partial class MainWindow : Window
             || !requestedNodeId.Equals(selectedItemNodeId, StringComparison.Ordinal);
     }
 
-    private IEnumerable<NovelNode> FilteredNodes(string query) =>
-        _project.Nodes.Where(node => NodeMatchesSearch(node, query));
+    private NovelNode? FindFirstFilteredNode(string query)
+    {
+        foreach (var node in _project.Nodes)
+        {
+            if (NodeMatchesSearch(node, query))
+            {
+                return node;
+            }
+        }
+
+        return null;
+    }
 
     private static bool NodeMatchesSearch(NovelNode node, string query)
     {
@@ -4560,7 +4570,7 @@ public partial class MainWindow : Window
         }
 
         var query = ProjectSearchBox.Text.Trim();
-        var node = FilteredNodes(query).FirstOrDefault();
+        var node = FindFirstFilteredNode(query);
         if (node is null)
         {
             StatusText.Text = query.Length == 0

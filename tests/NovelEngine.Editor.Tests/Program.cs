@@ -3274,6 +3274,10 @@ static void ProjectExplorerGroupsFilteredNodesOnce()
         "MainWindow.xaml.cs"));
     var refreshBody = ExtractMethodBody(source, "private void RefreshExplorer()");
     var addGroupBody = ExtractMethodBody(source, "private void AddNodeGroup");
+    var keyDownBody = ExtractMethodBody(source, "private void ProjectSearchBox_KeyDown");
+    var firstFilteredBody = ExtractMethodBody(
+        source,
+        "private NovelNode? FindFirstFilteredNode");
 
     Assert(
         refreshBody.Contains("BuildProjectExplorerGroups(_project.Nodes, query)", StringComparison.Ordinal),
@@ -3285,6 +3289,19 @@ static void ProjectExplorerGroupsFilteredNodesOnce()
         !addGroupBody.Contains(".Where(", StringComparison.Ordinal)
             && !addGroupBody.Contains(".ToList()", StringComparison.Ordinal),
         "Project explorer node groups should not re-filter each section.");
+    Assert(
+        keyDownBody.Contains("var node = FindFirstFilteredNode(query);", StringComparison.Ordinal)
+            && !keyDownBody.Contains("FilteredNodes(query).FirstOrDefault()", StringComparison.Ordinal),
+        "Project explorer Enter search should use a direct first-match lookup.");
+    Assert(
+        firstFilteredBody.Contains("foreach (var node in _project.Nodes)", StringComparison.Ordinal)
+            && firstFilteredBody.Contains("NodeMatchesSearch(node, query)", StringComparison.Ordinal)
+            && !firstFilteredBody.Contains(".Where(", StringComparison.Ordinal)
+            && !firstFilteredBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Project explorer first-match lookup should avoid LINQ iterators.");
+    Assert(
+        !source.Contains("FilteredNodes(string query)", StringComparison.Ordinal),
+        "Project explorer should not keep the old filtered-node iterator helper.");
 }
 
 static void ProjectExplorerSelectionUsesSyncOnlyPath()
