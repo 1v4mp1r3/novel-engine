@@ -412,21 +412,28 @@ public sealed class VisualScriptBlocksWindow : Window
     private void RefreshList(int selectedIndex = -1, bool blocksChanged = true)
     {
         var query = _filterBox.Text.Trim();
-        var views = _blocks
-            .Select((block, index) => new BlockView(
-                index,
-                index + 1,
-                DisplayBlock(block)))
-            .Where(view => BlockMatchesFilter(_blocks[view.SourceIndex], view.Text, query))
-            .ToList();
-        _blockList.ItemsSource = views;
-        if (selectedIndex >= 0 && selectedIndex < _blocks.Count)
+        var views = new List<BlockView>(_blocks.Count);
+        var visibleIndex = -1;
+        for (var index = 0; index < _blocks.Count; index++)
         {
-            var visibleIndex = views.FindIndex(view => view.SourceIndex == selectedIndex);
-            if (visibleIndex >= 0)
+            var block = _blocks[index];
+            var text = DisplayBlock(block);
+            if (!BlockMatchesFilter(block, text, query))
             {
-                _blockList.SelectedIndex = visibleIndex;
+                continue;
             }
+
+            if (index == selectedIndex)
+            {
+                visibleIndex = views.Count;
+            }
+            views.Add(new BlockView(index, index + 1, text));
+        }
+
+        _blockList.ItemsSource = views;
+        if (visibleIndex >= 0)
+        {
+            _blockList.SelectedIndex = visibleIndex;
         }
         UpdateSummary(views.Count);
         if (ShouldUpdatePreview(blocksChanged, _previewBox.Text))

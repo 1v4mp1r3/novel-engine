@@ -2622,6 +2622,9 @@ static void VisualScriptFilterUsesDebouncedRefresh()
     var scheduleBody = ExtractMethodBody(
         source,
         "private void ScheduleFilterRefresh");
+    var refreshBody = ExtractMethodBody(
+        source,
+        "private void RefreshList");
 
     Assert(
         source.Contains(
@@ -2645,6 +2648,15 @@ static void VisualScriptFilterUsesDebouncedRefresh()
             "RefreshList(GetSelectedBlockIndex(), blocksChanged: false);",
             StringComparison.Ordinal),
         "Visual script filter refresh should keep the compiled preview cache.");
+    Assert(
+        refreshBody.Contains("var views = new List<BlockView>(_blocks.Count);", StringComparison.Ordinal)
+            && refreshBody.Contains("for (var index = 0; index < _blocks.Count; index++)", StringComparison.Ordinal)
+            && refreshBody.Contains("visibleIndex = views.Count;", StringComparison.Ordinal)
+            && !refreshBody.Contains(".Select(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".Where(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".FindIndex(", StringComparison.Ordinal),
+        "Visual script filter refresh should build visible rows and selection in one direct pass.");
 }
 
 static void ScriptLiteralLoadSuppressesChangeEvents()
