@@ -5040,9 +5040,7 @@ public partial class MainWindow : Window
 
     private CharacterPlacement? SelectedCharacter()
     {
-        var node = Graph.SelectedNode;
-        var view = CharactersGrid.SelectedItem as CharacterView;
-        return node?.Characters.FirstOrDefault(character => character.Id == view?.Id);
+        return (CharactersGrid.SelectedItem as CharacterView)?.Character;
     }
 
     private void SelectCharacterView(string characterId)
@@ -5521,9 +5519,7 @@ public partial class MainWindow : Window
 
     private NodeOutput? SelectedOutput()
     {
-        var node = Graph.SelectedNode;
-        var view = OutputsGrid.SelectedItem as OutputView;
-        return node?.Outputs.FirstOrDefault(output => output.Id == view?.Id);
+        return (OutputsGrid.SelectedItem as OutputView)?.Output;
     }
 
     private void SelectOutputView(string outputId)

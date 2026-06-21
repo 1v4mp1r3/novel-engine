@@ -48,6 +48,7 @@ var tests = new (string Name, Action Run)[]
     ("asset binding refresh avoids duplicate dirty refreshes", AssetBindingRefreshAvoidsDuplicateDirtyRefreshes),
     ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
     ("selected node actions use graph selected node cache", SelectedNodeActionsUseGraphSelectedNodeCache),
+    ("property selection uses row model references", PropertySelectionUsesRowModelReferences),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
@@ -1299,14 +1300,12 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
         "private void SetSelectedCharacterPosition",
         "private void CharactersGrid_ContextMenuOpening",
         "private void CharactersGrid_PreviewKeyDown",
-        "private CharacterPlacement? SelectedCharacter",
         "private void AddOutput(string? nodeId = null)",
         "private void DeleteOutput_Click",
         "private void DuplicateOutput_Click",
         "private void MoveSelectedOutput",
         "private void OutputsGrid_ContextMenuOpening",
         "private void OutputsGrid_PreviewKeyDown",
-        "private NodeOutput? SelectedOutput",
         "private void EditSelectedOutputScriptBlocks()",
         "private void EditSelectedOutputTransition()",
         "private void Inheritance_Changed",
@@ -1322,6 +1321,36 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
             !body.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
             $"{method} should not linearly search the selected project node.");
     }
+}
+
+static void PropertySelectionUsesRowModelReferences()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var selectedCharacterBody = ExtractMethodBody(
+        source,
+        "private CharacterPlacement? SelectedCharacter");
+    var selectedOutputBody = ExtractMethodBody(
+        source,
+        "private NodeOutput? SelectedOutput");
+
+    Assert(
+        selectedCharacterBody.Contains("?.Character", StringComparison.Ordinal),
+        "SelectedCharacter should return the row's model reference directly.");
+    Assert(
+        selectedOutputBody.Contains("?.Output", StringComparison.Ordinal),
+        "SelectedOutput should return the row's model reference directly.");
+    Assert(
+        !selectedCharacterBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !selectedOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Selected row helpers should not scan node collections by id.");
+    Assert(
+        !selectedCharacterBody.Contains("Graph.SelectedNode", StringComparison.Ordinal)
+            && !selectedOutputBody.Contains("Graph.SelectedNode", StringComparison.Ordinal),
+        "Selected row helpers should not resolve the selected node.");
 }
 
 static void TransitionEditsRefreshAssetUsage()
