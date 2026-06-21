@@ -451,19 +451,19 @@ public partial class MainWindow : Window
             _projectTreeItemsByNodeId.Clear();
             _selectedProjectTreeItem = null;
 
-            var matchedNodes = FilteredNodes(query).ToList();
+            var groups = BuildProjectExplorerGroups(_project.Nodes, query);
             ProjectTree.Items.Clear();
             var root = new TreeViewItem
             {
                 Header = query.Length == 0
                     ? _project.Title
-                    : $"{_project.Title} · найдено {matchedNodes.Count}",
+                    : $"{_project.Title} · найдено {groups.TotalCount}",
                 IsExpanded = true,
             };
             ProjectTree.Items.Add(root);
-            AddNodeGroup(root, "Старт", NodeKind.Start, query, matchedNodes);
-            AddNodeGroup(root, "Сцены", NodeKind.Scene, query, matchedNodes);
-            AddNodeGroup(root, "Диалоги", NodeKind.Dialogue, query, matchedNodes);
+            AddNodeGroup(root, "Старт", query, groups.StartNodes);
+            AddNodeGroup(root, "Сцены", query, groups.SceneNodes);
+            AddNodeGroup(root, "Диалоги", query, groups.DialogueNodes);
             SyncProjectTreeSelection(Graph.SelectedNodeId);
         }
         finally
@@ -475,13 +475,9 @@ public partial class MainWindow : Window
     private void AddNodeGroup(
         TreeViewItem root,
         string title,
-        NodeKind kind,
         string query,
-        IReadOnlyList<NovelNode> matchedNodes)
+        IReadOnlyList<NovelNode> nodes)
     {
-        var nodes = matchedNodes
-            .Where(node => node.Kind == kind)
-            .ToList();
         var group = new TreeViewItem
         {
             Header = query.Length == 0 ? title : $"{title} ({nodes.Count})",
@@ -498,6 +494,41 @@ public partial class MainWindow : Window
             _projectTreeItemsByNodeId[node.Id] = item;
             group.Items.Add(item);
         }
+    }
+
+    internal static ProjectExplorerNodeGroups BuildProjectExplorerGroups(
+        IEnumerable<NovelNode> nodes,
+        string query)
+    {
+        var startNodes = new List<NovelNode>();
+        var sceneNodes = new List<NovelNode>();
+        var dialogueNodes = new List<NovelNode>();
+
+        foreach (var node in nodes)
+        {
+            if (!NodeMatchesSearch(node, query))
+            {
+                continue;
+            }
+
+            switch (node.Kind)
+            {
+                case NodeKind.Start:
+                    startNodes.Add(node);
+                    break;
+                case NodeKind.Scene:
+                    sceneNodes.Add(node);
+                    break;
+                case NodeKind.Dialogue:
+                    dialogueNodes.Add(node);
+                    break;
+            }
+        }
+
+        return new ProjectExplorerNodeGroups(
+            startNodes,
+            sceneNodes,
+            dialogueNodes);
     }
 
     private void SyncProjectTreeSelection(string? nodeId)
@@ -6666,6 +6697,15 @@ public partial class MainWindow : Window
         string Query,
         int NodeCount,
         int Hash);
+
+    internal readonly record struct ProjectExplorerNodeGroups(
+        IReadOnlyList<NovelNode> StartNodes,
+        IReadOnlyList<NovelNode> SceneNodes,
+        IReadOnlyList<NovelNode> DialogueNodes)
+    {
+        public int TotalCount =>
+            StartNodes.Count + SceneNodes.Count + DialogueNodes.Count;
+    }
 
     internal readonly record struct NodePropertyPanelStamp(
         string? NodeId,

@@ -89,6 +89,7 @@ var tests = new (string Name, Action Run)[]
     ("output editor guard skips unchanged apply", OutputEditorGuardSkipsUnchangedApply),
     ("output rendered property guard skips hidden graph refresh", OutputRenderedPropertyGuardSkipsHiddenGraphRefresh),
     ("project explorer stamp tracks visible node fields", ProjectExplorerStampTracksVisibleNodeFields),
+    ("project explorer groups filtered nodes once", ProjectExplorerGroupsFilteredNodesOnce),
     ("project explorer selection uses sync-only path", ProjectExplorerSelectionUsesSyncOnlyPath),
     ("project explorer selection skips unchanged sync", ProjectExplorerSelectionSkipsUnchangedSync),
     ("node property panel stamp tracks visible state", NodePropertyPanelStampTracksVisibleState),
@@ -2919,6 +2920,50 @@ static void ProjectExplorerStampTracksVisibleNodeFields()
     Assert(
         baseline == MainWindow.CreateProjectExplorerStamp(changedPositionProject, "scene"),
         "Project explorer stamp should ignore node position-only changes.");
+}
+
+static void ProjectExplorerGroupsFilteredNodesOnce()
+{
+    var project = NovelProject.CreateDefault();
+    project.Nodes.Add(new NovelNode
+    {
+        Id = "scene-extra",
+        Kind = NodeKind.Scene,
+        Title = "Hidden room",
+        Text = "quiet branch",
+    });
+    project.Nodes.Add(new NovelNode
+    {
+        Id = "dialogue-extra",
+        Kind = NodeKind.Dialogue,
+        Title = "Hero choice",
+        Text = "branch line",
+    });
+
+    var groups = MainWindow.BuildProjectExplorerGroups(project.Nodes, "branch");
+    Assert(groups.StartNodes.Count == 0, "Explorer groups should filter unmatched start nodes.");
+    Assert(groups.SceneNodes.Count == 1, "Explorer groups should include matching scene nodes.");
+    Assert(groups.DialogueNodes.Count == 1, "Explorer groups should include matching dialogue nodes.");
+    Assert(groups.TotalCount == 2, "Explorer group total should count all matching nodes.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var refreshBody = ExtractMethodBody(source, "private void RefreshExplorer()");
+    var addGroupBody = ExtractMethodBody(source, "private void AddNodeGroup");
+
+    Assert(
+        refreshBody.Contains("BuildProjectExplorerGroups(_project.Nodes, query)", StringComparison.Ordinal),
+        "Project explorer refresh should group filtered nodes in one pass.");
+    Assert(
+        !refreshBody.Contains("FilteredNodes(query).ToList()", StringComparison.Ordinal),
+        "Project explorer refresh should not allocate an intermediate matched node list.");
+    Assert(
+        !addGroupBody.Contains(".Where(", StringComparison.Ordinal)
+            && !addGroupBody.Contains(".ToList()", StringComparison.Ordinal),
+        "Project explorer node groups should not re-filter each section.");
 }
 
 static void ProjectExplorerSelectionUsesSyncOnlyPath()
