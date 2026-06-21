@@ -2365,8 +2365,12 @@ static void CodeEditorPlainTextReplaceSkipsSpanWork()
         "NovelEngine.Editor",
         "CodeEditorControl.cs"));
     var body = ExtractMethodBody(source, "private void ReplaceDocument");
+    var appendBody = ExtractMethodBody(source, "private static void AppendText");
     var plainTextGuardIndex = body.IndexOf(
         "if (spans.Count == 0 && !errorStart.HasValue)",
+        StringComparison.Ordinal);
+    var defaultForegroundIndex = body.IndexOf(
+        "var defaultForeground =",
         StringComparison.Ordinal);
     var boundaryIndex = body.IndexOf(
         "new SortedSet<int>",
@@ -2379,11 +2383,21 @@ static void CodeEditorPlainTextReplaceSkipsSpanWork()
         plainTextGuardIndex >= 0,
         "Plain text document replacement should have a fast path.");
     Assert(
+        defaultForegroundIndex >= 0 && defaultForegroundIndex < plainTextGuardIndex,
+        "Document replacement should resolve the default text brush once per repaint.");
+    Assert(
         boundaryIndex > plainTextGuardIndex && sortIndex > plainTextGuardIndex,
         "Plain text fast path should run before syntax boundary and sorting work.");
     Assert(
-        body.Contains("AppendText(paragraph, source, null, isError: false)", StringComparison.Ordinal),
+        body.Contains("AppendText(", StringComparison.Ordinal)
+            && body.Contains("source,", StringComparison.Ordinal)
+            && body.Contains("isError: false,", StringComparison.Ordinal)
+            && body.Contains("defaultForeground);", StringComparison.Ordinal),
         "Plain text fast path should append the source as a single undecorated run.");
+    Assert(
+        appendBody.Contains(": defaultForeground", StringComparison.Ordinal)
+            && !appendBody.Contains("Application.Current.Resources", StringComparison.Ordinal),
+        "AppendText should not look up application resources for every rendered run.");
 }
 
 static void CodeHighlightingSkipsSpanOverflowRepaint()

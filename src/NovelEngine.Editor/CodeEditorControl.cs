@@ -690,10 +690,17 @@ public sealed class CodeEditorControl : RichTextBox
                 Margin = new Thickness(0),
             };
             Document.Blocks.Add(paragraph);
+            var defaultForeground =
+                (Brush)Application.Current.Resources["TextBrush"];
 
             if (spans.Count == 0 && !errorStart.HasValue)
             {
-                AppendText(paragraph, source, null, isError: false);
+                AppendText(
+                    paragraph,
+                    source,
+                    null,
+                    isError: false,
+                    defaultForeground);
             }
             else
             {
@@ -749,7 +756,8 @@ public sealed class CodeEditorControl : RichTextBox
                         paragraph,
                         source[start..end],
                         syntax?.Kind,
-                        isError);
+                        isError,
+                        defaultForeground);
                 }
             }
             Document.PageWidth = 100_000;
@@ -803,7 +811,8 @@ public sealed class CodeEditorControl : RichTextBox
         Paragraph paragraph,
         string text,
         ProjectLanguageSyntaxKind? syntax,
-        bool isError)
+        bool isError,
+        Brush defaultForeground)
     {
         if (text.Length == 0)
         {
@@ -816,7 +825,7 @@ public sealed class CodeEditorControl : RichTextBox
                     ? ErrorForeground
                     : syntax.HasValue
                         ? SyntaxBrushes[syntax.Value]
-                        : (Brush)Application.Current.Resources["TextBrush"],
+                        : defaultForeground,
                 FontWeight = syntax == ProjectLanguageSyntaxKind.Keyword
                     ? FontWeights.SemiBold
                     : FontWeights.Normal,
