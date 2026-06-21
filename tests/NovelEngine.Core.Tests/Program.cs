@@ -2601,6 +2601,12 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     var createBody = ExtractMethodBody(
         source,
         "private static string CreateUniqueAssetId");
+    var idSetBody = ExtractMethodBody(
+        source,
+        "private static HashSet<string> BuildAssetIdSet");
+    var folderSetBody = ExtractMethodBody(
+        source,
+        "private static HashSet<string> BuildAssetFolderSet");
 
     Assert(
         syncBody.Contains("BuildAssetIdSet(project)", StringComparison.Ordinal),
@@ -2639,6 +2645,20 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     Assert(
         ensureFolderBody.Contains("knownFolders.Add(current)", StringComparison.Ordinal),
         "Folder registration should claim folders through the hash set.");
+    Assert(
+        idSetBody.Contains(
+            "new HashSet<string>(StringComparer.OrdinalIgnoreCase)",
+            StringComparison.Ordinal)
+            && idSetBody.Contains("foreach (var asset in project.Assets)", StringComparison.Ordinal)
+            && idSetBody.Contains("ids.Add(asset.Id)", StringComparison.Ordinal)
+            && !idSetBody.Contains(".Select(", StringComparison.Ordinal)
+            && !idSetBody.Contains(".ToHashSet(", StringComparison.Ordinal),
+        "Asset id set should be built in one direct pass.");
+    Assert(
+        folderSetBody.Contains("foreach (var folder in project.AssetFolders)", StringComparison.Ordinal)
+            && folderSetBody.Contains("folders.Add(folder)", StringComparison.Ordinal)
+            && !folderSetBody.Contains(".ToHashSet(", StringComparison.Ordinal),
+        "Asset folder set should be built in one direct pass.");
 }
 
 static void AssetFoldersMoveFiles()

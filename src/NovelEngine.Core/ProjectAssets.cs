@@ -233,13 +233,27 @@ public static class ProjectAssets
         return asset;
     }
 
-    private static HashSet<string> BuildAssetIdSet(NovelProject project) =>
-        project.Assets
-            .Select(asset => asset.Id)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    private static HashSet<string> BuildAssetIdSet(NovelProject project)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var asset in project.Assets)
+        {
+            ids.Add(asset.Id);
+        }
 
-    private static HashSet<string> BuildAssetFolderSet(NovelProject project) =>
-        project.AssetFolders.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return ids;
+    }
+
+    private static HashSet<string> BuildAssetFolderSet(NovelProject project)
+    {
+        var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var folder in project.AssetFolders)
+        {
+            folders.Add(folder);
+        }
+
+        return folders;
+    }
 
     private static string CreateUniqueAssetId(
         string baseId,
