@@ -1518,12 +1518,54 @@ static void NovelPlayerFollowsLargeGraphQuickly()
         "src",
         "NovelEngine.Core",
         "NovelPlayer.cs"));
+    var availableOutputsBody = ExtractMethodBody(
+        source,
+        "public IReadOnlyList<NodeOutput> GetAvailableOutputs");
+    var createSaveBody = ExtractMethodBody(
+        source,
+        "public RuntimeSaveState CreateSaveState");
+    var restoreBody = ExtractMethodBody(
+        source,
+        "public NovelNode Restore");
+    var chooseBody = ExtractMethodBody(
+        source,
+        "public NovelNode Choose");
+    var enterBody = ExtractMethodBody(
+        source,
+        "private NovelNode Enter");
+
     Assert(
         source.Contains("_nodesById", StringComparison.Ordinal),
         "NovelPlayer should build a node lookup for runtime transitions.");
     Assert(
         !source.Contains("_project.FindNode", StringComparison.Ordinal),
         "NovelPlayer runtime paths should not use linear project node lookup.");
+    Assert(
+        availableOutputsBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && availableOutputsBody.Contains("available ??= new List<NodeOutput>()", StringComparison.Ordinal)
+            && !availableOutputsBody.Contains(".Where(", StringComparison.Ordinal)
+            && !availableOutputsBody.Contains(".ToList(", StringComparison.Ordinal),
+        "NovelPlayer should collect available outputs without LINQ pipelines.");
+    Assert(
+        chooseBody.Contains("FindOutput(node, outputId)", StringComparison.Ordinal)
+            && !chooseBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "NovelPlayer should find chosen outputs in a direct pass.");
+    Assert(
+        createSaveBody.Contains("CloneCharacters(State.CurrentCharacters)", StringComparison.Ordinal)
+            && createSaveBody.Contains("CloneVariables(State.Variables)", StringComparison.Ordinal)
+            && !createSaveBody.Contains(".Select(", StringComparison.Ordinal)
+            && !createSaveBody.Contains(".ToDictionary(", StringComparison.Ordinal),
+        "Runtime save state should avoid transient LINQ cloning pipelines.");
+    Assert(
+        restoreBody.Contains(
+            "AddCharacterClones(saveState.CurrentCharacters, State.CurrentCharacters)",
+            StringComparison.Ordinal)
+            && !restoreBody.Contains(".Select(", StringComparison.Ordinal),
+        "Runtime restore should clone characters in one direct pass.");
+    Assert(
+        enterBody.Contains("AddCharacterClones(node.Characters, State.CurrentCharacters)", StringComparison.Ordinal)
+            && !enterBody.Contains(".Select(", StringComparison.Ordinal),
+        "Runtime node entry should clone characters without LINQ pipelines.");
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     var player = new NovelPlayer(project);

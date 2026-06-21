@@ -67,11 +67,28 @@ public sealed class NovelPlayer
         return CurrentNode!;
     }
 
-    public IReadOnlyList<NodeOutput> GetAvailableOutputs() =>
-        CurrentNode?.Outputs
-            .Where(output => VisualConditionCompiler.Evaluate(output, State))
-            .ToList()
-        ?? [];
+    public IReadOnlyList<NodeOutput> GetAvailableOutputs()
+    {
+        var node = CurrentNode;
+        if (node is null)
+        {
+            return [];
+        }
+
+        List<NodeOutput>? available = null;
+        foreach (var output in node.Outputs)
+        {
+            if (!VisualConditionCompiler.Evaluate(output, State))
+            {
+                continue;
+            }
+
+            available ??= new List<NodeOutput>();
+            available.Add(output);
+        }
+
+        return available ?? [];
+    }
 
     public RuntimeSaveState CreateSaveState()
     {
@@ -82,14 +99,8 @@ public sealed class NovelPlayer
             NodeId = node.Id,
             CurrentBackground = State.CurrentBackground,
             CurrentMusic = State.CurrentMusic,
-            CurrentCharacters =
-            [
-                .. State.CurrentCharacters.Select(character => character.Clone()),
-            ],
-            Variables = State.Variables.ToDictionary(
-                pair => pair.Key,
-                pair => JsonSerializer.SerializeToElement(pair.Value),
-                StringComparer.OrdinalIgnoreCase),
+            CurrentCharacters = CloneCharacters(State.CurrentCharacters),
+            Variables = CloneVariables(State.Variables),
         };
     }
 
@@ -100,8 +111,7 @@ public sealed class NovelPlayer
         State.Reset();
         State.CurrentBackground = saveState.CurrentBackground;
         State.CurrentMusic = saveState.CurrentMusic;
-        State.CurrentCharacters.AddRange(
-            saveState.CurrentCharacters.Select(character => character.Clone()));
+        AddCharacterClones(saveState.CurrentCharacters, State.CurrentCharacters);
         foreach (var variable in saveState.Variables)
         {
             State.Variables[variable.Key] = RestoreVariable(variable.Value);
@@ -114,7 +124,7 @@ public sealed class NovelPlayer
     {
         var node = CurrentNode
             ?? throw new InvalidOperationException("Проигрывание ещё не начато.");
-        var output = node.Outputs.FirstOrDefault(candidate => candidate.Id == outputId)
+        var output = FindOutput(node, outputId)
             ?? throw new InvalidOperationException("Выход ноды не найден.");
         if (!VisualConditionCompiler.Evaluate(output, State))
         {
@@ -142,7 +152,7 @@ public sealed class NovelPlayer
         if (!node.InheritCharacters)
         {
             State.CurrentCharacters.Clear();
-            State.CurrentCharacters.AddRange(node.Characters.Select(character => character.Clone()));
+            AddCharacterClones(node.Characters, State.CurrentCharacters);
         }
 
         VisualScriptCompiler.Execute(node.Script, node.ScriptBlocks, State);
@@ -203,6 +213,51 @@ public sealed class NovelPlayer
         nodeId is not null && _nodesById.TryGetValue(nodeId, out var node)
             ? node
             : null;
+
+    private static NodeOutput? FindOutput(NovelNode node, string outputId)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.Id == outputId)
+            {
+                return output;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<CharacterPlacement> CloneCharacters(
+        IReadOnlyList<CharacterPlacement> source)
+    {
+        var characters = new List<CharacterPlacement>(source.Count);
+        AddCharacterClones(source, characters);
+        return characters;
+    }
+
+    private static void AddCharacterClones(
+        IReadOnlyList<CharacterPlacement> source,
+        List<CharacterPlacement> target)
+    {
+        for (var index = 0; index < source.Count; index++)
+        {
+            target.Add(source[index].Clone());
+        }
+    }
+
+    private static Dictionary<string, JsonElement> CloneVariables(
+        IReadOnlyDictionary<string, object?> source)
+    {
+        var variables = new Dictionary<string, JsonElement>(
+            source.Count,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in source)
+        {
+            variables[variable.Key] = JsonSerializer.SerializeToElement(variable.Value);
+        }
+
+        return variables;
+    }
 
     private static List<PathStep> BuildPath(
         Dictionary<string, PathStep> previous,
