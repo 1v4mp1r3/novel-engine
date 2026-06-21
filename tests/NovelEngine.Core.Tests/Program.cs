@@ -7,6 +7,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("project diagnostics check character voice references", ProjectDiagnosticsCheckCharacterVoiceReferences),
     ("project diagnostics report caches summary", ProjectDiagnosticsReportCachesSummary),
+    ("project diagnostics analyzes large graph quickly", ProjectDiagnosticsAnalyzesLargeGraphQuickly),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
@@ -244,6 +245,77 @@ static void ProjectDiagnosticsReportCachesSummary()
     Assert(report.Diagnostics.Count == 3, "Report diagnostics should be snapshot-stable.");
     Assert(report.Fingerprint == same.Fingerprint, "Same diagnostics should keep the same fingerprint.");
     Assert(report.Fingerprint != changed.Fingerprint, "Changed diagnostics should change fingerprint.");
+}
+
+static void ProjectDiagnosticsAnalyzesLargeGraphQuickly()
+{
+    const int sceneCount = 2_000;
+    var project = new NovelProject { Title = "Large diagnostics graph" };
+    project.Nodes.Add(
+        new NovelNode
+        {
+            Id = "start",
+            Kind = NodeKind.Start,
+            TypeName = "start",
+            Title = "Start",
+            Text = "Start",
+            Outputs =
+            {
+                new NodeOutput
+                {
+                    Id = "out-start",
+                    TargetNodeId = "scene-0",
+                },
+            },
+        });
+    for (var index = 0; index < sceneCount; index++)
+    {
+        project.Nodes.Add(
+            new NovelNode
+            {
+                Id = $"scene-{index}",
+                Kind = NodeKind.Scene,
+                TypeName = "scene",
+                Title = $"Scene {index}",
+                Text = "Scene text",
+                Outputs =
+                {
+                    new NodeOutput
+                    {
+                        Id = $"out-scene-{index}",
+                        TargetNodeId = index + 1 < sceneCount
+                            ? $"scene-{index + 1}"
+                            : null,
+                    },
+                },
+            });
+    }
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectDiagnostics.cs"));
+    var graphBody = ExtractMethodBody(source, "private static void AddGraphDiagnostics");
+    var lookupBody = ExtractMethodBody(source, "private static IReadOnlyDictionary<string, NovelNode> BuildUniqueNodesById");
+    Assert(
+        graphBody.Contains("BuildUniqueNodesById(project.Nodes)", StringComparison.Ordinal),
+        "Graph diagnostics should use the single-pass node lookup helper.");
+    Assert(
+        !lookupBody.Contains("GroupBy", StringComparison.Ordinal),
+        "Graph diagnostics node lookup should not allocate LINQ groups.");
+
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    var report = ProjectDiagnostics.Analyze(project);
+    stopwatch.Stop();
+
+    Assert(
+        !report.Diagnostics.Any(diagnostic =>
+            diagnostic.Message.Contains("нет пути", StringComparison.Ordinal)),
+        "Large connected graph was reported as unreachable.");
+    Assert(
+        stopwatch.ElapsedMilliseconds < 2_000,
+        $"Large graph diagnostics are too slow: {stopwatch.ElapsedMilliseconds}ms.");
 }
 
 static void CharacterLibraryRoundTrip()

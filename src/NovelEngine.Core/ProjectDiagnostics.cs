@@ -165,10 +165,7 @@ public static class ProjectDiagnostics
         NovelProject project,
         List<ProjectDiagnostic> diagnostics)
     {
-        var uniqueNodesById = project.Nodes
-            .GroupBy(node => node.Id, StringComparer.Ordinal)
-            .Where(group => group.Count() == 1)
-            .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
+        var uniqueNodesById = BuildUniqueNodesById(project.Nodes);
 
         foreach (var character in project.Characters)
         {
@@ -231,6 +228,29 @@ public static class ProjectDiagnostics
         }
 
         AddUnreachableNodeDiagnostics(project, diagnostics, uniqueNodesById);
+    }
+
+    private static IReadOnlyDictionary<string, NovelNode> BuildUniqueNodesById(
+        IEnumerable<NovelNode> nodes)
+    {
+        var uniqueNodesById = new Dictionary<string, NovelNode>(StringComparer.Ordinal);
+        var duplicateNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in nodes)
+        {
+            if (duplicateNodeIds.Contains(node.Id))
+            {
+                continue;
+            }
+            if (uniqueNodesById.TryAdd(node.Id, node))
+            {
+                continue;
+            }
+
+            uniqueNodesById.Remove(node.Id);
+            duplicateNodeIds.Add(node.Id);
+        }
+
+        return uniqueNodesById;
     }
 
     private static void AddCharacterDiagnostics(
