@@ -52,6 +52,7 @@ var tests = new (string Name, Action Run)[]
     ("asset bindings skip hidden graph refresh", AssetBindingsSkipHiddenGraphRefresh),
     ("selected node actions use graph selected node cache", SelectedNodeActionsUseGraphSelectedNodeCache),
     ("property selection uses row model references", PropertySelectionUsesRowModelReferences),
+    ("property row lookup uses visible items source", PropertyRowLookupUsesVisibleItemsSource),
     ("transition edits refresh asset usage", TransitionEditsRefreshAssetUsage),
     ("editor asset mutations skip disk sync refreshes", EditorAssetMutationsSkipDiskSyncRefreshes),
     ("asset import refresh policy skips unchanged imports", AssetImportRefreshPolicySkipsUnchangedImports),
@@ -1443,6 +1444,51 @@ static void PropertySelectionUsesRowModelReferences()
         !selectedCharacterBody.Contains("Graph.SelectedNode", StringComparison.Ordinal)
             && !selectedOutputBody.Contains("Graph.SelectedNode", StringComparison.Ordinal),
         "Selected row helpers should not resolve the selected node.");
+}
+
+static void PropertyRowLookupUsesVisibleItemsSource()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var characterLookupBody = ExtractMethodBody(
+        source,
+        "private CharacterView? FindVisibleCharacterView");
+    var outputLookupBody = ExtractMethodBody(
+        source,
+        "private OutputView? FindVisibleOutputView");
+    var selectUsageBody = ExtractMethodBody(
+        source,
+        "private void SelectAssetUsageDetail");
+    var selectCharacterBody = ExtractMethodBody(
+        source,
+        "private void SelectCharacterView");
+    var selectOutputBody = ExtractMethodBody(
+        source,
+        "private void SelectOutputView");
+
+    Assert(
+        characterLookupBody.Contains(
+            "CharactersGrid.ItemsSource is IEnumerable<CharacterView>",
+            StringComparison.Ordinal),
+        "Character row lookup should use the current items source.");
+    Assert(
+        outputLookupBody.Contains(
+            "OutputsGrid.ItemsSource is IEnumerable<OutputView>",
+            StringComparison.Ordinal),
+        "Output row lookup should use the current items source.");
+    Assert(
+        selectUsageBody.Contains("FindVisibleOutputView(outputLabel)", StringComparison.Ordinal)
+            && selectUsageBody.Contains("FindVisibleCharacterView(characterName)", StringComparison.Ordinal)
+            && selectCharacterBody.Contains("FindVisibleCharacterView(characterId)", StringComparison.Ordinal)
+            && selectOutputBody.Contains("FindVisibleOutputView(outputId)", StringComparison.Ordinal),
+        "Property navigation should reuse visible row lookup helpers.");
+    Assert(
+        !source.Contains(".OfType<CharacterView>()", StringComparison.Ordinal)
+            && !source.Contains(".OfType<OutputView>()", StringComparison.Ordinal),
+        "Property row lookup should not walk DataGrid item containers.");
 }
 
 static void TransitionEditsRefreshAssetUsage()

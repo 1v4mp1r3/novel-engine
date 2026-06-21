@@ -3408,11 +3408,7 @@ public partial class MainWindow : Window
         var outputLabel = TryReadLocationTail(location, "переход ");
         if (outputLabel is not null)
         {
-            var outputView = OutputsGrid.Items
-                .OfType<OutputView>()
-                .FirstOrDefault(view => view.Label.Equals(
-                    outputLabel,
-                    StringComparison.Ordinal));
+            var outputView = FindVisibleOutputView(outputLabel);
             if (outputView is not null)
             {
                 OutputsGrid.SelectedItem = outputView;
@@ -3428,11 +3424,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var characterView = CharactersGrid.Items
-            .OfType<CharacterView>()
-            .FirstOrDefault(view => view.Name.Equals(
-                characterName,
-                StringComparison.Ordinal));
+        var characterView = FindVisibleCharacterView(characterName);
         if (characterView is not null)
         {
             CharactersGrid.SelectedItem = characterView;
@@ -5107,11 +5099,18 @@ public partial class MainWindow : Window
         return (CharactersGrid.SelectedItem as CharacterView)?.Character;
     }
 
+    private CharacterView? FindVisibleCharacterView(string idOrName)
+    {
+        return CharactersGrid.ItemsSource is IEnumerable<CharacterView> characterViews
+            ? characterViews.FirstOrDefault(view =>
+                view.Id.Equals(idOrName, StringComparison.OrdinalIgnoreCase)
+                || view.Name.Equals(idOrName, StringComparison.Ordinal))
+            : null;
+    }
+
     private void SelectCharacterView(string characterId)
     {
-        var characterView = CharactersGrid.Items
-            .OfType<CharacterView>()
-            .FirstOrDefault(view => view.Id == characterId);
+        var characterView = FindVisibleCharacterView(characterId);
         if (characterView is null)
         {
             return;
@@ -5586,11 +5585,18 @@ public partial class MainWindow : Window
         return (OutputsGrid.SelectedItem as OutputView)?.Output;
     }
 
+    private OutputView? FindVisibleOutputView(string idOrLabel)
+    {
+        return OutputsGrid.ItemsSource is IEnumerable<OutputView> outputViews
+            ? outputViews.FirstOrDefault(view =>
+                view.Id.Equals(idOrLabel, StringComparison.OrdinalIgnoreCase)
+                || view.Label.Equals(idOrLabel, StringComparison.Ordinal))
+            : null;
+    }
+
     private void SelectOutputView(string outputId)
     {
-        var outputView = OutputsGrid.Items
-            .OfType<OutputView>()
-            .FirstOrDefault(view => view.Id == outputId);
+        var outputView = FindVisibleOutputView(outputId);
         if (outputView is null)
         {
             return;
