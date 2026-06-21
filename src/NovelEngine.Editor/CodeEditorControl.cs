@@ -232,7 +232,7 @@ public sealed class CodeEditorControl : RichTextBox
             return;
         }
         _sourceTextCache = null;
-        UpdateEstimatedSourceLength(e);
+        var insertedText = UpdateEstimatedSourceLength(e);
         _caretOffsetCache = null;
         _caretPointerCache = null;
         InvalidateRenderedSyntax();
@@ -246,7 +246,7 @@ public sealed class CodeEditorControl : RichTextBox
             SuspendHistoryForOversizedDocument();
         }
 
-        if (ShouldScheduleAutomaticCompletion(_estimatedSourceLength))
+        if (ShouldScheduleAutomaticCompletion(_estimatedSourceLength, insertedText))
         {
             _completionTimer.Stop();
             _completionTimer.Start();
@@ -443,14 +443,17 @@ public sealed class CodeEditorControl : RichTextBox
         _completionContext = null;
     }
 
-    private void UpdateEstimatedSourceLength(TextChangedEventArgs e)
+    private bool UpdateEstimatedSourceLength(TextChangedEventArgs e)
     {
         var length = _sourceTextCache?.Length ?? _estimatedSourceLength;
+        var insertedText = false;
         foreach (var change in e.Changes)
         {
             length += change.AddedLength - change.RemovedLength;
+            insertedText |= change.AddedLength > 0;
         }
         _estimatedSourceLength = Math.Max(0, length);
+        return insertedText;
     }
 
     private static bool ShouldAutoComplete(string source, int caretOffset)
@@ -469,6 +472,11 @@ public sealed class CodeEditorControl : RichTextBox
 
     internal static bool ShouldScheduleAutomaticCompletion(int estimatedSourceLength) =>
         CodeEditorPerformancePolicy.ShouldRunAutomaticCompletions(estimatedSourceLength);
+
+    internal static bool ShouldScheduleAutomaticCompletion(
+        int estimatedSourceLength,
+        bool insertedText) =>
+        insertedText && ShouldScheduleAutomaticCompletion(estimatedSourceLength);
 
     internal static bool ShouldScheduleHistoryRecord(int estimatedSourceLength) =>
         CodeEditorPerformancePolicy.ShouldRecordHistorySnapshot(estimatedSourceLength);

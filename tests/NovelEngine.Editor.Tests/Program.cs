@@ -1974,6 +1974,21 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
         !CodeEditorControl.ShouldScheduleAutomaticCompletion(automaticCompletionLimit + 1),
         "Automatic completion timer should not run for oversized documents.");
     Assert(
+        CodeEditorControl.ShouldScheduleAutomaticCompletion(
+            automaticCompletionLimit,
+            insertedText: true),
+        "Inserted text should schedule the automatic completion timer at the configured boundary length.");
+    Assert(
+        !CodeEditorControl.ShouldScheduleAutomaticCompletion(
+            automaticCompletionLimit,
+            insertedText: false),
+        "Deletion-only edits should not schedule the automatic completion timer.");
+    Assert(
+        !CodeEditorControl.ShouldScheduleAutomaticCompletion(
+            automaticCompletionLimit + 1,
+            insertedText: true),
+        "Inserted text should still respect the automatic completion boundary.");
+    Assert(
         CodeEditorControl.ShouldScheduleHistoryRecord(historyLimit),
         "History timer should run at the configured boundary length.");
     Assert(
@@ -2015,6 +2030,23 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
     Assert(
         !MainWindow.ShouldScheduleLiveCodeAnalysis(liveAnalysisLimit + 1),
         "Live code analysis timer should not read oversized documents after typing.");
+
+    var editorSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "CodeEditorControl.cs"));
+    var textChangedBody = ExtractMethodBody(
+        editorSource,
+        "protected override void OnTextChanged");
+    Assert(
+        textChangedBody.Contains(
+            "var insertedText = UpdateEstimatedSourceLength(e);",
+            StringComparison.Ordinal)
+            && textChangedBody.Contains(
+                "ShouldScheduleAutomaticCompletion(_estimatedSourceLength, insertedText)",
+                StringComparison.Ordinal),
+        "Code editor text changes should skip automatic completion for delete-only edits.");
 }
 
 static void CodeCursorCacheSkipsOversizedLineScans()
