@@ -997,6 +997,12 @@ static void AssetListFilterSearchesInOnePass()
         !matchesBody.Contains(".Split(", StringComparison.Ordinal),
         "Asset search matching should not split the query per asset.");
     Assert(
+        matchesBody.Contains("var fileName = Path.GetFileName(asset.Path);", StringComparison.Ordinal)
+            && matchesBody.Contains("var kindName = asset.Kind.ToString();", StringComparison.Ordinal)
+            && matchesBody.Contains("for (var index = 0; index < tokens.Count; index++)", StringComparison.Ordinal)
+            && !matchesBody.Contains(".All(", StringComparison.Ordinal),
+        "Asset search matching should check tokens directly without LINQ delegates.");
+    Assert(
         !applyBody.Contains("filteredByFolder", StringComparison.Ordinal)
             && !applyBody.Contains(".Where(", StringComparison.Ordinal)
             && !applyBody.Contains(".ToList()", StringComparison.Ordinal),

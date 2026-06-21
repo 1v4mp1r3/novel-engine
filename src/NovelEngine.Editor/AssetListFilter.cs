@@ -54,14 +54,27 @@ internal static class AssetListFilter
             ' ',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static bool MatchesSearch(NovelAsset asset, IReadOnlyList<string> tokens) =>
-        tokens.All(token =>
-            ContainsSearchToken(asset.Id, token)
-            || ContainsSearchToken(asset.Path, token)
-            || ContainsSearchToken(asset.Folder, token)
-            || ContainsSearchToken(Path.GetFileName(asset.Path), token)
-            || ContainsSearchToken(asset.Kind.ToString(), token)
-            || ContainsSearchToken(AssetKindLabel(asset.Kind), token));
+    private static bool MatchesSearch(NovelAsset asset, IReadOnlyList<string> tokens)
+    {
+        var fileName = Path.GetFileName(asset.Path);
+        var kindName = asset.Kind.ToString();
+        var kindLabel = AssetKindLabel(asset.Kind);
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            var token = tokens[index];
+            if (!ContainsSearchToken(asset.Id, token)
+                && !ContainsSearchToken(asset.Path, token)
+                && !ContainsSearchToken(asset.Folder, token)
+                && !ContainsSearchToken(fileName, token)
+                && !ContainsSearchToken(kindName, token)
+                && !ContainsSearchToken(kindLabel, token))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool ContainsSearchToken(string value, string token) =>
         value.Contains(token, StringComparison.CurrentCultureIgnoreCase);
