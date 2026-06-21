@@ -1300,9 +1300,15 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
         "private void CharactersGrid_ContextMenuOpening",
         "private void CharactersGrid_PreviewKeyDown",
         "private CharacterPlacement? SelectedCharacter",
+        "private void AddOutput(string? nodeId = null)",
         "private void DeleteOutput_Click",
         "private void DuplicateOutput_Click",
         "private void MoveSelectedOutput",
+        "private void OutputsGrid_ContextMenuOpening",
+        "private void OutputsGrid_PreviewKeyDown",
+        "private NodeOutput? SelectedOutput",
+        "private void EditSelectedOutputScriptBlocks()",
+        "private void EditSelectedOutputTransition()",
         "private void Inheritance_Changed",
     };
 

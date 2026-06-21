@@ -5103,7 +5103,9 @@ public partial class MainWindow : Window
 
     private void AddOutput(string? nodeId = null)
     {
-        var node = _project.FindNode(nodeId ?? Graph.SelectedNodeId);
+        var node = nodeId is null
+            ? Graph.SelectedNode
+            : _project.FindNode(nodeId);
         if (node?.Kind != NodeKind.Dialogue)
         {
             return;
@@ -5343,7 +5345,7 @@ public partial class MainWindow : Window
         object sender,
         ContextMenuEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         var canEditChoices = CanEditOutputList(node);
         var menu = OutputsGrid.ContextMenu ?? new ContextMenu();
@@ -5420,7 +5422,7 @@ public partial class MainWindow : Window
 
     private void OutputsGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var canEditOutputList = CanEditOutputList(node);
         if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
         {
@@ -5519,7 +5521,7 @@ public partial class MainWindow : Window
 
     private NodeOutput? SelectedOutput()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var view = OutputsGrid.SelectedItem as OutputView;
         return node?.Outputs.FirstOrDefault(output => output.Id == view?.Id);
     }
@@ -5658,7 +5660,7 @@ public partial class MainWindow : Window
 
     private void EditSelectedOutputScriptBlocks()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         if (!CanEditOutputDetails(node, output))
         {
@@ -5670,7 +5672,7 @@ public partial class MainWindow : Window
 
     private void EditSelectedOutputTransition()
     {
-        var node = _project.FindNode(Graph.SelectedNodeId);
+        var node = Graph.SelectedNode;
         var output = SelectedOutput();
         if (!CanEditSelectedOutputTransition(node, output))
         {
