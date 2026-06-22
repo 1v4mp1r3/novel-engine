@@ -896,8 +896,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        node.ScriptBlocks.Clear();
-        node.ScriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        ReplaceVisualScriptBlocks(node.ScriptBlocks, dialog.Blocks);
         if (dialog.ClearImportedScript)
         {
             node.Script = string.Empty;
@@ -937,9 +936,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        output.ScriptBlocks.Clear();
-        output.ScriptBlocks.AddRange(
-            dialog.Blocks.Select(block => block.Clone()));
+        ReplaceVisualScriptBlocks(output.ScriptBlocks, dialog.Blocks);
         if (dialog.ClearImportedScript)
         {
             output.Script = string.Empty;
@@ -958,6 +955,17 @@ public partial class MainWindow : Window
         string textScript) =>
         !VisualScriptBlocksEqual(currentBlocks, dialogBlocks)
         || (clearImportedScript && textScript.Length > 0);
+
+    private static void ReplaceVisualScriptBlocks(
+        List<VisualScriptBlock> target,
+        IReadOnlyList<VisualScriptBlock> source)
+    {
+        target.Clear();
+        for (var index = 0; index < source.Count; index++)
+        {
+            target.Add(source[index].Clone());
+        }
+    }
 
     private static void MarkOverrideIfChanged<T>(
         NovelNode node,
@@ -4935,12 +4943,22 @@ public partial class MainWindow : Window
         MarkDirty(refreshGraph: false);
     }
 
-    private List<string> NormalizeVoiceReferences(IEnumerable<string> references) =>
-        references
-            .Select(reference => NormalizeAssetPath(reference, "voices"))
-            .Where(reference => reference.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    private List<string> NormalizeVoiceReferences(IEnumerable<string> references)
+    {
+        var voiceSounds = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in references)
+        {
+            var normalized = NormalizeAssetPath(reference, "voices");
+            if (normalized.Length == 0 || !seen.Add(normalized))
+            {
+                continue;
+            }
+
+            voiceSounds.Add(normalized);
+        }
+        return voiceSounds;
+    }
 
     private CharacterPlacement AddCharacterToNodeFromDialog(
         NovelNode node,
@@ -4972,7 +4990,7 @@ public partial class MainWindow : Window
             Name = dialog.CharacterName,
             Sprite = NormalizeAssetPath(dialog.Sprite, "characters"),
             Position = dialog.Position,
-            VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
+            VoiceSound = voiceSounds.Count > 0 ? voiceSounds[0] : string.Empty,
             VoiceSounds = voiceSounds,
             VoicePitch = dialog.VoicePitch,
             VoiceEveryNthCharacter = dialog.VoiceEveryNthCharacter,

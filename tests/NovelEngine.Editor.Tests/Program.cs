@@ -2989,6 +2989,20 @@ static void ScriptLiteralLoadSuppressesChangeEvents()
 
 static void ScriptBlockDialogGuardSkipsUnchangedApply()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var replaceBlocksBody = ExtractMethodBody(
+        source,
+        "private static void ReplaceVisualScriptBlocks");
+    var normalizeVoicesBody = ExtractMethodBody(
+        source,
+        "private List<string> NormalizeVoiceReferences");
+    var createCharacterBody = ExtractMethodBody(
+        source,
+        "private CharacterPlacement CreateCharacterPlacementFromDialog");
     var block = new VisualScriptBlock
     {
         Id = "block-1",
@@ -3034,6 +3048,24 @@ static void ScriptBlockDialogGuardSkipsUnchangedApply()
             clearImportedScript: true,
             textScript: string.Empty),
         "Clearing an already empty text script should not dirty the project.");
+    Assert(
+        replaceBlocksBody.Contains("for (var index = 0; index < source.Count; index++)", StringComparison.Ordinal)
+            && replaceBlocksBody.Contains("target.Add(source[index].Clone());", StringComparison.Ordinal)
+            && !replaceBlocksBody.Contains(".Select(", StringComparison.Ordinal)
+            && !replaceBlocksBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Applying visual script block dialogs should clone blocks with one direct pass.");
+    Assert(
+        normalizeVoicesBody.Contains("foreach (var reference in references)", StringComparison.Ordinal)
+            && normalizeVoicesBody.Contains("seen.Add(normalized)", StringComparison.Ordinal)
+            && !normalizeVoicesBody.Contains(".Select(", StringComparison.Ordinal)
+            && !normalizeVoicesBody.Contains(".Where(", StringComparison.Ordinal)
+            && !normalizeVoicesBody.Contains(".Distinct(", StringComparison.Ordinal)
+            && !normalizeVoicesBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Character voice references should normalize without transient LINQ pipelines.");
+    Assert(
+        createCharacterBody.Contains("VoiceSound = voiceSounds.Count > 0 ? voiceSounds[0] : string.Empty", StringComparison.Ordinal)
+            && !createCharacterBody.Contains("voiceSounds.FirstOrDefault()", StringComparison.Ordinal),
+        "Character placement creation should reuse the normalized voice list for the primary voice.");
 }
 
 static void NodePropertyGuardSkipsUnchangedApply()
