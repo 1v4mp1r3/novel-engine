@@ -53,15 +53,8 @@ public sealed class OutputEditorWindow : Window
             }
         };
         _scriptBox = DialogUi.TextBox(output.Script, multiline: true);
-        _knownVariables = knownVariables?
-            .Where(variable => !string.IsNullOrWhiteSpace(variable))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList()
-            ?? [];
-        _scriptBlocks = output.ScriptBlocks
-            .Select(block => block.Clone())
-            .ToList();
+        _knownVariables = NormalizeKnownVariables(knownVariables);
+        _scriptBlocks = CloneScriptBlocks(output.ScriptBlocks);
         _scriptBlocksButton = new Button
         {
             MinWidth = 150,
@@ -118,7 +111,7 @@ public sealed class OutputEditorWindow : Window
         _conditionExpression?.Clone();
     public string Script => _scriptBox.Text.Trim();
     public IReadOnlyList<VisualScriptBlock> ScriptBlocks =>
-        _scriptBlocks.Select(block => block.Clone()).ToList();
+        CloneScriptBlocks(_scriptBlocks);
 
     public void ApplyTo(NodeOutput output)
     {
@@ -151,7 +144,7 @@ public sealed class OutputEditorWindow : Window
         }
 
         _scriptBlocks.Clear();
-        _scriptBlocks.AddRange(dialog.Blocks.Select(block => block.Clone()));
+        _scriptBlocks.AddRange(CloneScriptBlocks(dialog.Blocks));
         if (dialog.ClearImportedScript)
         {
             _scriptBox.Text = string.Empty;
@@ -198,6 +191,44 @@ public sealed class OutputEditorWindow : Window
         }
         DialogResult = true;
     }
+
+    private static List<string> NormalizeKnownVariables(IEnumerable<string>? variables)
+    {
+        if (variables is null)
+        {
+            return [];
+        }
+
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var values = new List<string>();
+        foreach (var variable in variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                continue;
+            }
+
+            var value = variable.Trim();
+            if (known.Add(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        values.Sort(StringComparer.OrdinalIgnoreCase);
+        return values;
+    }
+
+    private static List<VisualScriptBlock> CloneScriptBlocks(
+        IEnumerable<VisualScriptBlock> blocks)
+    {
+        var clones = new List<VisualScriptBlock>();
+        foreach (var block in blocks)
+        {
+            clones.Add(block.Clone());
+        }
+        return clones;
+    }
 }
 
 public sealed class CharacterEditorWindow : Window
@@ -233,7 +264,7 @@ public sealed class CharacterEditorWindow : Window
             character?.Sprite ?? suggestedSprite ?? string.Empty,
             requireSprite ? "Выберите спрайт" : "Без спрайта");
         var voiceReferences = character is null
-            ? suggestedVoices?.ToList() ?? []
+            ? CreateReferenceList(suggestedVoices)
             : CharacterVoiceReferences(character);
         _voiceList = CreateAssetList(
             voiceAssets,
@@ -276,13 +307,9 @@ public sealed class CharacterEditorWindow : Window
 
     public string CharacterName => _nameBox.Text.Trim();
     public string Sprite => (_spriteBox.SelectedItem as AssetChoice)?.Reference ?? string.Empty;
-    public IReadOnlyList<string> VoiceSounds => _voiceList.SelectedItems
-        .OfType<AssetChoice>()
-        .Select(choice => choice.Reference)
-        .Where(reference => reference.Length > 0)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToList();
-    public string VoiceSound => VoiceSounds.FirstOrDefault() ?? string.Empty;
+    public IReadOnlyList<string> VoiceSounds =>
+        CreateSelectedVoiceReferences(_voiceList.SelectedItems);
+    public string VoiceSound => FirstSelectedVoiceReference(_voiceList.SelectedItems);
     public double VoicePitch => double.TryParse(
         _voicePitchBox.Text,
         NumberStyles.Float,
@@ -312,24 +339,31 @@ public sealed class CharacterEditorWindow : Window
         IEnumerable<NovelAsset> assets,
         IReadOnlyList<string> currentReferences)
     {
-        var selected = currentReferences
-            .Where(reference => !string.IsNullOrWhiteSpace(reference))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var values = assets
-            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
-            .Select(asset => new AssetChoice(
-                AssetReference.Create(asset.Id),
-                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
-            .ToList();
-        foreach (var reference in selected.Where(reference =>
-            !values.Any(value => value.Reference.Equals(
-                reference,
-                StringComparison.OrdinalIgnoreCase))))
+        var selected = new List<string>();
+        var selectedLookup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reference in currentReferences)
         {
-            values.Add(new AssetChoice(
-                reference,
-                $"Текущее значение: {reference}"));
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                continue;
+            }
+
+            var normalized = reference.Trim();
+            if (selectedLookup.Add(normalized))
+            {
+                selected.Add(normalized);
+            }
+        }
+
+        var values = CreateSortedAssetChoices(assets);
+        foreach (var reference in selected)
+        {
+            if (!ContainsAssetChoiceReference(values, reference))
+            {
+                values.Add(new AssetChoice(
+                    reference,
+                    $"Текущее значение: {reference}"));
+            }
         }
 
         var list = new ListBox
@@ -343,11 +377,12 @@ public sealed class CharacterEditorWindow : Window
             BorderBrush = (System.Windows.Media.Brush)Application.Current.Resources["BorderBrush"],
             Margin = new Thickness(0, 4, 0, 12),
         };
-        foreach (var item in values.Where(value => selected.Contains(
-            value.Reference,
-            StringComparer.OrdinalIgnoreCase)))
+        foreach (var item in values)
         {
-            list.SelectedItems.Add(item);
+            if (selectedLookup.Contains(item.Reference))
+            {
+                list.SelectedItems.Add(item);
+            }
         }
         return list;
     }
@@ -379,33 +414,107 @@ public sealed class CharacterEditorWindow : Window
         string currentReference,
         string emptyLabel)
     {
-        var values = assets
-            .OrderBy(asset => asset.Id, StringComparer.CurrentCultureIgnoreCase)
-            .Select(asset => new AssetChoice(
-                AssetReference.Create(asset.Id),
-                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"))
-            .Prepend(new AssetChoice(string.Empty, emptyLabel))
-            .ToList();
+        var assetChoices = CreateSortedAssetChoices(assets);
+        var values = new List<AssetChoice>(assetChoices.Count + 2)
+        {
+            new(string.Empty, emptyLabel),
+        };
+        values.AddRange(assetChoices);
         if (currentReference.Length > 0
-            && !values.Any(value => value.Reference.Equals(
-                currentReference,
-                StringComparison.OrdinalIgnoreCase)))
+            && !ContainsAssetChoiceReference(values, currentReference))
         {
             values.Add(new AssetChoice(
                 currentReference,
                 $"Текущее значение: {currentReference}"));
         }
+
+        var selected = FindAssetChoice(values, currentReference) ?? values[0];
         return new ComboBox
         {
             ItemsSource = values,
             DisplayMemberPath = nameof(AssetChoice.Name),
-            SelectedItem = values.FirstOrDefault(value =>
-                    value.Reference.Equals(
-                        currentReference,
-                        StringComparison.OrdinalIgnoreCase))
-                ?? values[0],
+            SelectedItem = selected,
             Margin = new Thickness(0, 4, 0, 12),
         };
+    }
+
+    private static List<string> CreateReferenceList(IEnumerable<string>? references)
+    {
+        if (references is null)
+        {
+            return [];
+        }
+
+        var values = new List<string>();
+        foreach (var reference in references)
+        {
+            values.Add(reference);
+        }
+        return values;
+    }
+
+    private static List<string> CreateSelectedVoiceReferences(
+        System.Collections.IList selectedItems)
+    {
+        var references = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var selectedItem in selectedItems)
+        {
+            if (selectedItem is not AssetChoice { Reference.Length: > 0 } choice
+                || !seen.Add(choice.Reference))
+            {
+                continue;
+            }
+
+            references.Add(choice.Reference);
+        }
+        return references;
+    }
+
+    private static string FirstSelectedVoiceReference(System.Collections.IList selectedItems)
+    {
+        foreach (var selectedItem in selectedItems)
+        {
+            if (selectedItem is AssetChoice { Reference.Length: > 0 } choice)
+            {
+                return choice.Reference;
+            }
+        }
+        return string.Empty;
+    }
+
+    private static List<AssetChoice> CreateSortedAssetChoices(
+        IEnumerable<NovelAsset> assets)
+    {
+        var values = new List<AssetChoice>();
+        foreach (var asset in assets)
+        {
+            values.Add(new AssetChoice(
+                AssetReference.Create(asset.Id),
+                $"{asset.Id}  ·  {Path.GetFileName(asset.Path)}"));
+        }
+        values.Sort(static (left, right) =>
+            StringComparer.CurrentCultureIgnoreCase.Compare(left.Reference, right.Reference));
+        return values;
+    }
+
+    private static bool ContainsAssetChoiceReference(
+        List<AssetChoice> values,
+        string reference) =>
+        FindAssetChoice(values, reference) is not null;
+
+    private static AssetChoice? FindAssetChoice(
+        List<AssetChoice> values,
+        string reference)
+    {
+        foreach (var value in values)
+        {
+            if (value.Reference.Equals(reference, StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
+        }
+        return null;
     }
 
     private void Save()
@@ -468,13 +577,18 @@ public sealed class CharacterLibraryPickerWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
-        var choices = characters
-            .OrderBy(character => character.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(character => new CharacterChoice(
+        var choices = new List<CharacterChoice>();
+        foreach (var character in characters)
+        {
+            choices.Add(new CharacterChoice(
                 character,
                 $"{DisplayName(character)}  ·  {character.Id}  ·  "
-                + $"блипы: {character.GetVoiceSounds().Count}"))
-            .ToList();
+                + $"блипы: {character.GetVoiceSounds().Count}"));
+        }
+        choices.Sort(static (left, right) =>
+            StringComparer.CurrentCultureIgnoreCase.Compare(
+                left.Character.Name,
+                right.Character.Name));
         _characterList = new ListBox
         {
             ItemsSource = choices,
@@ -708,6 +822,16 @@ public sealed class AssetUsageWindow : Window
 
     private static DataGrid CreateUsageGrid(IReadOnlyList<AssetUsage> usages)
     {
+        var usageViews = new List<AssetUsageView>(usages.Count);
+        foreach (var usage in usages)
+        {
+            usageViews.Add(new AssetUsageView(
+                usage,
+                usage.Location,
+                AssetKindName(usage.ExpectedKind),
+                usage.Reference));
+        }
+
         var grid = new DataGrid
         {
             AutoGenerateColumns = false,
@@ -715,13 +839,7 @@ public sealed class AssetUsageWindow : Window
             CanUserDeleteRows = false,
             IsReadOnly = true,
             HeadersVisibility = DataGridHeadersVisibility.Column,
-            ItemsSource = usages
-                .Select(usage => new AssetUsageView(
-                    usage,
-                    usage.Location,
-                    AssetKindName(usage.ExpectedKind),
-                    usage.Reference))
-                .ToList(),
+            ItemsSource = usageViews,
             Height = 250,
             Margin = new Thickness(0, 0, 0, 8),
             Background = (Brush)Application.Current.Resources["PanelBrush"],
@@ -860,16 +978,27 @@ public sealed class AssetFolderPickerWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
 
-        var values = folders
-            .OrderBy(folder => folder, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        var values = new List<string>();
+        foreach (var folder in folders)
+        {
+            values.Add(folder);
+        }
+        values.Sort(StringComparer.CurrentCultureIgnoreCase);
+
+        string? selectedFolder = null;
+        foreach (var folder in values)
+        {
+            if (folder.Equals(currentFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedFolder = folder;
+                break;
+            }
+        }
+
         _folderBox = new ComboBox
         {
             ItemsSource = values,
-            SelectedItem = values.FirstOrDefault(
-                folder => folder.Equals(
-                    currentFolder,
-                    StringComparison.OrdinalIgnoreCase)),
+            SelectedItem = selectedFolder,
             Margin = new Thickness(0, 4, 0, 12),
         };
 

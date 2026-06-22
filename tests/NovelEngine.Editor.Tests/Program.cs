@@ -87,6 +87,7 @@ var tests = new (string Name, Action Run)[]
     ("condition builder uses direct loops", ConditionBuilderUsesDirectLoops),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
+    ("modal asset dialogs use direct lists", ModalAssetDialogsUseDirectLists),
     ("script literal load suppresses change events", ScriptLiteralLoadSuppressesChangeEvents),
     ("script block dialog guard skips unchanged apply", ScriptBlockDialogGuardSkipsUnchangedApply),
     ("node property guard skips unchanged apply", NodePropertyGuardSkipsUnchangedApply),
@@ -2873,6 +2874,90 @@ static void VisualScriptFilterUsesDebouncedRefresh()
             && !normalizeBody.Contains(".Order(", StringComparison.Ordinal)
             && !normalizeBody.Contains(".ToList(", StringComparison.Ordinal),
         "Visual script variable normalization should use direct filtering and sorting.");
+}
+
+static void ModalAssetDialogsUseDirectLists()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "EditorDialogs.cs"));
+    var normalizeVariablesBody = ExtractMethodBody(
+        source,
+        "private static List<string> NormalizeKnownVariables");
+    var cloneBlocksBody = ExtractMethodBody(
+        source,
+        "private static List<VisualScriptBlock> CloneScriptBlocks");
+    var selectedVoicesBody = ExtractMethodBody(
+        source,
+        "private static List<string> CreateSelectedVoiceReferences");
+    var assetListBody = ExtractMethodBody(
+        source,
+        "private static ListBox CreateAssetList");
+    var sortedAssetsBody = ExtractMethodBody(
+        source,
+        "private static List<AssetChoice> CreateSortedAssetChoices");
+    var characterPickerBody = ExtractMethodBody(
+        source,
+        "public CharacterLibraryPickerWindow(");
+    var usageGridBody = ExtractMethodBody(
+        source,
+        "private static DataGrid CreateUsageGrid");
+    var folderPickerBody = ExtractMethodBody(
+        source,
+        "public AssetFolderPickerWindow(");
+
+    Assert(
+        normalizeVariablesBody.Contains("foreach (var variable in variables)", StringComparison.Ordinal)
+            && normalizeVariablesBody.Contains("values.Sort(StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal)
+            && !normalizeVariablesBody.Contains(".Where(", StringComparison.Ordinal)
+            && !normalizeVariablesBody.Contains(".Order(", StringComparison.Ordinal)
+            && !normalizeVariablesBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Output editor known variables should normalize with direct loops.");
+    Assert(
+        cloneBlocksBody.Contains("foreach (var block in blocks)", StringComparison.Ordinal)
+            && !cloneBlocksBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBlocksBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Output editor script block snapshots should clone without LINQ lists.");
+    Assert(
+        selectedVoicesBody.Contains("foreach (var selectedItem in selectedItems)", StringComparison.Ordinal)
+            && selectedVoicesBody.Contains("seen.Add(choice.Reference)", StringComparison.Ordinal)
+            && !selectedVoicesBody.Contains(".OfType", StringComparison.Ordinal)
+            && !selectedVoicesBody.Contains(".Select(", StringComparison.Ordinal)
+            && !selectedVoicesBody.Contains(".Where(", StringComparison.Ordinal)
+            && !selectedVoicesBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Character editor selected voices should materialize in one direct pass.");
+    Assert(
+        assetListBody.Contains("foreach (var reference in currentReferences)", StringComparison.Ordinal)
+            && assetListBody.Contains("foreach (var item in values)", StringComparison.Ordinal)
+            && !assetListBody.Contains(".Where(", StringComparison.Ordinal)
+            && !assetListBody.Contains(".Any(", StringComparison.Ordinal),
+        "Character editor voice lists should avoid transient filtered enumerables.");
+    Assert(
+        sortedAssetsBody.Contains("foreach (var asset in assets)", StringComparison.Ordinal)
+            && sortedAssetsBody.Contains("values.Sort(", StringComparison.Ordinal)
+            && !sortedAssetsBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !sortedAssetsBody.Contains(".Select(", StringComparison.Ordinal),
+        "Character editor asset choices should build and sort directly.");
+    Assert(
+        characterPickerBody.Contains("foreach (var character in characters)", StringComparison.Ordinal)
+            && characterPickerBody.Contains("choices.Sort(", StringComparison.Ordinal)
+            && !characterPickerBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !characterPickerBody.Contains(".Select(", StringComparison.Ordinal)
+            && !characterPickerBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Character library picker should build choices without LINQ pipelines.");
+    Assert(
+        usageGridBody.Contains("foreach (var usage in usages)", StringComparison.Ordinal)
+            && !usageGridBody.Contains(".Select(", StringComparison.Ordinal)
+            && !usageGridBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Asset usage rows should be built in one direct pass.");
+    Assert(
+        folderPickerBody.Contains("foreach (var folder in folders)", StringComparison.Ordinal)
+            && folderPickerBody.Contains("values.Sort(StringComparer.CurrentCultureIgnoreCase)", StringComparison.Ordinal)
+            && !folderPickerBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !folderPickerBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Asset folder picker should sort and select folders directly.");
 }
 
 static void ScriptLiteralLoadSuppressesChangeEvents()
