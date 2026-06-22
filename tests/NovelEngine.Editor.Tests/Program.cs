@@ -114,6 +114,7 @@ var tests = new (string Name, Action Run)[]
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
     ("preview playback avoids transient lists", PreviewPlaybackAvoidsTransientLists),
+    ("game process start is registered before launch", GameProcessStartIsRegisteredBeforeLaunch),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
@@ -4205,6 +4206,33 @@ static void PreviewPlaybackAvoidsTransientLists()
             && typeDialogueBody.Contains("ReferenceEquals(_dialogueCts, cancellationTokenSource)", StringComparison.Ordinal)
             && typeDialogueBody.Contains("cancellationTokenSource.Dispose();", StringComparison.Ordinal),
         "Preview dialogue typing should own and dispose its CTS after the async loop exits.");
+}
+
+static void GameProcessStartIsRegisteredBeforeLaunch()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var startBody = ExtractMethodBody(source, "private void StartGameProcess");
+    var exitedBody = ExtractMethodBody(source, "private void GameProcess_Exited");
+    var assignIndex = startBody.IndexOf("_gameProcess = process;", StringComparison.Ordinal);
+    var startIndex = startBody.IndexOf("process.Start()", StringComparison.Ordinal);
+    var clearIndex = startBody.IndexOf("_gameProcess = null;", startIndex, StringComparison.Ordinal);
+    var disposeIndex = startBody.IndexOf("process.Dispose();", startIndex, StringComparison.Ordinal);
+
+    Assert(
+        assignIndex >= 0 && startIndex > assignIndex,
+        "Game process should be stored before Start so fast Exited events can match the active process.");
+    Assert(
+        clearIndex > startIndex && clearIndex < disposeIndex,
+        "Failed game starts should clear the stored process before disposal.");
+    Assert(
+        exitedBody.Contains("ReferenceEquals(process, _gameProcess)", StringComparison.Ordinal)
+            && exitedBody.Contains("_gameProcess = null;", StringComparison.Ordinal)
+            && exitedBody.Contains("process.Dispose();", StringComparison.Ordinal),
+        "Game process exit handling should only clear and dispose the active process.");
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()

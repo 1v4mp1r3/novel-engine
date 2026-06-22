@@ -6147,12 +6147,13 @@ public partial class MainWindow : Window
             EnableRaisingEvents = true,
         };
         process.Exited += GameProcess_Exited;
+        _gameProcess = process;
         if (!process.Start())
         {
+            _gameProcess = null;
             process.Dispose();
             throw new InvalidOperationException("Не удалось запустить процесс игры.");
         }
-        _gameProcess = process;
         UpdateGameControls();
         StatusText.Text = debugMode
             ? $"Debug запущен · PID {process.Id}"
