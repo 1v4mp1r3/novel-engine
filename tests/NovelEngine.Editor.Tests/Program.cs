@@ -4121,6 +4121,9 @@ static void PreviewPlaybackAvoidsTransientLists()
         "src",
         "NovelEngine.Editor",
         "PreviewWindow.xaml.cs"));
+    var constructorBody = ExtractMethodBody(source, "public PreviewWindow(");
+    var closedBody = ExtractMethodBody(source, "private void PreviewWindow_Closed");
+    var renderBody = ExtractMethodBody(source, "private void RenderNode");
     var trimBody = ExtractMethodBody(source, "private void TrimVoicePools");
     var hasActiveBody = ExtractMethodBody(
         source,
@@ -4183,6 +4186,25 @@ static void PreviewPlaybackAvoidsTransientLists()
             && typeDialogueBody.Contains("DialogueText.Text = $\"Ошибка показа реплики: {error.Message}\";", StringComparison.Ordinal)
             && typeDialogueBody.Contains("ShowChoices();", StringComparison.Ordinal),
         "Preview dialogue typing should surface current-node errors instead of leaving fire-and-forget task faults unhandled.");
+    Assert(
+        constructorBody.Contains("Closed += PreviewWindow_Closed;", StringComparison.Ordinal)
+            && closedBody.Contains("dialogueCts?.Cancel();", StringComparison.Ordinal)
+            && closedBody.Contains("_musicPlayer.Close();", StringComparison.Ordinal)
+            && closedBody.Contains("_transitionPlayer.Close();", StringComparison.Ordinal)
+            && closedBody.Contains("StopAllVoicePlayers(close: true);", StringComparison.Ordinal),
+        "Preview windows should close media resources and cancel active typing when the window closes.");
+    Assert(
+        renderBody.Contains("var previousDialogueCts = _dialogueCts;", StringComparison.Ordinal)
+            && renderBody.Contains("previousDialogueCts?.Cancel();", StringComparison.Ordinal)
+            && renderBody.Contains("_dialogueCts = new CancellationTokenSource();", StringComparison.Ordinal)
+            && renderBody.Contains("TypeDialogueAsync(node, _dialogueCts, ++_typingVersion)", StringComparison.Ordinal)
+            && !renderBody.Contains("_dialogueCts?.Cancel();", StringComparison.Ordinal),
+        "Rendering a new preview node should replace the typing CTS through one explicit cancellation path.");
+    Assert(
+        typeDialogueBody.Contains("var cancellationToken = cancellationTokenSource.Token;", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("ReferenceEquals(_dialogueCts, cancellationTokenSource)", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("cancellationTokenSource.Dispose();", StringComparison.Ordinal),
+        "Preview dialogue typing should own and dispose its CTS after the async loop exits.");
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()

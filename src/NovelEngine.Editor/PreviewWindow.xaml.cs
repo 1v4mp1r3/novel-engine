@@ -65,6 +65,7 @@ public partial class PreviewWindow : Window
         _debugMode = debugMode;
         _buildManifest = buildManifest;
         _saveDirectoryName = CreateSaveDirectoryName(project, buildManifest);
+        Closed += PreviewWindow_Closed;
         DebugPanel.Visibility = debugMode
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -107,11 +108,20 @@ public partial class PreviewWindow : Window
         }
     }
 
+    private void PreviewWindow_Closed(object? sender, EventArgs e)
+    {
+        var dialogueCts = _dialogueCts;
+        _dialogueCts = null;
+        dialogueCts?.Cancel();
+        _musicPlayer.Close();
+        _transitionPlayer.Close();
+        StopAllVoicePlayers(close: true);
+    }
+
     private void RenderNode(NovelNode node)
     {
         _mainMenuActive = false;
         MainMenuHost.Visibility = Visibility.Collapsed;
-        _dialogueCts?.Cancel();
         StopAllVoicePlayers(close: false);
         SetBackground(_player.State.CurrentBackground);
         SetCharacters(_player.State.CurrentCharacters);
@@ -128,8 +138,10 @@ public partial class PreviewWindow : Window
         _choicesReady = false;
         _skipTypingRequested = false;
 
+        var previousDialogueCts = _dialogueCts;
+        previousDialogueCts?.Cancel();
         _dialogueCts = new CancellationTokenSource();
-        _ = TypeDialogueAsync(node, _dialogueCts.Token, ++_typingVersion);
+        _ = TypeDialogueAsync(node, _dialogueCts, ++_typingVersion);
     }
 
     private void ShowChoices()
@@ -617,9 +629,10 @@ public partial class PreviewWindow : Window
 
     private async Task TypeDialogueAsync(
         NovelNode node,
-        CancellationToken cancellationToken,
+        CancellationTokenSource cancellationTokenSource,
         int version)
     {
+        var cancellationToken = cancellationTokenSource.Token;
         var text = node.Text;
         var voice = ResolveVoice(node);
         var visible = new StringBuilder(text.Length);
@@ -682,6 +695,11 @@ public partial class PreviewWindow : Window
             {
                 _skipTypingRequested = false;
             }
+            if (ReferenceEquals(_dialogueCts, cancellationTokenSource))
+            {
+                _dialogueCts = null;
+            }
+            cancellationTokenSource.Dispose();
         }
     }
 
