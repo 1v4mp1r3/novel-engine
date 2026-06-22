@@ -11,6 +11,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics analyzes large graph quickly", ProjectDiagnosticsAnalyzesLargeGraphQuickly),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
     ("dialogue choices connect independently", DialogueChoicesConnectIndependently),
+    ("core graph lookups use direct loops", CoreGraphLookupsUseDirectLoops),
     ("adding connected nodes preserves existing graph", AddConnectedNodePreservesExistingGraph),
     ("duplicating nodes copies authoring data safely", DuplicateNodeCopiesAuthoringDataSafely),
     ("duplicating dialogue choices copies authoring data safely", DuplicateDialogueChoiceCopiesAuthoringDataSafely),
@@ -446,6 +447,91 @@ static void DialogueChoicesConnectIndependently()
 
     Assert(dialogue.Outputs[0].TargetNodeId == firstTarget.Id, "First choice target was lost.");
     Assert(dialogue.Outputs[1].TargetNodeId == secondTarget.Id, "Second choice target was lost.");
+}
+
+static void CoreGraphLookupsUseDirectLoops()
+{
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var findAssetBody = ExtractMethodBody(
+        sourceText,
+        "public NovelAsset? FindAsset");
+    var findCharacterBody = ExtractMethodBody(
+        sourceText,
+        "public CharacterPlacement? FindCharacter");
+    var findNodeBody = ExtractMethodBody(
+        sourceText,
+        "public NovelNode? FindNode");
+    var findOutputBody = ExtractMethodBody(
+        sourceText,
+        "public NodeOutput? FindOutput");
+    var findOutputCoreBody = ExtractMethodBody(
+        sourceText,
+        "private static NodeOutput? FindOutput");
+    var findFreeOutputBody = ExtractMethodBody(
+        sourceText,
+        "private static NodeOutput? FindFirstFreeOutput");
+    var findNodeCharacterBody = ExtractMethodBody(
+        sourceText,
+        "private static CharacterPlacement? FindNodeCharacter");
+    var countNodesBody = ExtractMethodBody(
+        sourceText,
+        "private int CountNodes");
+    var addNodeBody = ExtractMethodBody(
+        sourceText,
+        "public NovelNode AddNode");
+    var duplicateOutputBody = ExtractMethodBody(
+        sourceText,
+        "public NodeOutput DuplicateOutput");
+    var setCharacterPositionBody = ExtractMethodBody(
+        sourceText,
+        "public bool SetCharacterPosition");
+
+    var project = NovelProject.CreateDefault();
+    project.Assets.Add(
+        new NovelAsset
+        {
+            Id = "City_BG",
+            Kind = AssetKind.Image,
+            Path = "files/backgrounds/city.png",
+        });
+    project.Characters.Add(new CharacterPlacement { Id = "hero", Name = "Hero" });
+    var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+
+    Assert(project.FindAsset("city_bg")?.Id == "City_BG", "Asset lookup changed case-insensitive behavior.");
+    Assert(project.FindCharacter("hero")?.Name == "Hero", "Library character lookup failed.");
+    Assert(project.FindNode(scene.Id) == scene, "Node lookup failed.");
+    Assert(project.FindOutput(scene.Id, scene.Outputs[0].Id) == scene.Outputs[0], "Output lookup failed.");
+    Assert(project.FindOutput("missing", scene.Outputs[0].Id) is null, "Missing node output lookup should return null.");
+    Assert(
+        findAssetBody.Contains("foreach (var asset in Assets)", StringComparison.Ordinal)
+            && findCharacterBody.Contains("foreach (var character in Characters)", StringComparison.Ordinal)
+            && findNodeBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal)
+            && findOutputCoreBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && findFreeOutputBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && findNodeCharacterBody.Contains("foreach (var character in node.Characters)", StringComparison.Ordinal)
+            && countNodesBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal),
+        "Core graph lookup helpers should use direct loops.");
+    Assert(
+        !findAssetBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findCharacterBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findNodeBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findOutputCoreBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findFreeOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findNodeCharacterBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Core graph lookup helpers should avoid LINQ FirstOrDefault delegates.");
+    Assert(
+        addNodeBody.Contains("var index = CountNodes(kind) + 1;", StringComparison.Ordinal)
+            && !addNodeBody.Contains("Nodes.Count(", StringComparison.Ordinal),
+        "Node creation should count existing nodes through a direct helper.");
+    Assert(
+        duplicateOutputBody.Contains("var source = FindOutput(node, outputId)", StringComparison.Ordinal)
+            && setCharacterPositionBody.Contains("FindNodeCharacter(node, characterId)", StringComparison.Ordinal),
+        "Graph editing operations should reuse direct lookup helpers.");
 }
 
 static void AddConnectedNodePreservesExistingGraph()

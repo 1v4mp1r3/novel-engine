@@ -321,11 +321,22 @@ public sealed class NovelProject
     public List<NodeTypeDefinition> NodeTypes { get; init; } = [];
     public List<NovelNode> Nodes { get; init; } = [];
 
-    public NovelAsset? FindAsset(string? id) =>
-        id is null
-            ? null
-            : Assets.FirstOrDefault(
-                asset => asset.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+    public NovelAsset? FindAsset(string? id)
+    {
+        if (id is null)
+        {
+            return null;
+        }
+
+        foreach (var asset in Assets)
+        {
+            if (asset.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+            {
+                return asset;
+            }
+        }
+        return null;
+    }
 
     public string ResolveAssetReference(string reference)
     {
@@ -336,13 +347,22 @@ public sealed class NovelProject
         return FindAsset(id)?.Path ?? string.Empty;
     }
 
-    public CharacterPlacement? FindCharacter(string? characterId) =>
-        characterId is null
-            ? null
-            : Characters.FirstOrDefault(
-                character => character.Id.Equals(
-                    characterId,
-                    StringComparison.Ordinal));
+    public CharacterPlacement? FindCharacter(string? characterId)
+    {
+        if (characterId is null)
+        {
+            return null;
+        }
+
+        foreach (var character in Characters)
+        {
+            if (character.Id.Equals(characterId, StringComparison.Ordinal))
+            {
+                return character;
+            }
+        }
+        return null;
+    }
 
     public int CountAssetReferences(string assetId)
     {
@@ -433,13 +453,79 @@ public sealed class NovelProject
         }
     }
 
-    public NovelNode? FindNode(string? nodeId) =>
-        nodeId is null
-            ? null
-            : Nodes.FirstOrDefault(node => node.Id == nodeId);
+    public NovelNode? FindNode(string? nodeId)
+    {
+        if (nodeId is null)
+        {
+            return null;
+        }
 
-    public NodeOutput? FindOutput(string nodeId, string outputId) =>
-        FindNode(nodeId)?.Outputs.FirstOrDefault(output => output.Id == outputId);
+        foreach (var node in Nodes)
+        {
+            if (node.Id == nodeId)
+            {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    public NodeOutput? FindOutput(string nodeId, string outputId)
+    {
+        var node = FindNode(nodeId);
+        return node is null ? null : FindOutput(node, outputId);
+    }
+
+    private static NodeOutput? FindOutput(NovelNode node, string outputId)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.Id == outputId)
+            {
+                return output;
+            }
+        }
+        return null;
+    }
+
+    private static NodeOutput? FindFirstFreeOutput(NovelNode node)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.TargetNodeId is null)
+            {
+                return output;
+            }
+        }
+        return null;
+    }
+
+    private static CharacterPlacement? FindNodeCharacter(
+        NovelNode node,
+        string characterId)
+    {
+        foreach (var character in node.Characters)
+        {
+            if (character.Id == characterId)
+            {
+                return character;
+            }
+        }
+        return null;
+    }
+
+    private int CountNodes(NodeKind kind)
+    {
+        var count = 0;
+        foreach (var node in Nodes)
+        {
+            if (node.Kind == kind)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
 
     public NovelNode AddNode(NodeKind kind, float x, float y)
     {
@@ -448,7 +534,7 @@ public sealed class NovelProject
             throw new InvalidOperationException("В проекте может быть только одна стартовая нода.");
         }
 
-        var index = Nodes.Count(node => node.Kind == kind) + 1;
+        var index = CountNodes(kind) + 1;
         var node = new NovelNode
         {
             Id = CreateId("node"),
@@ -509,7 +595,7 @@ public sealed class NovelProject
 
         var source = FindNode(sourceNodeId)
             ?? throw new InvalidOperationException("Исходная нода не найдена.");
-        var output = source.Outputs.FirstOrDefault(output => output.TargetNodeId is null);
+        var output = FindFirstFreeOutput(source);
         if (output is null)
         {
             if (source.Kind != NodeKind.Dialogue)
@@ -625,7 +711,7 @@ public sealed class NovelProject
             throw new InvalidOperationException("Варианты ответа доступны только диалоговой ноде.");
         }
 
-        var source = node.Outputs.FirstOrDefault(output => output.Id == outputId)
+        var source = FindOutput(node, outputId)
             ?? throw new InvalidOperationException("Вариант ответа не найден.");
 
         var duplicate = new NodeOutput
@@ -682,7 +768,7 @@ public sealed class NovelProject
     {
         var node = FindNode(nodeId)
             ?? throw new InvalidOperationException("Нода не найдена.");
-        var character = node.Characters.FirstOrDefault(candidate => candidate.Id == characterId)
+        var character = FindNodeCharacter(node, characterId)
             ?? throw new InvalidOperationException("Персонаж не найден.");
 
         var duplicate = character.CloneWithId(
@@ -744,8 +830,13 @@ public sealed class NovelProject
         CharacterPosition position)
     {
         var node = FindNode(nodeId);
-        var character = node?.Characters.FirstOrDefault(candidate => candidate.Id == characterId);
-        if (node is null || character is null || character.Position == position)
+        if (node is null)
+        {
+            return false;
+        }
+
+        var character = FindNodeCharacter(node, characterId);
+        if (character is null || character.Position == position)
         {
             return false;
         }
@@ -764,7 +855,7 @@ public sealed class NovelProject
             ?? throw new InvalidOperationException("Исходная нода не найдена.");
         var target = FindNode(targetNodeId)
             ?? throw new InvalidOperationException("Целевая нода не найдена.");
-        var output = source.Outputs.FirstOrDefault(candidate => candidate.Id == outputId)
+        var output = FindOutput(source, outputId)
             ?? throw new InvalidOperationException("Выход ноды не найден.");
 
         if (source.Id == target.Id)
@@ -783,7 +874,7 @@ public sealed class NovelProject
             return false;
         }
 
-        var output = node.Outputs.FirstOrDefault(candidate => candidate.Id == outputId);
+        var output = FindOutput(node, outputId);
         return output is not null && node.Outputs.Remove(output);
     }
 
