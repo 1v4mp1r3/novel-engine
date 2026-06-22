@@ -24,7 +24,12 @@ public static partial class ProjectScriptVariables
             }
         }
 
-        return variables.ToList();
+        var result = new List<string>(variables.Count);
+        foreach (var variable in variables)
+        {
+            result.Add(variable);
+        }
+        return result;
     }
 
     private static void AddScript(string? script, ISet<string> variables)

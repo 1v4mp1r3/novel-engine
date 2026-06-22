@@ -1189,6 +1189,14 @@ static void VisualScriptBlocksSurviveProjectLanguageApply()
 
 static void ProjectScriptVariablesCollectAuthoredNames()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectScriptVariables.cs"));
+    var collectBody = ExtractMethodBody(
+        sourceText,
+        "public static IReadOnlyList<string> Collect");
     var project = NovelProject.CreateDefault();
     project.NodeTypes.Add(
         new NodeTypeDefinition
@@ -1244,10 +1252,34 @@ static void ProjectScriptVariablesCollectAuthoredNames()
     variables = ProjectScriptVariables.Collect(project);
     Assert(variables.Contains("route"), "Compound condition variable was not collected.");
     Assert(variables.Contains("trust"), "Output visual block variable was not collected.");
+    Assert(
+        collectBody.Contains("foreach (var variable in variables)", StringComparison.Ordinal)
+            && !collectBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Project script variables should materialize the sorted set without LINQ list allocation.");
 }
 
 static void VisualConditionsParseAndCompile()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "VisualConditions.cs"));
+    var cloneBody = ExtractMethodBody(
+        sourceText,
+        "public VisualConditionExpression Clone");
+    var compileGroupBody = ExtractMethodBody(
+        sourceText,
+        "private static string CompileGroup");
+    var evaluateAllBody = ExtractMethodBody(
+        sourceText,
+        "private static bool EvaluateAll");
+    var evaluateAnyBody = ExtractMethodBody(
+        sourceText,
+        "private static bool EvaluateAny");
+    var splitLogicalBody = ExtractMethodBody(
+        sourceText,
+        "private static List<string> SplitLogical");
     Assert(
         VisualConditionCompiler.Compile(VisualConditionCompiler.Parse(string.Empty)) == string.Empty,
         "Empty condition did not compile as always.");
@@ -1325,6 +1357,27 @@ static void VisualConditionsParseAndCompile()
                 ],
             }),
         "Empty child condition in group was accepted.");
+    Assert(
+        cloneBody.Contains("foreach (var child in Children)", StringComparison.Ordinal)
+            && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Visual condition cloning should copy children with a direct loop.");
+    Assert(
+        compileGroupBody.Contains("var builder = new StringBuilder();", StringComparison.Ordinal)
+            && compileGroupBody.Contains("for (var index = 0; index < children.Count; index++)", StringComparison.Ordinal)
+            && !compileGroupBody.Contains(".Select(", StringComparison.Ordinal)
+            && !compileGroupBody.Contains("string.Join", StringComparison.Ordinal),
+        "Visual condition groups should compile without transient enumerable chains.");
+    Assert(
+        evaluateAllBody.Contains("foreach (var child in children)", StringComparison.Ordinal)
+            && evaluateAnyBody.Contains("foreach (var child in children)", StringComparison.Ordinal)
+            && !evaluateAllBody.Contains(".All(", StringComparison.Ordinal)
+            && !evaluateAnyBody.Contains(".Any(", StringComparison.Ordinal),
+        "Visual condition group evaluation should avoid LINQ delegates.");
+    Assert(
+        splitLogicalBody.Contains("foreach (var part in parts)", StringComparison.Ordinal)
+            && !splitLogicalBody.Contains("parts.Any", StringComparison.Ordinal),
+        "Visual condition splitting should validate parts without LINQ delegates.");
 }
 
 static void VisualConditionExpressionsSurviveJsonAndRuntime()

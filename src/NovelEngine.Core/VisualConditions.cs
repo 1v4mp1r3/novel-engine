@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace NovelEngine.Core;
@@ -20,15 +21,21 @@ public sealed class VisualConditionExpression
     public string Value { get; set; } = string.Empty;
     public List<VisualConditionExpression> Children { get; init; } = [];
 
-    public VisualConditionExpression Clone() =>
-        new()
+    public VisualConditionExpression Clone()
+    {
+        var clone = new VisualConditionExpression
         {
             Kind = Kind,
             VariableName = VariableName,
             Operator = Operator,
             Value = Value,
-            Children = Children.Select(child => child.Clone()).ToList(),
         };
+        foreach (var child in Children)
+        {
+            clone.Children.Add(child.Clone());
+        }
+        return clone;
+    }
 }
 
 public static partial class VisualConditionCompiler
@@ -102,15 +109,9 @@ public static partial class VisualConditionCompiler
             VisualConditionKind.Comparison =>
                 $"{RequiredVariableName(expression)} {RequiredOperator(expression)} {RequiredValue(expression)}",
             VisualConditionKind.All =>
-                string.Join(
-                    " && ",
-                    RequiredChildren(expression).Select(child =>
-                        CompileChild(expression.Kind, child))),
+                CompileGroup(expression, " && "),
             VisualConditionKind.Any =>
-                string.Join(
-                    " || ",
-                    RequiredChildren(expression).Select(child =>
-                        CompileChild(expression.Kind, child))),
+                CompileGroup(expression, " || "),
             _ => throw new InvalidDataException(
                 $"Неизвестный тип visual condition: {expression.Kind}"),
         };
@@ -132,10 +133,8 @@ public static partial class VisualConditionCompiler
     public static bool Evaluate(VisualConditionExpression expression, ScriptState state) =>
         expression.Kind switch
         {
-            VisualConditionKind.All =>
-                RequiredChildren(expression).All(child => Evaluate(child, state)),
-            VisualConditionKind.Any =>
-                RequiredChildren(expression).Any(child => Evaluate(child, state)),
+            VisualConditionKind.All => EvaluateAll(expression, state),
+            VisualConditionKind.Any => EvaluateAny(expression, state),
             _ => NovelScript.Evaluate(Compile(expression), state),
         };
 
@@ -166,11 +165,23 @@ public static partial class VisualConditionCompiler
     private static string RequiredOperator(VisualConditionExpression expression)
     {
         var operation = expression.Operator.Trim();
-        if (!ComparisonOperators.Contains(operation, StringComparer.Ordinal))
+        if (!IsComparisonOperator(operation))
         {
             throw new InvalidDataException($"Некорректный оператор условия: {operation}");
         }
         return operation;
+    }
+
+    private static bool IsComparisonOperator(string operation)
+    {
+        for (var index = 0; index < ComparisonOperators.Count; index++)
+        {
+            if (ComparisonOperators[index].Equals(operation, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static string RequiredValue(VisualConditionExpression expression)
@@ -191,6 +202,53 @@ public static partial class VisualConditionCompiler
             throw new InvalidDataException("Группа условий должна содержать хотя бы одно условие.");
         }
         return expression.Children;
+    }
+
+    private static string CompileGroup(
+        VisualConditionExpression expression,
+        string separator)
+    {
+        var children = RequiredChildren(expression);
+        var builder = new StringBuilder();
+        for (var index = 0; index < children.Count; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(separator);
+            }
+            builder.Append(CompileChild(expression.Kind, children[index]));
+        }
+        return builder.ToString();
+    }
+
+    private static bool EvaluateAll(
+        VisualConditionExpression expression,
+        ScriptState state)
+    {
+        var children = RequiredChildren(expression);
+        foreach (var child in children)
+        {
+            if (!Evaluate(child, state))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool EvaluateAny(
+        VisualConditionExpression expression,
+        ScriptState state)
+    {
+        var children = RequiredChildren(expression);
+        foreach (var child in children)
+        {
+            if (Evaluate(child, state))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static string CompileChild(
@@ -342,9 +400,12 @@ public static partial class VisualConditionCompiler
             return [];
         }
         parts.Add(condition[start..].Trim());
-        if (parts.Any(part => part.Length == 0))
+        foreach (var part in parts)
         {
-            throw new InvalidDataException($"Некорректное условие: {condition}");
+            if (part.Length == 0)
+            {
+                throw new InvalidDataException($"Некорректное условие: {condition}");
+            }
         }
         return parts;
     }
