@@ -1825,8 +1825,7 @@ public partial class MainWindow : Window
             currentAsset?.Folder
             ?? PreferredFolder(folderOptions, preferredFolders)
             ?? string.Empty;
-        folderBox.SelectedItem = folderOptions.FirstOrDefault(option =>
-                option.Folder.Equals(selectedFolder, StringComparison.OrdinalIgnoreCase))
+        folderBox.SelectedItem = FindFolderOption(folderOptions, selectedFolder)
             ?? folderOptions.First();
         RefreshAssetChoices(assetBox, kind, selectedFolder, currentReference);
         folderBox.IsEnabled = enabled && folderOptions.Count > 1;
@@ -1891,11 +1890,7 @@ public partial class MainWindow : Window
     {
         foreach (var preferred in preferredFolders)
         {
-            var found = options.FirstOrDefault(option =>
-                option.Folder.Equals(preferred, StringComparison.OrdinalIgnoreCase)
-                || option.Folder.EndsWith(
-                    "/" + preferred,
-                    StringComparison.OrdinalIgnoreCase));
+            var found = FindPreferredFolderOption(options, preferred);
             if (found is not null)
             {
                 return found.Folder;
@@ -1934,8 +1929,7 @@ public partial class MainWindow : Window
             var currentAsset = ResolveAssetChoice(currentReference);
             assetBox.SelectedItem = currentAsset is null
                 ? choices[0]
-                : choices.FirstOrDefault(choice =>
-                        ReferenceEquals(choice.Asset, currentAsset))
+                : FindAssetChoice(choices, currentAsset)
                     ?? choices[0];
         }
         finally
@@ -1990,6 +1984,54 @@ public partial class MainWindow : Window
         }
         _nodeAssetChoicesCache[key] = choices;
         return choices;
+    }
+
+    private static NodeAssetFolderOption? FindFolderOption(
+        IReadOnlyList<NodeAssetFolderOption> options,
+        string folder)
+    {
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            if (option.Folder.Equals(folder, StringComparison.OrdinalIgnoreCase))
+            {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private static NodeAssetFolderOption? FindPreferredFolderOption(
+        IReadOnlyList<NodeAssetFolderOption> options,
+        string preferred)
+    {
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            if (option.Folder.Equals(preferred, StringComparison.OrdinalIgnoreCase)
+                || option.Folder.EndsWith(
+                    "/" + preferred,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private static NodeAssetChoice? FindAssetChoice(
+        IReadOnlyList<NodeAssetChoice> choices,
+        NovelAsset asset)
+    {
+        for (var index = 0; index < choices.Count; index++)
+        {
+            var choice = choices[index];
+            if (ReferenceEquals(choice.Asset, asset))
+            {
+                return choice;
+            }
+        }
+        return null;
     }
 
     private void EnsureAssetPickerCachesCurrent()

@@ -3903,6 +3903,14 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     var assetChoicesBody = ExtractMethodBody(
         source,
         "private List<NodeAssetChoice> GetCachedAssetChoices");
+    var refreshAssetPickerBody = ExtractMethodBody(source, "private void RefreshAssetPicker");
+    var preferredFolderBody = ExtractMethodBody(source, "private static string? PreferredFolder");
+    var refreshAssetChoicesBody = ExtractMethodBody(source, "private void RefreshAssetChoices");
+    var findFolderOptionBody = ExtractMethodBody(source, "private static NodeAssetFolderOption? FindFolderOption");
+    var findPreferredFolderOptionBody = ExtractMethodBody(
+        source,
+        "private static NodeAssetFolderOption? FindPreferredFolderOption");
+    var findAssetChoiceBody = ExtractMethodBody(source, "private static NodeAssetChoice? FindAssetChoice");
     var ensureBody = ExtractMethodBody(source, "private void EnsureAssetPickerCachesCurrent");
     var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
     var resolveBody = ExtractMethodBody(source, "private NovelAsset? ResolveAssetChoice");
@@ -3946,6 +3954,22 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
             && !assetChoicesBody.Contains(".Select(", StringComparison.Ordinal)
             && !assetChoicesBody.Contains(".Prepend(", StringComparison.Ordinal),
         "Node asset choices should be cached through a direct filter and sort pass.");
+    Assert(
+        refreshAssetPickerBody.Contains("FindFolderOption(folderOptions, selectedFolder)", StringComparison.Ordinal)
+            && preferredFolderBody.Contains("FindPreferredFolderOption(options, preferred)", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("FindAssetChoice(choices, currentAsset)", StringComparison.Ordinal)
+            && !refreshAssetPickerBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
+            && !preferredFolderBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
+            && !refreshAssetChoicesBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Node asset picker selection should use direct helper lookups.");
+    Assert(
+        findFolderOptionBody.Contains("for (var index = 0; index < options.Count; index++)", StringComparison.Ordinal)
+            && findPreferredFolderOptionBody.Contains("for (var index = 0; index < options.Count; index++)", StringComparison.Ordinal)
+            && findAssetChoiceBody.Contains("for (var index = 0; index < choices.Count; index++)", StringComparison.Ordinal)
+            && !findFolderOptionBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findPreferredFolderOptionBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findAssetChoiceBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Node asset picker lookup helpers should avoid LINQ delegates.");
     Assert(
         ensureBody.Contains("_nodeAssetByIdCache.Clear();", StringComparison.Ordinal)
             && ensureBody.Contains("_nodeAssetByIdCache[asset.Id] = asset;", StringComparison.Ordinal),
