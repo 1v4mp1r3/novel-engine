@@ -4525,10 +4525,20 @@ public partial class MainWindow : Window
             e.Cancel = true;
             return;
         }
-        _autoSaveTimer.Stop();
+        StopEditorTimers();
         _filesWatcher?.Dispose();
         _assetPreviewPlayer.Close();
         StopGameProcess(silent: true);
+    }
+
+    private void StopEditorTimers()
+    {
+        _codeAnalysisTimer.Stop();
+        _autoSaveTimer.Stop();
+        _filesRefreshTimer.Stop();
+        _diagnosticsTimer.Stop();
+        _projectExplorerSearchTimer.Stop();
+        _assetSearchTimer.Stop();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();

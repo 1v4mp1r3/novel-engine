@@ -117,6 +117,7 @@ var tests = new (string Name, Action Run)[]
     ("preview playback avoids transient lists", PreviewPlaybackAvoidsTransientLists),
     ("game process start is registered before launch", GameProcessStartIsRegisteredBeforeLaunch),
     ("silent game process stop disposes immediately", SilentGameProcessStopDisposesImmediately),
+    ("main window closing stops editor timers", MainWindowClosingStopsEditorTimers),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
@@ -4291,6 +4292,39 @@ static void SilentGameProcessStopDisposesImmediately()
     Assert(
         normalStopIndex > returnIndex,
         "Normal game process stop should keep the visible stopping status outside the silent cleanup branch.");
+}
+
+static void MainWindowClosingStopsEditorTimers()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var closingBody = ExtractMethodBody(source, "private void MainWindow_Closing");
+    var stopTimersBody = ExtractMethodBody(source, "private void StopEditorTimers");
+
+    Assert(
+        closingBody.Contains("StopEditorTimers();", StringComparison.Ordinal)
+            && closingBody.IndexOf("StopEditorTimers();", StringComparison.Ordinal)
+                < closingBody.IndexOf("_filesWatcher?.Dispose();", StringComparison.Ordinal),
+        "Main window closing should stop timers before disposing editor resources.");
+
+    var expectedStops = new[]
+    {
+        "_codeAnalysisTimer.Stop();",
+        "_autoSaveTimer.Stop();",
+        "_filesRefreshTimer.Stop();",
+        "_diagnosticsTimer.Stop();",
+        "_projectExplorerSearchTimer.Stop();",
+        "_assetSearchTimer.Stop();",
+    };
+    foreach (var expected in expectedStops)
+    {
+        Assert(
+            stopTimersBody.Contains(expected, StringComparison.Ordinal),
+            $"Main window timer cleanup is missing {expected}");
+    }
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()
