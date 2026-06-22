@@ -4791,6 +4791,14 @@ static void GraphInheritanceMenuCachesIncomingNodes()
     var resolveBody = ExtractMethodBody(
         source,
         "private InheritanceSourceDescription? ResolveInheritanceSource");
+    var hasFreeOutputBody = ExtractMethodBody(source, "private static bool HasFreeOutput");
+    var describeExplicitBody = ExtractMethodBody(
+        source,
+        "private static string DescribeExplicitInheritanceValue");
+    var formatNodeTitlesBody = ExtractMethodBody(source, "private static string FormatNodeTitles");
+    var formatCharacterNamesBody = ExtractMethodBody(
+        source,
+        "private static string FormatCharacterNames");
 
     Assert(
         menuBody.Contains("BuildIncomingNodesByTargetId();", StringComparison.Ordinal),
@@ -4809,6 +4817,35 @@ static void GraphInheritanceMenuCachesIncomingNodes()
     Assert(
         resolveBody.Contains("GetIncomingNodes(node, incomingNodesByTargetId)", StringComparison.Ordinal),
         "Recursive inheritance resolution should reuse the cached incoming lookup.");
+    Assert(
+        source.Contains(
+            "HasFreeOutput(node) || node.Kind == NodeKind.Dialogue;",
+            StringComparison.Ordinal),
+        "Connected-node availability should delegate free-output scanning to a direct helper.");
+    Assert(
+        hasFreeOutputBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && !hasFreeOutputBody.Contains(".Any(", StringComparison.Ordinal),
+        "Free output detection should use one direct pass over outputs.");
+    Assert(
+        resolveBody.Contains("FormatNodeTitles(sources)", StringComparison.Ordinal)
+            && !resolveBody.Contains(".Select(", StringComparison.Ordinal),
+        "Ambiguous inheritance descriptions should not allocate a projected title sequence.");
+    Assert(
+        describeExplicitBody.Contains("FormatCharacterNames(source.Characters)", StringComparison.Ordinal)
+            && !describeExplicitBody.Contains(".Select(", StringComparison.Ordinal),
+        "Character inheritance descriptions should not allocate a projected character sequence.");
+    Assert(
+        formatNodeTitlesBody.Contains("var builder = new System.Text.StringBuilder();", StringComparison.Ordinal)
+            && formatNodeTitlesBody.Contains("for (var index = 0; index < nodes.Count; index++)", StringComparison.Ordinal)
+            && !formatNodeTitlesBody.Contains("string.Join", StringComparison.Ordinal)
+            && !formatNodeTitlesBody.Contains(".Select(", StringComparison.Ordinal),
+        "Node title formatting should use one indexed StringBuilder pass.");
+    Assert(
+        formatCharacterNamesBody.Contains("var builder = new System.Text.StringBuilder();", StringComparison.Ordinal)
+            && formatCharacterNamesBody.Contains("for (var index = 0; index < characters.Count; index++)", StringComparison.Ordinal)
+            && !formatCharacterNamesBody.Contains("string.Join", StringComparison.Ordinal)
+            && !formatCharacterNamesBody.Contains(".Select(", StringComparison.Ordinal),
+        "Character-name formatting should use one indexed StringBuilder pass.");
 }
 
 static void GraphInheritanceMenuSkipsUnchangedApply()
@@ -5005,6 +5042,23 @@ static void GraphHitTestCacheCrossesSpatialCells()
 
 static void GraphHitTestCacheHandlesLargeGraphsQuickly()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "GraphSurface.cs"));
+    var hitConnectionBody = ExtractMethodBody(source, "private ConnectionVisual? HitConnection");
+
+    Assert(
+        hitConnectionBody.Contains(
+            "for (var index = _connections.Count - 1; index >= 0; index--)",
+            StringComparison.Ordinal)
+            && hitConnectionBody.Contains("StrokeContains(ConnectionHitPen, worldPoint)", StringComparison.Ordinal)
+            && !hitConnectionBody.Contains(".Reverse(", StringComparison.Ordinal)
+            && !hitConnectionBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
+            && !hitConnectionBody.Contains(".AsEnumerable(", StringComparison.Ordinal),
+        "Graph connection hit testing should scan topmost connections directly.");
+
     var cache = new GraphHitTestCache();
     const int count = 5_000;
 

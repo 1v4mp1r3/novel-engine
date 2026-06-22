@@ -633,8 +633,19 @@ public sealed class GraphSurface : FrameworkElement
     }
 
     private static bool CanAddConnectedNode(NovelNode node) =>
-        node.Outputs.Any(output => output.TargetNodeId is null)
-        || node.Kind == NodeKind.Dialogue;
+        HasFreeOutput(node) || node.Kind == NodeKind.Dialogue;
+
+    private static bool HasFreeOutput(NovelNode node)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.TargetNodeId is null)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private MenuItem CreateTemplateMenu(Point worldPosition)
     {
@@ -826,7 +837,7 @@ public sealed class GraphSurface : FrameworkElement
         {
             return new InheritanceSourceDescription(
                 node,
-                $"источник зависит от ветки: {string.Join(", ", sources.Select(source => $"«{source.Title}»"))}");
+                $"источник зависит от ветки: {FormatNodeTitles(sources)}");
         }
 
         return ResolveInheritanceSource(
@@ -856,9 +867,39 @@ public sealed class GraphSurface : FrameworkElement
             InheritanceResource.Background => EmptyFallback(source.Background, "фон не задан"),
             InheritanceResource.Characters => source.Characters.Count == 0
                 ? "персонажи не заданы"
-                : string.Join(", ", source.Characters.Select(CharacterDisplayName)),
+                : FormatCharacterNames(source.Characters),
             _ => string.Empty,
         };
+
+    private static string FormatNodeTitles(IReadOnlyList<NovelNode> nodes)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(", ");
+            }
+            builder.Append('«');
+            builder.Append(nodes[index].Title);
+            builder.Append('»');
+        }
+        return builder.ToString();
+    }
+
+    private static string FormatCharacterNames(IReadOnlyList<CharacterPlacement> characters)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var index = 0; index < characters.Count; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(", ");
+            }
+            builder.Append(CharacterDisplayName(characters[index]));
+        }
+        return builder.ToString();
+    }
 
     private static string CharacterDisplayName(CharacterPlacement character) =>
         string.IsNullOrWhiteSpace(character.Name)
@@ -1302,13 +1343,15 @@ public sealed class GraphSurface : FrameworkElement
     private ConnectionVisual? HitConnection(Point point)
     {
         var worldPoint = ScreenToWorld(point);
-        return _connections
-            .AsEnumerable()
-            .Reverse()
-            .FirstOrDefault(
-                connection => connection.Geometry.StrokeContains(
-                    ConnectionHitPen,
-                    worldPoint));
+        for (var index = _connections.Count - 1; index >= 0; index--)
+        {
+            var connection = _connections[index];
+            if (connection.Geometry.StrokeContains(ConnectionHitPen, worldPoint))
+            {
+                return connection;
+            }
+        }
+        return null;
     }
 
     private static SolidColorBrush FrozenBrush(byte red, byte green, byte blue)
