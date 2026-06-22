@@ -352,8 +352,7 @@ public static class ProjectAssets
         }
         var parent = ParentFolder(folder);
         var target = parent.Length == 0 ? newName : $"{parent}/{newName}";
-        if (project.AssetFolders.Any(
-            candidate => candidate.Equals(target, StringComparison.OrdinalIgnoreCase)))
+        if (FolderExists(project, target))
         {
             throw new InvalidDataException("Папка с таким именем уже существует.");
         }
@@ -396,14 +395,12 @@ public static class ProjectAssets
         {
             throw new InvalidDataException("Имя папки не может быть пустым.");
         }
-        if (project.Assets.Any(asset => IsInFolder(asset.Folder, folder)))
+        if (HasAssetInFolder(project, folder))
         {
             throw new InvalidOperationException(
                 "Сначала переместите или удалите ассеты из этой папки.");
         }
-        if (project.AssetFolders.Any(
-            candidate => !candidate.Equals(folder, StringComparison.OrdinalIgnoreCase)
-                && IsInFolder(candidate, folder)))
+        if (HasNestedFolder(project, folder))
         {
             throw new InvalidOperationException(
                 "Сначала удалите вложенные папки.");
@@ -415,15 +412,14 @@ public static class ProjectAssets
             {
                 continue;
             }
-            if (Directory.EnumerateFileSystemEntries(directory).Any())
+            if (DirectoryHasEntries(directory))
             {
                 throw new InvalidOperationException(
                     "Сначала удалите файлы из этой папки.");
             }
             directories.Add(directory);
         }
-        project.AssetFolders.RemoveAll(
-            candidate => candidate.Equals(folder, StringComparison.OrdinalIgnoreCase));
+        RemoveFolder(project, folder);
         foreach (var directory in directories)
         {
             Directory.Delete(directory, recursive: false);
@@ -588,6 +584,65 @@ public static class ProjectAssets
             || candidate.StartsWith(
                 folder + "/",
                 StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool FolderExists(NovelProject project, string folder)
+    {
+        for (var index = 0; index < project.AssetFolders.Count; index++)
+        {
+            if (project.AssetFolders[index].Equals(
+                    folder,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool HasAssetInFolder(NovelProject project, string folder)
+    {
+        foreach (var asset in project.Assets)
+        {
+            if (IsInFolder(asset.Folder, folder))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool HasNestedFolder(NovelProject project, string folder)
+    {
+        foreach (var candidate in project.AssetFolders)
+        {
+            if (!candidate.Equals(folder, StringComparison.OrdinalIgnoreCase)
+                && IsInFolder(candidate, folder))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool DirectoryHasEntries(string directory)
+    {
+        using var entries = Directory.EnumerateFileSystemEntries(directory)
+            .GetEnumerator();
+        return entries.MoveNext();
+    }
+
+    private static void RemoveFolder(NovelProject project, string folder)
+    {
+        for (var index = project.AssetFolders.Count - 1; index >= 0; index--)
+        {
+            if (project.AssetFolders[index].Equals(
+                    folder,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                project.AssetFolders.RemoveAt(index);
+            }
+        }
     }
 
     private static string UniquePath(string directory, string fileName)

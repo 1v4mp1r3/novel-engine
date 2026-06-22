@@ -3332,10 +3332,20 @@ static void AssetFolderDeleteScansDirectoriesOnce()
         "NovelEngine.Core",
         "ProjectAssets.cs"));
     var body = ExtractMethodBody(source, "public static void DeleteFolder");
+    var renameBody = ExtractMethodBody(source, "public static void RenameFolder");
+    var folderExistsBody = ExtractMethodBody(source, "private static bool FolderExists");
+    var hasAssetBody = ExtractMethodBody(source, "private static bool HasAssetInFolder");
+    var hasNestedBody = ExtractMethodBody(source, "private static bool HasNestedFolder");
+    var directoryHasEntriesBody = ExtractMethodBody(source, "private static bool DirectoryHasEntries");
+    var removeFolderBody = ExtractMethodBody(source, "private static void RemoveFolder");
     var managedDirectoryCalls = CountOccurrences(
         body,
         "ManagedFolderDirectories(projectPath, folder)");
 
+    Assert(
+        renameBody.Contains("FolderExists(project, target)", StringComparison.Ordinal)
+            && !renameBody.Contains(".Any(", StringComparison.Ordinal),
+        "RenameFolder should check target folders through a direct helper.");
     Assert(
         managedDirectoryCalls == 1,
         "DeleteFolder should enumerate managed and legacy directories once.");
@@ -3345,8 +3355,28 @@ static void AssetFolderDeleteScansDirectoriesOnce()
         "DeleteFolder should collect existing empty directories during validation.");
     Assert(
         !body.Contains(".Where(Directory.Exists)", StringComparison.Ordinal)
-            && !body.Contains(".ToList()", StringComparison.Ordinal),
+            && !body.Contains(".ToList()", StringComparison.Ordinal)
+            && !body.Contains(".Any(", StringComparison.Ordinal)
+            && !body.Contains("RemoveAll(", StringComparison.Ordinal),
         "DeleteFolder should not allocate a filtered directory list before validation.");
+    Assert(
+        body.Contains("HasAssetInFolder(project, folder)", StringComparison.Ordinal)
+            && body.Contains("HasNestedFolder(project, folder)", StringComparison.Ordinal)
+            && body.Contains("DirectoryHasEntries(directory)", StringComparison.Ordinal)
+            && body.Contains("RemoveFolder(project, folder)", StringComparison.Ordinal),
+        "DeleteFolder should route folder checks and removal through direct helpers.");
+    Assert(
+        folderExistsBody.Contains("for (var index = 0; index < project.AssetFolders.Count; index++)", StringComparison.Ordinal)
+            && hasAssetBody.Contains("foreach (var asset in project.Assets)", StringComparison.Ordinal)
+            && hasNestedBody.Contains("foreach (var candidate in project.AssetFolders)", StringComparison.Ordinal)
+            && directoryHasEntriesBody.Contains(".GetEnumerator()", StringComparison.Ordinal)
+            && removeFolderBody.Contains("for (var index = project.AssetFolders.Count - 1; index >= 0; index--)", StringComparison.Ordinal)
+            && !folderExistsBody.Contains(".Any(", StringComparison.Ordinal)
+            && !hasAssetBody.Contains(".Any(", StringComparison.Ordinal)
+            && !hasNestedBody.Contains(".Any(", StringComparison.Ordinal)
+            && !directoryHasEntriesBody.Contains(".Any(", StringComparison.Ordinal)
+            && !removeFolderBody.Contains("RemoveAll(", StringComparison.Ordinal),
+        "Asset folder helpers should use direct loops without LINQ predicates.");
 }
 
 static void ProjectLanguagePreservesFolders()
