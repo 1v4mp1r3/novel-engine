@@ -6348,7 +6348,7 @@ public partial class MainWindow : Window
         node.InheritCharacters = false;
         node.Characters.Clear();
         node.Characters.AddRange(
-            editor.Characters.Select(character => character.Clone()));
+            SceneEditorWindow.CloneCharacterPlacements(editor.Characters));
         if (node.UsesTypeDefaults)
         {
             node.PropertyOverrides.Add("inheritCharacters");

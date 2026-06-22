@@ -51,9 +51,7 @@ public partial class SceneEditorWindow : Window
 
         var player = new NovelPlayer(project);
         player.StartAt(node.Id);
-        _characters = player.State.CurrentCharacters
-            .Select(character => character.Clone())
-            .ToList();
+        _characters = CloneCharacterPlacements(player.State.CurrentCharacters);
         BackgroundImage.Source = LoadBitmapCached(ResolveAsset(player.State.CurrentBackground));
 
         if (node.InheritCharacters && Characters.Count > 0)
@@ -72,6 +70,17 @@ public partial class SceneEditorWindow : Window
     }
 
     public IReadOnlyList<CharacterPlacement> Characters => _characters;
+
+    internal static List<CharacterPlacement> CloneCharacterPlacements(
+        IReadOnlyList<CharacterPlacement> source)
+    {
+        var characters = new List<CharacterPlacement>(source.Count);
+        for (var index = 0; index < source.Count; index++)
+        {
+            characters.Add(source[index].Clone());
+        }
+        return characters;
+    }
 
     internal void EnableTransformModeForScreenshot()
     {

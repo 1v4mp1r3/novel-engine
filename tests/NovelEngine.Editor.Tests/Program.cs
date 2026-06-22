@@ -4328,6 +4328,25 @@ static void SceneEditorTransformClampsAndSkipsMicroMoves()
 
 static void SceneEditorCharacterListStampTracksVisibleRows()
 {
+    var sceneSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "SceneEditorWindow.xaml.cs"));
+    var mainWindowSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var sceneConstructorBody = ExtractMethodBody(
+        sceneSource,
+        "public SceneEditorWindow(");
+    var cloneBody = ExtractMethodBody(
+        sceneSource,
+        "internal static List<CharacterPlacement> CloneCharacterPlacements");
+    var editSceneBody = ExtractMethodBody(
+        mainWindowSource,
+        "private void EditNodeScene");
     var characters = new List<CharacterPlacement>
     {
         new()
@@ -4360,6 +4379,17 @@ static void SceneEditorCharacterListStampTracksVisibleRows()
     Assert(
         baseline != SceneEditorWindow.CreateCharacterListStamp(characters),
         "Scene character list stamp should track added rows.");
+    Assert(
+        sceneConstructorBody.Contains("CloneCharacterPlacements(player.State.CurrentCharacters)", StringComparison.Ordinal)
+            && cloneBody.Contains("for (var index = 0; index < source.Count; index++)", StringComparison.Ordinal)
+            && cloneBody.Contains("characters.Add(source[index].Clone());", StringComparison.Ordinal)
+            && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Scene editor should clone inherited runtime characters with a direct pass.");
+    Assert(
+        editSceneBody.Contains("SceneEditorWindow.CloneCharacterPlacements(editor.Characters)", StringComparison.Ordinal)
+            && !editSceneBody.Contains("editor.Characters.Select", StringComparison.Ordinal),
+        "Applying scene editor characters should reuse the direct clone helper.");
 }
 
 static void PreviewPlaybackAvoidsTransientLists()
