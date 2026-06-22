@@ -4130,6 +4130,9 @@ static void PreviewPlaybackAvoidsTransientLists()
     var resolveVoicePathsBody = ExtractMethodBody(
         source,
         "private List<string> ResolveVoiceSoundPaths");
+    var typeDialogueBody = ExtractMethodBody(
+        source,
+        "private async Task TypeDialogueAsync");
     var stopBody = ExtractMethodBody(source, "private void StopAllVoicePlayers");
     var pauseBody = ExtractMethodBody(source, "private void SetPaused");
     var settingsBody = ExtractMethodBody(source, "private void ApplyRuntimeSettings");
@@ -4173,6 +4176,13 @@ static void PreviewPlaybackAvoidsTransientLists()
         keyBody.Contains("FindChoiceButton(index, out var buttonCount)", StringComparison.Ordinal)
             && !keyBody.Contains("ChoicesPanel.Children.OfType<Button>().ToList()", StringComparison.Ordinal),
         "Choice shortcuts should find buttons without allocating a temporary list.");
+    Assert(
+        typeDialogueBody.Contains("catch (OperationCanceledException)", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("catch (Exception error)", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("if (version == _typingVersion)", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("DialogueText.Text = $\"Ошибка показа реплики: {error.Message}\";", StringComparison.Ordinal)
+            && typeDialogueBody.Contains("ShowChoices();", StringComparison.Ordinal),
+        "Preview dialogue typing should surface current-node errors instead of leaving fire-and-forget task faults unhandled.");
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()

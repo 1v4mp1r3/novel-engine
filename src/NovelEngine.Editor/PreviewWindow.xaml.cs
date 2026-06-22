@@ -668,6 +668,14 @@ public partial class PreviewWindow : Window
         {
             // A new node started rendering.
         }
+        catch (Exception error)
+        {
+            if (version == _typingVersion)
+            {
+                DialogueText.Text = $"Ошибка показа реплики: {error.Message}";
+                ShowChoices();
+            }
+        }
         finally
         {
             if (version == _typingVersion)
