@@ -1160,6 +1160,9 @@ static void VisualScriptBlocksCloneForPasteSafely()
     var cloneBody = ExtractMethodBody(
         sourceText,
         "public static IReadOnlyList<VisualScriptBlock> CloneForPaste");
+    var findMatchingOutputBody = ExtractMethodBody(
+        sourceText,
+        "private static NodeOutput? FindMatchingOutput");
     var source = new[]
     {
         new VisualScriptBlock
@@ -1204,6 +1207,13 @@ static void VisualScriptBlocksCloneForPasteSafely()
             && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
             && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
         "Visual script paste clones should be built with a direct loop.");
+    Assert(
+        findMatchingOutputBody.Contains("var sourceOutputs = sourceNode.Outputs;", StringComparison.Ordinal)
+            && findMatchingOutputBody.Contains("for (var index = 0; index < sourceOutputs.Count; index++)", StringComparison.Ordinal)
+            && findMatchingOutputBody.Contains("sourceOutput.Id.Equals", StringComparison.Ordinal)
+            && findMatchingOutputBody.Contains("sourceOutput.Label.Equals", StringComparison.Ordinal)
+            && !findMatchingOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Visual script output matching should avoid repeated LINQ searches.");
 }
 
 static void VisualScriptBlocksValidateGeneratedScripts()

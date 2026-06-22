@@ -414,41 +414,48 @@ public static class VisualScriptBlockPreserver
         int targetIndex,
         ISet<NodeOutput> usedSourceOutputs)
     {
-        var match = sourceNode.Outputs.FirstOrDefault(output =>
-            !usedSourceOutputs.Contains(output)
-            && output.Id.Equals(targetOutput.Id, StringComparison.Ordinal));
-        if (match is not null)
+        var sourceOutputs = sourceNode.Outputs;
+        for (var index = 0; index < sourceOutputs.Count; index++)
         {
-            return match;
+            var sourceOutput = sourceOutputs[index];
+            if (!usedSourceOutputs.Contains(sourceOutput)
+                && sourceOutput.Id.Equals(targetOutput.Id, StringComparison.Ordinal))
+            {
+                return sourceOutput;
+            }
         }
 
-        match = sourceNode.Outputs.FirstOrDefault(output =>
-            !usedSourceOutputs.Contains(output)
-            && output.Label.Equals(
-                targetOutput.Label,
-                StringComparison.Ordinal)
-            && string.Equals(
-                output.TargetNodeId,
-                targetOutput.TargetNodeId,
-                StringComparison.Ordinal));
-        if (match is not null)
+        for (var index = 0; index < sourceOutputs.Count; index++)
         {
-            return match;
+            var sourceOutput = sourceOutputs[index];
+            if (!usedSourceOutputs.Contains(sourceOutput)
+                && sourceOutput.Label.Equals(
+                    targetOutput.Label,
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    sourceOutput.TargetNodeId,
+                    targetOutput.TargetNodeId,
+                    StringComparison.Ordinal))
+            {
+                return sourceOutput;
+            }
         }
 
-        match = sourceNode.Outputs.FirstOrDefault(output =>
-            !usedSourceOutputs.Contains(output)
-            && output.Label.Equals(
-                targetOutput.Label,
-                StringComparison.Ordinal));
-        if (match is not null)
+        for (var index = 0; index < sourceOutputs.Count; index++)
         {
-            return match;
+            var sourceOutput = sourceOutputs[index];
+            if (!usedSourceOutputs.Contains(sourceOutput)
+                && sourceOutput.Label.Equals(
+                    targetOutput.Label,
+                    StringComparison.Ordinal))
+            {
+                return sourceOutput;
+            }
         }
 
-        return targetIndex < sourceNode.Outputs.Count
-            && !usedSourceOutputs.Contains(sourceNode.Outputs[targetIndex])
-                ? sourceNode.Outputs[targetIndex]
+        return targetIndex < sourceOutputs.Count
+            && !usedSourceOutputs.Contains(sourceOutputs[targetIndex])
+                ? sourceOutputs[targetIndex]
                 : null;
     }
 
