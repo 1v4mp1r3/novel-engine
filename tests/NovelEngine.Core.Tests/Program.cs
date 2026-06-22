@@ -3305,6 +3305,11 @@ static void BuildCompilerCopiesVisualBlocksWithNodeLookup()
     Assert(
         !body.Contains("destination.FindNode", StringComparison.Ordinal),
         "Build compiler should not linearly search destination nodes for every source node.");
+    Assert(
+        !body.Contains(".Select(", StringComparison.Ordinal)
+            && !body.Contains(".ToList(", StringComparison.Ordinal)
+            && !body.Contains(".ToArray(", StringComparison.Ordinal),
+        "Build compiler should clone visual blocks with direct loops.");
 }
 
 static void BuildCompilerEmitsPackage()

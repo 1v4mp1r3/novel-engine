@@ -122,8 +122,10 @@ public static class NovelBuildCompiler
     {
         destination.Background = source.Background;
         destination.Elements.Clear();
-        destination.Elements.AddRange(
-            source.Elements.Select(element => element.Clone()));
+        foreach (var element in source.Elements)
+        {
+            destination.Elements.Add(element.Clone());
+        }
     }
 
     private static void CopyVisualScriptBlocks(
@@ -147,8 +149,10 @@ public static class NovelBuildCompiler
             }
 
             destinationNode.ScriptBlocks.Clear();
-            destinationNode.ScriptBlocks.AddRange(
-                sourceNode.ScriptBlocks.Select(block => block.Clone()));
+            foreach (var block in sourceNode.ScriptBlocks)
+            {
+                destinationNode.ScriptBlocks.Add(block.Clone());
+            }
             for (var index = 0; index < sourceNode.Outputs.Count
                 && index < destinationNode.Outputs.Count; index++)
             {
@@ -163,8 +167,10 @@ public static class NovelBuildCompiler
                         sourceOutput.ConditionExpression.Clone();
                 }
                 destinationOutput.ScriptBlocks.Clear();
-                destinationOutput.ScriptBlocks.AddRange(
-                    sourceOutput.ScriptBlocks.Select(block => block.Clone()));
+                foreach (var block in sourceOutput.ScriptBlocks)
+                {
+                    destinationOutput.ScriptBlocks.Add(block.Clone());
+                }
             }
         }
     }
