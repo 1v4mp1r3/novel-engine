@@ -14,18 +14,15 @@ public sealed class RuntimeSaveState
 
 public sealed class NovelPlayer
 {
-    private readonly NovelProject _project;
     private readonly IReadOnlyDictionary<string, NovelNode> _nodesById;
     private readonly NovelNode _startNode;
 
     public NovelPlayer(NovelProject project)
     {
         project.Validate();
-        _project = project;
-        _nodesById = project.Nodes.ToDictionary(
-            node => node.Id,
-            StringComparer.Ordinal);
-        _startNode = project.Nodes.Single(node => node.Kind == NodeKind.Start);
+        _nodesById = BuildNodeLookup(project.Nodes, out var startNode);
+        _startNode = startNode
+            ?? throw new InvalidDataException("Стартовая нода не найдена.");
         State = new ScriptState();
     }
 
@@ -213,6 +210,25 @@ public sealed class NovelPlayer
         nodeId is not null && _nodesById.TryGetValue(nodeId, out var node)
             ? node
             : null;
+
+    private static IReadOnlyDictionary<string, NovelNode> BuildNodeLookup(
+        IReadOnlyList<NovelNode> nodes,
+        out NovelNode? startNode)
+    {
+        var lookup = new Dictionary<string, NovelNode>(
+            nodes.Count,
+            StringComparer.Ordinal);
+        startNode = null;
+        foreach (var node in nodes)
+        {
+            lookup[node.Id] = node;
+            if (node.Kind == NodeKind.Start)
+            {
+                startNode = node;
+            }
+        }
+        return lookup;
+    }
 
     private static NodeOutput? FindOutput(NovelNode node, string outputId)
     {

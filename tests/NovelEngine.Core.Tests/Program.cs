@@ -1818,6 +1818,12 @@ static void NovelPlayerFollowsLargeGraphQuickly()
         "src",
         "NovelEngine.Core",
         "NovelPlayer.cs"));
+    var constructorBody = ExtractMethodBody(
+        source,
+        "public NovelPlayer(");
+    var lookupBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyDictionary<string, NovelNode> BuildNodeLookup");
     var availableOutputsBody = ExtractMethodBody(
         source,
         "public IReadOnlyList<NodeOutput> GetAvailableOutputs");
@@ -1837,6 +1843,18 @@ static void NovelPlayerFollowsLargeGraphQuickly()
     Assert(
         source.Contains("_nodesById", StringComparison.Ordinal),
         "NovelPlayer should build a node lookup for runtime transitions.");
+    Assert(
+        constructorBody.Contains("BuildNodeLookup(project.Nodes, out var startNode)", StringComparison.Ordinal)
+            && !constructorBody.Contains(".ToDictionary(", StringComparison.Ordinal)
+            && !constructorBody.Contains(".Single(", StringComparison.Ordinal),
+        "NovelPlayer constructor should build runtime lookup state in one direct pass.");
+    Assert(
+        lookupBody.Contains("foreach (var node in nodes)", StringComparison.Ordinal)
+            && lookupBody.Contains("lookup[node.Id] = node;", StringComparison.Ordinal)
+            && lookupBody.Contains("node.Kind == NodeKind.Start", StringComparison.Ordinal)
+            && !lookupBody.Contains(".ToDictionary(", StringComparison.Ordinal)
+            && !lookupBody.Contains(".Single(", StringComparison.Ordinal),
+        "NovelPlayer node lookup builder should avoid LINQ startup scans.");
     Assert(
         !source.Contains("_project.FindNode", StringComparison.Ordinal),
         "NovelPlayer runtime paths should not use linear project node lookup.");
