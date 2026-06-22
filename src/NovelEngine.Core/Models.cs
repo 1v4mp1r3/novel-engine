@@ -138,7 +138,10 @@ public sealed class MainMenuDesign
             Background = Background,
         };
         clone.Elements.Clear();
-        clone.Elements.AddRange(Elements.Select(element => element.Clone()));
+        foreach (var element in Elements)
+        {
+            clone.Elements.Add(element.Clone());
+        }
         return clone;
     }
 }

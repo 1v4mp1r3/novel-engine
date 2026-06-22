@@ -1907,6 +1907,14 @@ static void CharacterTransformsRoundTrip()
 
 static void MainMenuAndVoiceRoundTrip()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var menuCloneBody = ExtractMethodBody(
+        sourceText,
+        "public MainMenuDesign Clone");
     var project = NovelProject.CreateDefault();
     project.MainMenu.Background = "backgrounds/menu.png";
     project.MainMenu.Elements.Add(
@@ -1940,6 +1948,7 @@ static void MainMenuAndVoiceRoundTrip()
         });
 
     var restored = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
+    var clonedMenu = project.MainMenu.Clone();
     var restoredLogo = restored.MainMenu.Elements.Single(element => element.Id == "logo");
     var restoredHero = restored.Nodes
         .Single(node => node.Id == scene.Id)
@@ -1950,6 +1959,17 @@ static void MainMenuAndVoiceRoundTrip()
     Assert(restored.MainMenu.Background == "backgrounds/menu.png", "Main menu background changed.");
     Assert(restoredLogo.Kind == MainMenuElementKind.ImageLabel, "Main menu element kind changed.");
     Assert(restoredLogo.Image == "ui/logo.png", "Main menu element image changed.");
+    Assert(
+        clonedMenu.Elements.Any(element => element.Id == "logo")
+            && !ReferenceEquals(
+                clonedMenu.Elements.Single(element => element.Id == "logo"),
+                project.MainMenu.Elements.Single(element => element.Id == "logo")),
+        "Main menu clone did not deep-copy elements.");
+    Assert(
+        menuCloneBody.Contains("foreach (var element in Elements)", StringComparison.Ordinal)
+            && !menuCloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !menuCloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Main menu clone should copy elements with a direct loop.");
     Assert(restoredHero.VoiceSound == "voices/hero.wav", "Character voice sound changed.");
     Assert(restoredHero.VoiceSounds.Count == 2, "Character voice sound list changed.");
     Assert(Math.Abs(restoredHero.VoicePitch - 1.15) < 0.001, "Character voice pitch changed.");
