@@ -2930,6 +2930,16 @@ static void AssetFoldersMoveFiles()
             !Directory.Exists(unusedChildDirectory)
                 && !Directory.Exists(unusedDirectory),
             "Deleted empty folders were left on disk.");
+        var filesRoot = Path.Combine(directory, "files");
+        AssertThrows<InvalidDataException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, string.Empty),
+            "Deleting an empty folder name should fail.");
+        AssertThrows<InvalidDataException>(
+            () => ProjectAssets.DeleteFolder(project, projectPath, "/"),
+            "Deleting a root-like folder name should fail.");
+        Assert(
+            Directory.Exists(filesRoot),
+            "Failed root-like folder deletion removed the managed files root.");
     }
     finally
     {

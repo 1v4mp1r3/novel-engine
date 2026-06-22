@@ -390,6 +390,10 @@ public static class ProjectAssets
     public static void DeleteFolder(NovelProject project, string projectPath, string folder)
     {
         folder = NormalizeFolder(folder);
+        if (folder.Length == 0)
+        {
+            throw new InvalidDataException("Имя папки не может быть пустым.");
+        }
         if (project.Assets.Any(asset => IsInFolder(asset.Folder, folder)))
         {
             throw new InvalidOperationException(
