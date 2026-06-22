@@ -168,7 +168,7 @@ public sealed class ConditionBuilderWindow : Window
 
     private void LoadExpression(VisualConditionExpression expression)
     {
-        if (!ModeChoices.Any(choice => choice.Mode == expression.Kind))
+        if (FindModeChoice(expression.Kind) is null)
         {
             _rawFallbackExpression = expression.Clone();
             _rawFallbackCondition = VisualConditionCompiler.Compile(expression);
@@ -183,8 +183,7 @@ public sealed class ConditionBuilderWindow : Window
         if (IsGroupMode(expression.Kind))
         {
             _groupChildren.Clear();
-            _groupChildren.AddRange(
-                expression.Children.Select(child => child.Clone()));
+            _groupChildren.AddRange(CloneChildren(expression.Children));
             _variableBox.Text = string.Empty;
             _operatorBox.SelectedItem = "==";
             _valueEditor.LoadLiteral(string.Empty);
@@ -199,8 +198,23 @@ public sealed class ConditionBuilderWindow : Window
         _valueEditor.LoadLiteral(expression.Value);
     }
 
-    private void SelectMode(VisualConditionKind mode) =>
-        _modeBox.SelectedItem = ModeChoices.First(choice => choice.Mode == mode);
+    private void SelectMode(VisualConditionKind mode)
+    {
+        _modeBox.SelectedItem = FindModeChoice(mode) ?? ModeChoices[0];
+    }
+
+    private static ModeChoice? FindModeChoice(VisualConditionKind mode)
+    {
+        foreach (var choice in ModeChoices)
+        {
+            if (choice.Mode == mode)
+            {
+                return choice;
+            }
+        }
+
+        return null;
+    }
 
     private void UpdateFields()
     {
@@ -396,11 +410,16 @@ public sealed class ConditionBuilderWindow : Window
 
     private void RefreshChildrenList(int selectedIndex = -1)
     {
-        _childrenList.ItemsSource = _groupChildren
-            .Select((child, index) => new ConditionChildView(
-                index + 1,
-                DescribeChild(child)))
-            .ToList();
+        var views = new List<ConditionChildView>(_groupChildren.Count);
+        for (var index = 0; index < _groupChildren.Count; index++)
+        {
+            views.Add(
+                new ConditionChildView(
+                    index + 1,
+                    DescribeChild(_groupChildren[index])));
+        }
+
+        _childrenList.ItemsSource = views;
         if (selectedIndex >= 0 && selectedIndex < _groupChildren.Count)
         {
             _childrenList.SelectedIndex = selectedIndex;
@@ -464,7 +483,7 @@ public sealed class ConditionBuilderWindow : Window
             return new()
             {
                 Kind = SelectedMode,
-                Children = _groupChildren.Select(child => child.Clone()).ToList(),
+                Children = CloneChildren(_groupChildren),
             };
         }
 
@@ -477,14 +496,45 @@ public sealed class ConditionBuilderWindow : Window
         };
     }
 
+    private static List<VisualConditionExpression> CloneChildren(
+        IEnumerable<VisualConditionExpression> children)
+    {
+        var clones = new List<VisualConditionExpression>();
+        foreach (var child in children)
+        {
+            clones.Add(child.Clone());
+        }
+
+        return clones;
+    }
+
     private static IReadOnlyList<string> NormalizeVariables(
-        IEnumerable<string>? variables) =>
-        variables?
-            .Where(variable => !string.IsNullOrWhiteSpace(variable))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList()
-        ?? [];
+        IEnumerable<string>? variables)
+    {
+        if (variables is null)
+        {
+            return [];
+        }
+
+        var values = new List<string>();
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                continue;
+            }
+
+            var value = variable.Trim();
+            if (known.Add(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        values.Sort(StringComparer.OrdinalIgnoreCase);
+        return values;
+    }
 
     private static bool IsGroupMode(VisualConditionKind mode) =>
         mode is VisualConditionKind.All or VisualConditionKind.Any;

@@ -84,6 +84,7 @@ var tests = new (string Name, Action Run)[]
     ("code refresh skips unchanged rich text reset", CodeRefreshSkipsUnchangedRichTextReset),
     ("code editor plain text replace skips span work", CodeEditorPlainTextReplaceSkipsSpanWork),
     ("code highlighting skips span overflow repaint", CodeHighlightingSkipsSpanOverflowRepaint),
+    ("condition builder uses direct loops", ConditionBuilderUsesDirectLoops),
     ("visual script filter keeps preview cache", VisualScriptFilterKeepsPreviewCache),
     ("visual script filter uses debounced refresh", VisualScriptFilterUsesDebouncedRefresh),
     ("script literal load suppresses change events", ScriptLiteralLoadSuppressesChangeEvents),
@@ -2722,6 +2723,58 @@ static void CodeHighlightingSkipsSpanOverflowRepaint()
             StringComparison.Ordinal)
         < applyBody.IndexOf("CodeEditor.ApplySyntax(", StringComparison.Ordinal),
         "Code editor should skip overflow repaint before touching the RichTextBox document.");
+}
+
+static void ConditionBuilderUsesDirectLoops()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "ConditionBuilderWindow.cs"));
+    var loadBody = ExtractMethodBody(source, "private void LoadExpression");
+    var selectModeBody = ExtractMethodBody(source, "private void SelectMode");
+    var findModeBody = ExtractMethodBody(source, "private static ModeChoice? FindModeChoice");
+    var refreshBody = ExtractMethodBody(source, "private void RefreshChildrenList");
+    var buildBody = ExtractMethodBody(source, "private VisualConditionExpression BuildExpression");
+    var cloneBody = ExtractMethodBody(
+        source,
+        "private static List<VisualConditionExpression> CloneChildren");
+    var normalizeBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyList<string> NormalizeVariables");
+
+    Assert(
+        loadBody.Contains("FindModeChoice(expression.Kind) is null", StringComparison.Ordinal)
+            && loadBody.Contains("_groupChildren.AddRange(CloneChildren(expression.Children));", StringComparison.Ordinal)
+            && !loadBody.Contains(".Any(", StringComparison.Ordinal)
+            && !loadBody.Contains(".Select(", StringComparison.Ordinal),
+        "Condition builder should load modes and children without LINQ scans.");
+    Assert(
+        selectModeBody.Contains("FindModeChoice(mode) ?? ModeChoices[0]", StringComparison.Ordinal)
+            && findModeBody.Contains("foreach (var choice in ModeChoices)", StringComparison.Ordinal)
+            && !selectModeBody.Contains(".First(", StringComparison.Ordinal),
+        "Condition builder should resolve mode choices with a direct loop.");
+    Assert(
+        refreshBody.Contains("var views = new List<ConditionChildView>(_groupChildren.Count);", StringComparison.Ordinal)
+            && refreshBody.Contains("for (var index = 0; index < _groupChildren.Count; index++)", StringComparison.Ordinal)
+            && !refreshBody.Contains(".Select(", StringComparison.Ordinal)
+            && !refreshBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Condition child list refresh should build rows directly.");
+    Assert(
+        buildBody.Contains("Children = CloneChildren(_groupChildren)", StringComparison.Ordinal)
+            && cloneBody.Contains("foreach (var child in children)", StringComparison.Ordinal)
+            && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Condition group expressions should clone children directly.");
+    Assert(
+        normalizeBody.Contains("var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);", StringComparison.Ordinal)
+            && normalizeBody.Contains("foreach (var variable in variables)", StringComparison.Ordinal)
+            && normalizeBody.Contains("values.Sort(StringComparer.OrdinalIgnoreCase);", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".Where(", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".Order(", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Condition builder variable normalization should use direct filtering and sorting.");
 }
 
 static void VisualScriptFilterKeepsPreviewCache()
