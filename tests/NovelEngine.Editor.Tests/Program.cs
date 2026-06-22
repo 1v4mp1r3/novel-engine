@@ -3061,6 +3061,14 @@ static void NodeCharacterActionsSkipHiddenGraphRefresh()
 
 static void NodeVoiceBindingMaterializesInheritedCharacters()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var bindingBody = ExtractMethodBody(
+        source,
+        "internal static NodeVoiceBindingResult TryBindVoiceAssetToNodeCharacter");
     var node = new NovelNode
     {
         Id = "scene",
@@ -3110,6 +3118,12 @@ static void NodeVoiceBindingMaterializesInheritedCharacters()
         node.PropertyOverrides.Contains("inheritCharacters")
             && node.PropertyOverrides.Contains("characters"),
         "Voice binding did not mark type-default character overrides.");
+    Assert(
+        bindingBody.Contains("foreach (var candidate in effectiveCharacters ?? node.Characters)", StringComparison.Ordinal)
+            && !bindingBody.Contains(".Select(", StringComparison.Ordinal)
+            && !bindingBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !bindingBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Inherited voice binding should clone and find characters in one direct pass.");
 }
 
 static void NodeVoiceBindingSkipsMissingInheritedCharacter()

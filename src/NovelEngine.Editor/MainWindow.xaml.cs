@@ -3346,10 +3346,10 @@ public partial class MainWindow : Window
 
         if (result == NodeVoiceBindingResult.Unchanged)
         {
-            var unchangedCharacter = node.Characters.FirstOrDefault(
-                    candidate => candidate.Id == characterId)
-                ?? effectiveCharacters?.FirstOrDefault(
-                    candidate => candidate.Id == characterId);
+            var unchangedCharacter = FindCharacterById(node.Characters, characterId)
+                ?? (effectiveCharacters is null
+                    ? null
+                    : FindCharacterById(effectiveCharacters, characterId));
             var label = unchangedCharacter is null
                 ? characterId
                 : CharacterLabel(unchangedCharacter);
@@ -3358,7 +3358,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        var character = node.Characters.First(candidate => candidate.Id == characterId);
+        var character = FindCharacterById(node.Characters, characterId);
+        if (character is null)
+        {
+            StatusText.Text = "Персонаж для привязки voice-блипа не найден";
+            return;
+        }
         MarkDirty(refreshGraph: false);
         RefreshAssetUsageAfterBinding();
         StatusText.Text =
@@ -3377,14 +3382,19 @@ public partial class MainWindow : Window
         }
 
         var reference = AssetReference.Create(asset.Id);
-        CharacterPlacement? character;
+        CharacterPlacement? character = null;
         if (node.Kind != NodeKind.Start && node.InheritCharacters)
         {
-            var inheritedCharacters = (effectiveCharacters ?? node.Characters)
-                .Select(candidate => candidate.Clone())
-                .ToList();
-            character = inheritedCharacters.FirstOrDefault(
-                candidate => candidate.Id == characterId);
+            var inheritedCharacters = new List<CharacterPlacement>();
+            foreach (var candidate in effectiveCharacters ?? node.Characters)
+            {
+                var clone = candidate.Clone();
+                inheritedCharacters.Add(clone);
+                if (clone.Id == characterId)
+                {
+                    character = clone;
+                }
+            }
             if (character is null)
             {
                 return NodeVoiceBindingResult.Unavailable;
@@ -3406,8 +3416,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            character = node.Characters.FirstOrDefault(
-                candidate => candidate.Id == characterId);
+            character = FindCharacterById(node.Characters, characterId);
             if (character is null)
             {
                 return NodeVoiceBindingResult.Unavailable;
@@ -3430,6 +3439,21 @@ public partial class MainWindow : Window
             node.PropertyOverrides.Add("characters");
         }
         return NodeVoiceBindingResult.Changed;
+    }
+
+    private static CharacterPlacement? FindCharacterById(
+        IEnumerable<CharacterPlacement> characters,
+        string characterId)
+    {
+        foreach (var character in characters)
+        {
+            if (character.Id == characterId)
+            {
+                return character;
+            }
+        }
+
+        return null;
     }
 
     private void BindVoiceAssetToLibraryCharacter(
