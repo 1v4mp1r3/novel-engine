@@ -485,6 +485,9 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     var duplicateBody = ExtractMethodBody(
         sourceText,
         "public NovelNode DuplicateNode");
+    var duplicateTitleBody = ExtractMethodBody(
+        sourceText,
+        "private string CreateDuplicateTitle");
     var project = NovelProject.CreateDefault();
     project.Assets.AddRange(
     [
@@ -574,6 +577,11 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
             && !duplicateBody.Contains(".Select(", StringComparison.Ordinal)
             && !duplicateBody.Contains(".Zip(", StringComparison.Ordinal),
         "Node duplication should copy authoring collections with direct loops.");
+    Assert(
+        duplicateTitleBody.Contains("foreach (var node in Nodes)", StringComparison.Ordinal)
+            && !duplicateTitleBody.Contains(".Select(", StringComparison.Ordinal)
+            && !duplicateTitleBody.Contains(".ToHashSet(", StringComparison.Ordinal),
+        "Duplicate node titles should build their existing-title lookup directly.");
     project.Validate();
 }
 
@@ -587,6 +595,9 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
     var duplicateOutputBody = ExtractMethodBody(
         sourceText,
         "public NodeOutput DuplicateOutput");
+    var duplicateOutputLabelBody = ExtractMethodBody(
+        sourceText,
+        "private static string CreateDuplicateOutputLabel");
     var project = NovelProject.CreateDefault();
     project.Assets.Add(
         new NovelAsset { Id = "click", Kind = AssetKind.Audio, Path = "click.wav" });
@@ -644,6 +655,11 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
             && !duplicateOutputBody.Contains(".Select(", StringComparison.Ordinal)
             && !duplicateOutputBody.Contains(".ToList(", StringComparison.Ordinal),
         "Choice duplication should copy visual script blocks with a direct loop.");
+    Assert(
+        duplicateOutputLabelBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && !duplicateOutputLabelBody.Contains(".Select(", StringComparison.Ordinal)
+            && !duplicateOutputLabelBody.Contains(".ToHashSet(", StringComparison.Ordinal),
+        "Duplicate output labels should build their existing-label lookup directly.");
     project.Validate();
 }
 
@@ -1394,6 +1410,20 @@ static void CharactersFlow()
 
 static void NodeCharacterOperationsPreserveDataAndOrder()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var uniqueCharacterIdBody = ExtractMethodBody(
+        sourceText,
+        "private static string CreateUniqueCharacterId");
+    var duplicateCharacterNameBody = ExtractMethodBody(
+        sourceText,
+        "private static string CreateDuplicateCharacterName");
+    var sanitizeCharacterIdBody = ExtractMethodBody(
+        sourceText,
+        "private static string SanitizeCharacterId");
     var project = NovelProject.CreateDefault();
     project.AssetFolders.Add("characters");
     project.AssetFolders.Add("voices");
@@ -1494,6 +1524,14 @@ static void NodeCharacterOperationsPreserveDataAndOrder()
     Assert(
         previewAdded.Id == "hero-3",
         "Direct character collection clone id was not made unique.");
+    Assert(
+        uniqueCharacterIdBody.Contains("foreach (var character in characters)", StringComparison.Ordinal)
+            && duplicateCharacterNameBody.Contains("foreach (var character in characters)", StringComparison.Ordinal)
+            && sanitizeCharacterIdBody.Contains("Span<char> buffer", StringComparison.Ordinal)
+            && !uniqueCharacterIdBody.Contains(".Select(", StringComparison.Ordinal)
+            && !duplicateCharacterNameBody.Contains(".Select(", StringComparison.Ordinal)
+            && !sanitizeCharacterIdBody.Contains(".Select(", StringComparison.Ordinal),
+        "Character copy helpers should avoid LINQ allocations on authoring operations.");
     project.Validate();
 }
 

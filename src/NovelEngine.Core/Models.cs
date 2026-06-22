@@ -1224,9 +1224,12 @@ public sealed class NovelProject
         var baseTitle = string.IsNullOrWhiteSpace(title)
             ? "Копия ноды"
             : $"{title} копия";
-        var existing = Nodes
-            .Select(node => node.Title)
-            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        var existing = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (var node in Nodes)
+        {
+            existing.Add(node.Title);
+        }
+
         if (!existing.Contains(baseTitle))
         {
             return baseTitle;
@@ -1247,9 +1250,12 @@ public sealed class NovelProject
         var baseLabel = string.IsNullOrWhiteSpace(label)
             ? "Копия варианта"
             : $"{label} копия";
-        var existing = node.Outputs
-            .Select(output => output.Label)
-            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        var existing = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (var output in node.Outputs)
+        {
+            existing.Add(output.Label);
+        }
+
         if (!existing.Contains(baseLabel))
         {
             return baseLabel;
@@ -1270,9 +1276,12 @@ public sealed class NovelProject
         IEnumerable<CharacterPlacement> characters)
     {
         var seed = SanitizeCharacterId(preferredId);
-        var existing = characters
-            .Select(character => character.Id)
-            .ToHashSet(StringComparer.Ordinal);
+        var existing = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var character in characters)
+        {
+            existing.Add(character.Id);
+        }
+
         if (!existing.Contains(seed))
         {
             return seed;
@@ -1295,9 +1304,12 @@ public sealed class NovelProject
         var baseName = string.IsNullOrWhiteSpace(name)
             ? "Персонаж копия"
             : $"{name} копия";
-        var existing = characters
-            .Select(character => character.Name)
-            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        var existing = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (var character in characters)
+        {
+            existing.Add(character.Name);
+        }
+
         if (!existing.Contains(baseName))
         {
             return baseName;
@@ -1315,15 +1327,19 @@ public sealed class NovelProject
 
     private static string SanitizeCharacterId(string value)
     {
-        var cleaned = new string(
-            value
-                .Trim()
-                .Select(character =>
-                    character is '_' or '-' || char.IsLetterOrDigit(character)
-                        ? character
-                        : '-')
-                .ToArray())
-            .Trim('-');
+        var trimmed = value.Trim();
+        Span<char> buffer = trimmed.Length <= 256
+            ? stackalloc char[trimmed.Length]
+            : new char[trimmed.Length];
+        for (var index = 0; index < trimmed.Length; index++)
+        {
+            var character = trimmed[index];
+            buffer[index] = character is '_' or '-' || char.IsLetterOrDigit(character)
+                ? character
+                : '-';
+        }
+
+        var cleaned = buffer.Trim('-').ToString();
         if (cleaned.Length == 0 || !(cleaned[0] == '_' || char.IsLetter(cleaned[0])))
         {
             cleaned = $"character-{cleaned}";
