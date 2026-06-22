@@ -2081,12 +2081,12 @@ public partial class MainWindow : Window
                 NotifyFilters.FileName
                 | NotifyFilters.DirectoryName
                 | NotifyFilters.LastWrite,
-            EnableRaisingEvents = true,
         };
         _filesWatcher.Created += (_, _) => ScheduleFilesRefresh();
         _filesWatcher.Renamed += (_, _) => ScheduleFilesRefresh();
         _filesWatcher.Changed += (_, _) => ScheduleFilesRefresh();
         _filesWatcher.Deleted += (_, _) => ScheduleFilesRefresh();
+        _filesWatcher.EnableRaisingEvents = true;
     }
 
     private void ScheduleFilesRefresh()

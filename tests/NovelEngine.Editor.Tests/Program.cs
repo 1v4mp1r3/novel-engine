@@ -46,6 +46,7 @@ var tests = new (string Name, Action Run)[]
     ("asset preview playback stop skips inactive player", AssetPreviewPlaybackStopSkipsInactivePlayer),
     ("asset selection uses visible items source", AssetSelectionUsesVisibleItemsSource),
     ("dispatcher debounce gate collapses pending requests", DispatcherDebounceGateCollapsesPendingRequests),
+    ("files watcher enables after event handlers", FilesWatcherEnablesAfterEventHandlers),
     ("search text changes use debounced refreshes", SearchTextChangesUseDebouncedRefreshes),
     ("asset file caches clear only after disk changes", AssetFileCachesClearOnlyAfterDiskChanges),
     ("asset size cache tracks file stamp", AssetSizeCacheTracksFileStamp),
@@ -1314,6 +1315,29 @@ static void DispatcherDebounceGateCollapsesPendingRequests()
 
     Assert(!gate.IsPending, "Dispatcher refresh gate should clear its pending state.");
     Assert(gate.TryRequest(), "Dispatcher refresh gate should allow a request after completion.");
+}
+
+static void FilesWatcherEnablesAfterEventHandlers()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "private void ConfigureFilesWatcher");
+    var createdIndex = body.IndexOf("_filesWatcher.Created +=", StringComparison.Ordinal);
+    var renamedIndex = body.IndexOf("_filesWatcher.Renamed +=", StringComparison.Ordinal);
+    var changedIndex = body.IndexOf("_filesWatcher.Changed +=", StringComparison.Ordinal);
+    var deletedIndex = body.IndexOf("_filesWatcher.Deleted +=", StringComparison.Ordinal);
+    var enableIndex = body.IndexOf("_filesWatcher.EnableRaisingEvents = true;", StringComparison.Ordinal);
+
+    Assert(
+        createdIndex >= 0
+            && renamedIndex > createdIndex
+            && changedIndex > renamedIndex
+            && deletedIndex > changedIndex
+            && enableIndex > deletedIndex,
+        "File watcher should subscribe handlers before enabling filesystem events.");
 }
 
 static void SearchTextChangesUseDebouncedRefreshes()
