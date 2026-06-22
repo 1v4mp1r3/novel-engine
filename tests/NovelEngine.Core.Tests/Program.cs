@@ -6,6 +6,7 @@ var tests = new (string Name, Action Run)[]
     ("project diagnostics report authoring issues", ProjectDiagnosticsReportAuthoringIssues),
     ("project diagnostics check physical assets", ProjectDiagnosticsCheckPhysicalAssets),
     ("project diagnostics check character voice references", ProjectDiagnosticsCheckCharacterVoiceReferences),
+    ("project diagnostics survives duplicate starts", ProjectDiagnosticsSurvivesDuplicateStarts),
     ("project diagnostics report caches summary", ProjectDiagnosticsReportCachesSummary),
     ("project diagnostics analyzes large graph quickly", ProjectDiagnosticsAnalyzesLargeGraphQuickly),
     ("character library survives JSON and DSL", CharacterLibraryRoundTrip),
@@ -225,6 +226,26 @@ static void ProjectDiagnosticsCheckCharacterVoiceReferences()
         "Missing character voice diagnostic did not point to the library character.");
 }
 
+static void ProjectDiagnosticsSurvivesDuplicateStarts()
+{
+    var project = NovelProject.CreateDefault();
+    project.Nodes.Add(
+        new NovelNode
+        {
+            Id = "start-two",
+            Kind = NodeKind.Start,
+            TypeName = "start",
+            Title = "Second start",
+            Text = "Broken duplicate start",
+        });
+
+    var report = ProjectDiagnostics.Analyze(project);
+
+    Assert(
+        report.HasErrors,
+        "Duplicate start project should still report validation errors.");
+}
+
 static void ProjectDiagnosticsReportCachesSummary()
 {
     var diagnostics = new List<ProjectDiagnostic>
@@ -304,12 +325,18 @@ static void ProjectDiagnosticsAnalyzesLargeGraphQuickly()
         "ProjectDiagnostics.cs"));
     var graphBody = ExtractMethodBody(source, "private static void AddGraphDiagnostics");
     var lookupBody = ExtractMethodBody(source, "private static IReadOnlyDictionary<string, NovelNode> BuildUniqueNodesById");
+    var unreachableBody = ExtractMethodBody(source, "private static void AddUnreachableNodeDiagnostics");
     Assert(
         graphBody.Contains("BuildUniqueNodesById(project.Nodes)", StringComparison.Ordinal),
         "Graph diagnostics should use the single-pass node lookup helper.");
     Assert(
         !lookupBody.Contains("GroupBy", StringComparison.Ordinal),
         "Graph diagnostics node lookup should not allocate LINQ groups.");
+    Assert(
+        !unreachableBody.Contains(".SingleOrDefault(", StringComparison.Ordinal)
+            && !unreachableBody.Contains(".Select(", StringComparison.Ordinal)
+            && !unreachableBody.Contains(".Where(", StringComparison.Ordinal),
+        "Reachability diagnostics should use direct loops and tolerate invalid graphs.");
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     var report = ProjectDiagnostics.Analyze(project);

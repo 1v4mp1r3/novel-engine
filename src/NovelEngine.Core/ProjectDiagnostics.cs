@@ -273,7 +273,16 @@ public static class ProjectDiagnostics
         List<ProjectDiagnostic> diagnostics,
         IReadOnlyDictionary<string, NovelNode> uniqueNodesById)
     {
-        var start = project.Nodes.SingleOrDefault(node => node.Kind == NodeKind.Start);
+        NovelNode? start = null;
+        foreach (var node in project.Nodes)
+        {
+            if (node.Kind == NodeKind.Start)
+            {
+                start = node;
+                break;
+            }
+        }
+
         if (start is null || !uniqueNodesById.ContainsKey(start.Id))
         {
             return;
@@ -287,8 +296,9 @@ public static class ProjectDiagnostics
         while (queue.Count > 0)
         {
             var node = queue.Dequeue();
-            foreach (var targetId in node.Outputs.Select(output => output.TargetNodeId))
+            foreach (var output in node.Outputs)
             {
+                var targetId = output.TargetNodeId;
                 if (targetId is null
                     || !uniqueNodesById.TryGetValue(targetId, out var target)
                     || !reachable.Add(target.Id))
@@ -299,8 +309,13 @@ public static class ProjectDiagnostics
             }
         }
 
-        foreach (var node in project.Nodes.Where(node => !reachable.Contains(node.Id)))
+        foreach (var node in project.Nodes)
         {
+            if (reachable.Contains(node.Id))
+            {
+                continue;
+            }
+
             diagnostics.Add(
                 Warning(
                     $"Нода «{DisplayNode(node)}»",
