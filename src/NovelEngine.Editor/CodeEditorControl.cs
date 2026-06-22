@@ -393,7 +393,7 @@ public sealed class CodeEditorControl : RichTextBox
 
     private void MoveCompletionSelection(int delta)
     {
-        if (_completionList.Items.Count == 0)
+        if (!ShouldMoveCompletionSelection(_completionList.Items.Count))
         {
             return;
         }
@@ -486,6 +486,9 @@ public sealed class CodeEditorControl : RichTextBox
         bool hasContext,
         bool hasItemsSource) =>
         isOpen || hasContext || hasItemsSource;
+
+    internal static bool ShouldMoveCompletionSelection(int itemCount) =>
+        itemCount > 1;
 
     private void ScheduleUserChangeRecord()
     {

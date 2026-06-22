@@ -2507,6 +2507,11 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
             hasItemsSource: true),
         "Completion item source should be cleared.");
     Assert(
+        !CodeEditorControl.ShouldMoveCompletionSelection(0)
+            && !CodeEditorControl.ShouldMoveCompletionSelection(1)
+            && CodeEditorControl.ShouldMoveCompletionSelection(2),
+        "Completion selection movement should skip empty and single-item lists.");
+    Assert(
         MainWindow.ShouldReadCodeCursorSource(highlightedLimit),
         "Cursor source reads should include the configured boundary length.");
     Assert(
