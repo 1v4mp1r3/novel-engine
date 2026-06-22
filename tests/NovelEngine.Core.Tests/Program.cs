@@ -2772,6 +2772,15 @@ static void ProjectAssetSyncCachesGeneratedLookups()
             && syncBody.Contains("RegisterManagedFile(", StringComparison.Ordinal),
         "Asset sync should pass known lookup sets through file registration.");
     Assert(
+        syncBody.Contains(
+            "var knownRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);",
+            StringComparison.Ordinal)
+            && syncBody.Contains("foreach (var asset in project.Assets)", StringComparison.Ordinal)
+            && syncBody.Contains("knownRelativePaths.Add(NormalizeRelativeAssetPath(asset.Path));", StringComparison.Ordinal)
+            && !syncBody.Contains(".Select(", StringComparison.Ordinal)
+            && !syncBody.Contains(".ToHashSet(", StringComparison.Ordinal),
+        "Asset sync should build known relative paths directly without LINQ pipelines.");
+    Assert(
         registerBody.Contains(
             "CreateUniqueAssetId(\r\n            MakeId(Path.GetFileNameWithoutExtension(fullPath)),\r\n            knownAssetIds)",
             StringComparison.Ordinal)

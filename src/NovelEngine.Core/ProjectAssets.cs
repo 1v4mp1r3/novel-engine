@@ -212,9 +212,11 @@ public static class ProjectAssets
         }
 
         var projectDirectory = GetProjectDirectory(projectPath);
-        var knownRelativePaths = project.Assets
-            .Select(asset => NormalizeRelativeAssetPath(asset.Path))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var asset in project.Assets)
+        {
+            knownRelativePaths.Add(NormalizeRelativeAssetPath(asset.Path));
+        }
         var knownAssetsByFullPath = BuildAssetFullPathMap(project, projectPath);
         var knownAssetIds = BuildAssetIdSet(project);
         foreach (var file in Directory.EnumerateFiles(
