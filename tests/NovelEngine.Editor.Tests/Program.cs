@@ -115,6 +115,7 @@ var tests = new (string Name, Action Run)[]
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
     ("preview playback avoids transient lists", PreviewPlaybackAvoidsTransientLists),
     ("game process start is registered before launch", GameProcessStartIsRegisteredBeforeLaunch),
+    ("silent game process stop disposes immediately", SilentGameProcessStopDisposesImmediately),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
     ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
@@ -4233,6 +4234,39 @@ static void GameProcessStartIsRegisteredBeforeLaunch()
             && exitedBody.Contains("_gameProcess = null;", StringComparison.Ordinal)
             && exitedBody.Contains("process.Dispose();", StringComparison.Ordinal),
         "Game process exit handling should only clear and dispose the active process.");
+}
+
+static void SilentGameProcessStopDisposesImmediately()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var stopBody = ExtractMethodBody(source, "private void StopGameProcess");
+    var silentIndex = stopBody.IndexOf("if (silent)", StringComparison.Ordinal);
+    var clearIndex = stopBody.IndexOf("_gameProcess = null;", silentIndex, StringComparison.Ordinal);
+    var killIndex = stopBody.IndexOf("process.Kill(entireProcessTree: true);", silentIndex, StringComparison.Ordinal);
+    var disposeIndex = stopBody.IndexOf("process.Dispose();", silentIndex, StringComparison.Ordinal);
+    var returnIndex = stopBody.IndexOf("return;", silentIndex, StringComparison.Ordinal);
+    var normalStopIndex = stopBody.LastIndexOf(
+        "StatusText.Text = \"Остановка игры...\";",
+        StringComparison.Ordinal);
+
+    Assert(
+        stopBody.Contains("var process = _gameProcess;", StringComparison.Ordinal)
+            && stopBody.Contains("if (process is not { HasExited: false })", StringComparison.Ordinal),
+        "Game process stop should capture the process once before checking running state.");
+    Assert(
+        silentIndex >= 0
+            && clearIndex > silentIndex
+            && killIndex > clearIndex
+            && disposeIndex > killIndex
+            && returnIndex > disposeIndex,
+        "Silent game process stop should clear, kill, dispose, and return without waiting for Exited.");
+    Assert(
+        normalStopIndex > returnIndex,
+        "Normal game process stop should keep the visible stopping status outside the silent cleanup branch.");
 }
 
 static void GraphSurfaceShortcutsUseExactModifiers()

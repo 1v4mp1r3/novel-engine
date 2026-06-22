@@ -6182,7 +6182,8 @@ public partial class MainWindow : Window
 
     private void StopGameProcess(bool silent = false)
     {
-        if (!IsGameRunning())
+        var process = _gameProcess;
+        if (process is not { HasExited: false })
         {
             if (!silent)
             {
@@ -6190,17 +6191,33 @@ public partial class MainWindow : Window
             }
             return;
         }
+        if (silent)
+        {
+            _gameProcess = null;
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // Process already exited while the editor was closing.
+            }
+            finally
+            {
+                process.Dispose();
+                UpdateGameControls();
+            }
+            return;
+        }
+
         try
         {
-            _gameProcess!.Kill(entireProcessTree: true);
-            if (!silent)
-            {
-                StatusText.Text = "Остановка игры...";
-            }
+            process.Kill(entireProcessTree: true);
+            StatusText.Text = "Остановка игры...";
         }
         catch (InvalidOperationException)
         {
-            _gameProcess?.Dispose();
+            process.Dispose();
             _gameProcess = null;
             UpdateGameControls();
         }
