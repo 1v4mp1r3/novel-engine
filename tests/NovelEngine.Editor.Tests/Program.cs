@@ -4170,6 +4170,9 @@ static void PreviewPlaybackAvoidsTransientLists()
     var constructorBody = ExtractMethodBody(source, "public PreviewWindow(");
     var closedBody = ExtractMethodBody(source, "private void PreviewWindow_Closed");
     var renderBody = ExtractMethodBody(source, "private void RenderNode");
+    var debugBody = ExtractMethodBody(source, "private void RefreshDebugState");
+    var debugCharactersBody = ExtractMethodBody(source, "private string FormatDebugCharacters");
+    var debugVariablesBody = ExtractMethodBody(source, "private string FormatDebugVariables");
     var trimBody = ExtractMethodBody(source, "private void TrimVoicePools");
     var hasActiveBody = ExtractMethodBody(
         source,
@@ -4201,9 +4204,24 @@ static void PreviewPlaybackAvoidsTransientLists()
         "Choice availability toggles should avoid LINQ iterators.");
     Assert(
         resolveVoiceBody.Contains("ResolveVoiceSoundPaths(character)", StringComparison.Ordinal)
+            && resolveVoiceBody.Contains("foreach (var candidate in _player.State.CurrentCharacters)", StringComparison.Ordinal)
+            && !resolveVoiceBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
             && !resolveVoiceBody.Contains(".Select(ResolveAsset)", StringComparison.Ordinal)
             && !resolveVoiceBody.Contains(".Distinct(", StringComparison.Ordinal),
         "Voice resolution should delegate runtime path collection without LINQ chains.");
+    Assert(
+        debugBody.Contains("FormatDebugCharacters()", StringComparison.Ordinal)
+            && debugBody.Contains("FormatDebugVariables()", StringComparison.Ordinal)
+            && !debugBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !debugBody.Contains(".Select(", StringComparison.Ordinal),
+        "Preview debug refresh should delegate state formatting without LINQ chains.");
+    Assert(
+        debugCharactersBody.Contains("foreach (var character in _player.State.CurrentCharacters)", StringComparison.Ordinal)
+            && debugVariablesBody.Contains("variables.Sort(", StringComparison.Ordinal)
+            && debugVariablesBody.Contains("foreach (var pair in variables)", StringComparison.Ordinal)
+            && !debugVariablesBody.Contains(".OrderBy(", StringComparison.Ordinal)
+            && !debugVariablesBody.Contains(".Select(", StringComparison.Ordinal),
+        "Preview debug state formatting should use direct loops.");
     Assert(
         resolveVoicePathsBody.Contains("foreach (var reference in character.GetVoiceSounds())", StringComparison.Ordinal)
             && resolveVoicePathsBody.Contains("sounds.Contains(sound, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),

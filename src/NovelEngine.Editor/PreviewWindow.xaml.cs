@@ -179,28 +179,64 @@ public partial class PreviewWindow : Window
         DebugBuildText.Text = _buildManifest is null
             ? "preview runtime"
             : $"build {_buildManifest.BuildId} · {_buildManifest.CompiledAtUtc:O}";
-        var variables = _player.State.Variables.Count == 0
-            ? "(нет)"
-            : string.Join(
-                "\n",
-                _player.State.Variables
-                    .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(pair => $"{pair.Key} = {pair.Value ?? "null"}"));
-        var characters = _player.State.CurrentCharacters.Count == 0
-            ? "(нет)"
-            : string.Join(
-                ", ",
-                _player.State.CurrentCharacters.Select(character => character.Id));
         DebugStateText.Text =
             $"node: {node.Id} ({node.Kind})\n"
             + $"background: {DisplayStateValue(_player.State.CurrentBackground)}\n"
             + $"music: {DisplayStateValue(_player.State.CurrentMusic)}\n"
-            + $"characters: {characters}\n"
-            + $"variables:\n{variables}";
+            + $"characters: {FormatDebugCharacters()}\n"
+            + $"variables:\n{FormatDebugVariables()}";
     }
 
     private static string DisplayStateValue(string value) =>
         value.Length == 0 ? "(нет)" : value;
+
+    private string FormatDebugCharacters()
+    {
+        if (_player.State.CurrentCharacters.Count == 0)
+        {
+            return "(нет)";
+        }
+
+        var builder = new StringBuilder();
+        foreach (var character in _player.State.CurrentCharacters)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append(", ");
+            }
+            builder.Append(character.Id);
+        }
+        return builder.ToString();
+    }
+
+    private string FormatDebugVariables()
+    {
+        if (_player.State.Variables.Count == 0)
+        {
+            return "(нет)";
+        }
+
+        var variables = new List<KeyValuePair<string, object?>>(
+            _player.State.Variables);
+        variables.Sort(
+            (left, right) => StringComparer.OrdinalIgnoreCase.Compare(
+                left.Key,
+                right.Key));
+
+        var builder = new StringBuilder();
+        foreach (var pair in variables)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append('\n');
+            }
+            builder
+                .Append(pair.Key)
+                .Append(" = ")
+                .Append(pair.Value ?? "null");
+        }
+        return builder.ToString();
+    }
 
     private void RenderMainMenu()
     {
@@ -730,11 +766,18 @@ public partial class PreviewWindow : Window
 
     private CharacterVoice? ResolveVoice(NovelNode node)
     {
-        var character = _player.State.CurrentCharacters.FirstOrDefault(
-                candidate => candidate.Name.Equals(
+        CharacterPlacement? character = null;
+        foreach (var candidate in _player.State.CurrentCharacters)
+        {
+            character ??= candidate;
+            if (candidate.Name.Equals(
                     node.Speaker,
                     StringComparison.OrdinalIgnoreCase))
-            ?? _player.State.CurrentCharacters.FirstOrDefault();
+            {
+                character = candidate;
+                break;
+            }
+        }
         if (character is null)
         {
             return null;
