@@ -3274,7 +3274,7 @@ public partial class MainWindow : Window
         var node = Graph.SelectedNode;
         var output = outputId is null
             ? SelectedOutput()
-            : node?.Outputs.FirstOrDefault(candidate => candidate.Id == outputId);
+            : FindNodeOutput(node, outputId);
         if (!CanBindAssetAsOutputTransitionSound(asset, node, output))
         {
             return;
@@ -3297,11 +3297,11 @@ public partial class MainWindow : Window
     internal static bool CanBindAssetAsOutputTransitionSound(
         NovelAsset asset,
         NovelNode? node,
-        NodeOutput? output) =>
-        asset.Kind == AssetKind.Audio
-        && node is not null
-        && output is not null
-        && node.Outputs.Any(candidate => candidate.Id == output.Id);
+        NodeOutput? output)
+    {
+        return asset.Kind == AssetKind.Audio
+            && OutputBelongsToNode(node, output);
+    }
 
     private void CreateLibraryCharacterFromSprite(
         NovelAsset asset,
@@ -5995,10 +5995,10 @@ public partial class MainWindow : Window
 
     internal static bool CanEditOutputDetails(
         NovelNode? node,
-        NodeOutput? output) =>
-        node is not null
-        && output is not null
-        && node.Outputs.Any(candidate => candidate.Id == output.Id);
+        NodeOutput? output)
+    {
+        return OutputBelongsToNode(node, output);
+    }
 
     private void EditSelectedOutputScriptBlocks()
     {
@@ -6051,10 +6051,33 @@ public partial class MainWindow : Window
 
     internal static bool CanEditSelectedOutputTransition(
         NovelNode? node,
-        NodeOutput? output) =>
-        node is not null
-        && output is not null
-        && node.Outputs.Any(candidate => candidate.Id == output.Id);
+        NodeOutput? output)
+    {
+        return OutputBelongsToNode(node, output);
+    }
+
+    private static bool OutputBelongsToNode(NovelNode? node, NodeOutput? output)
+    {
+        return output is not null && FindNodeOutput(node, output.Id) is not null;
+    }
+
+    private static NodeOutput? FindNodeOutput(NovelNode? node, string outputId)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < node.Outputs.Count; index++)
+        {
+            var output = node.Outputs[index];
+            if (output.Id.Equals(outputId, StringComparison.Ordinal))
+            {
+                return output;
+            }
+        }
+        return null;
+    }
 
     private void EditTransition(string sourceNodeId, string outputId)
     {

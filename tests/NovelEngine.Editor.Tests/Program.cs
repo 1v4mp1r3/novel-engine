@@ -1815,6 +1815,17 @@ static void AssetImportUsesBatchImport()
 
 static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var bindBody = ExtractMethodBody(source, "private void BindAssetAsOutputTransitionSound");
+    var canBindBody = ExtractMethodBody(
+        source,
+        "internal static bool CanBindAssetAsOutputTransitionSound");
+    var outputBelongsBody = ExtractMethodBody(source, "private static bool OutputBelongsToNode");
+    var findOutputBody = ExtractMethodBody(source, "private static NodeOutput? FindNodeOutput");
     var project = NovelProject.CreateDefault();
     var node = project.FindNode("dialogue-1")
         ?? throw new InvalidOperationException("Default dialogue node was not found.");
@@ -1845,6 +1856,20 @@ static void AssetTransitionSoundBindingPolicyRequiresAudioOutput()
     Assert(
         !MainWindow.CanBindAssetAsOutputTransitionSound(audio, node, foreignOutput),
         "Transition sound binding should reject outputs from a different node.");
+    Assert(
+        bindBody.Contains("FindNodeOutput(node, outputId)", StringComparison.Ordinal)
+            && !bindBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Transition sound binding should resolve menu output ids without LINQ delegates.");
+    Assert(
+        canBindBody.Contains("OutputBelongsToNode(node, output)", StringComparison.Ordinal)
+            && !canBindBody.Contains(".Any(", StringComparison.Ordinal),
+        "Transition sound binding policy should share direct output ownership checks.");
+    Assert(
+        outputBelongsBody.Contains("FindNodeOutput(node, output.Id)", StringComparison.Ordinal)
+            && findOutputBody.Contains("for (var index = 0; index < node.Outputs.Count; index++)", StringComparison.Ordinal)
+            && !findOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !findOutputBody.Contains(".Any(", StringComparison.Ordinal),
+        "Output ownership helpers should use direct output lookup.");
 }
 
 static void AssetTransitionSoundMenuListsNodeOutputs()
@@ -1974,6 +1999,12 @@ static void OutputEditorCopyIsOutputNeutral()
 
 static void OutputDetailEditorPolicyAcceptsSceneNextOutputs()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "internal static bool CanEditOutputDetails");
     var project = NovelProject.CreateDefault();
     var scene = project.FindNode("scene-1")
         ?? throw new InvalidOperationException("Default scene node was not found.");
@@ -1995,10 +2026,20 @@ static void OutputDetailEditorPolicyAcceptsSceneNextOutputs()
     Assert(
         !MainWindow.CanEditOutputDetails(scene, foreignOutput),
         "Output detail editing should reject outputs from a different node.");
+    Assert(
+        body.Contains("OutputBelongsToNode(node, output)", StringComparison.Ordinal)
+            && !body.Contains(".Any(", StringComparison.Ordinal),
+        "Output detail policy should use the shared direct output ownership helper.");
 }
 
 static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var body = ExtractMethodBody(source, "internal static bool CanEditSelectedOutputTransition");
     var project = NovelProject.CreateDefault();
     var scene = project.FindNode("scene-1")
         ?? throw new InvalidOperationException("Default scene node was not found.");
@@ -2020,6 +2061,10 @@ static void OutputTransitionEditorPolicyAcceptsSceneNextOutputs()
     Assert(
         !MainWindow.CanEditSelectedOutputTransition(scene, foreignOutput),
         "Transition editing should reject outputs from a different node.");
+    Assert(
+        body.Contains("OutputBelongsToNode(node, output)", StringComparison.Ordinal)
+            && !body.Contains(".Any(", StringComparison.Ordinal),
+        "Output transition policy should use the shared direct output ownership helper.");
 }
 
 static void OutputScriptBlockShortcutUsesCtrlB()
