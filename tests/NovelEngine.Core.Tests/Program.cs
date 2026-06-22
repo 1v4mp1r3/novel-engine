@@ -248,6 +248,12 @@ static void ProjectDiagnosticsSurvivesDuplicateStarts()
 
 static void ProjectDiagnosticsReportCachesSummary()
 {
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectDiagnostics.cs"));
+    var constructorBody = ExtractMethodBody(source, "public ProjectDiagnosticReport");
     var diagnostics = new List<ProjectDiagnostic>
     {
         new(ProjectDiagnosticSeverity.Error, "Нода «start»", "Нет выхода."),
@@ -272,6 +278,12 @@ static void ProjectDiagnosticsReportCachesSummary()
     Assert(report.Diagnostics.Count == 3, "Report diagnostics should be snapshot-stable.");
     Assert(report.Fingerprint == same.Fingerprint, "Same diagnostics should keep the same fingerprint.");
     Assert(report.Fingerprint != changed.Fingerprint, "Changed diagnostics should change fingerprint.");
+    Assert(
+        constructorBody.Contains("var snapshot = new ProjectDiagnostic[diagnostics.Count];", StringComparison.Ordinal)
+            && constructorBody.Contains("for (var index = 0; index < diagnostics.Count; index++)", StringComparison.Ordinal)
+            && !constructorBody.Contains(".ToArray(", StringComparison.Ordinal)
+            && !constructorBody.Contains("foreach", StringComparison.Ordinal),
+        "Diagnostic report should snapshot and summarize diagnostics in one indexed pass.");
 }
 
 static void ProjectDiagnosticsAnalyzesLargeGraphQuickly()

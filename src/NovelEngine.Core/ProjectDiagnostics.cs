@@ -16,10 +16,13 @@ public sealed class ProjectDiagnosticReport
 {
     public ProjectDiagnosticReport(IReadOnlyList<ProjectDiagnostic> diagnostics)
     {
-        Diagnostics = diagnostics.ToArray();
+        var snapshot = new ProjectDiagnostic[diagnostics.Count];
+        Diagnostics = snapshot;
         var hash = new HashCode();
-        foreach (var diagnostic in Diagnostics)
+        for (var index = 0; index < diagnostics.Count; index++)
         {
+            var diagnostic = diagnostics[index];
+            snapshot[index] = diagnostic;
             hash.Add(diagnostic.Severity);
             hash.Add(diagnostic.Location, StringComparer.Ordinal);
             hash.Add(diagnostic.Message, StringComparer.Ordinal);
