@@ -5370,11 +5370,20 @@ public partial class MainWindow : Window
 
     private CharacterView? FindVisibleCharacterView(string idOrName)
     {
-        return CharactersGrid.ItemsSource is IEnumerable<CharacterView> characterViews
-            ? characterViews.FirstOrDefault(view =>
-                view.Id.Equals(idOrName, StringComparison.OrdinalIgnoreCase)
+        if (CharactersGrid.ItemsSource is not IEnumerable<CharacterView> characterViews)
+        {
+            return null;
+        }
+
+        foreach (var view in characterViews)
+        {
+            if (view.Id.Equals(idOrName, StringComparison.OrdinalIgnoreCase)
                 || view.Name.Equals(idOrName, StringComparison.Ordinal))
-            : null;
+            {
+                return view;
+            }
+        }
+        return null;
     }
 
     private void SelectCharacterView(string characterId)
@@ -5882,11 +5891,20 @@ public partial class MainWindow : Window
 
     private OutputView? FindVisibleOutputView(string idOrLabel)
     {
-        return OutputsGrid.ItemsSource is IEnumerable<OutputView> outputViews
-            ? outputViews.FirstOrDefault(view =>
-                view.Id.Equals(idOrLabel, StringComparison.OrdinalIgnoreCase)
+        if (OutputsGrid.ItemsSource is not IEnumerable<OutputView> outputViews)
+        {
+            return null;
+        }
+
+        foreach (var view in outputViews)
+        {
+            if (view.Id.Equals(idOrLabel, StringComparison.OrdinalIgnoreCase)
                 || view.Label.Equals(idOrLabel, StringComparison.Ordinal))
-            : null;
+            {
+                return view;
+            }
+        }
+        return null;
     }
 
     private void SelectOutputView(string outputId)

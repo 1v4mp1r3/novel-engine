@@ -1690,14 +1690,20 @@ static void PropertyRowLookupUsesVisibleItemsSource()
 
     Assert(
         characterLookupBody.Contains(
-            "CharactersGrid.ItemsSource is IEnumerable<CharacterView>",
+            "CharactersGrid.ItemsSource is not IEnumerable<CharacterView>",
             StringComparison.Ordinal),
         "Character row lookup should use the current items source.");
     Assert(
         outputLookupBody.Contains(
-            "OutputsGrid.ItemsSource is IEnumerable<OutputView>",
+            "OutputsGrid.ItemsSource is not IEnumerable<OutputView>",
             StringComparison.Ordinal),
         "Output row lookup should use the current items source.");
+    Assert(
+        characterLookupBody.Contains("foreach (var view in characterViews)", StringComparison.Ordinal)
+            && outputLookupBody.Contains("foreach (var view in outputViews)", StringComparison.Ordinal)
+            && !characterLookupBody.Contains("FirstOrDefault", StringComparison.Ordinal)
+            && !outputLookupBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Property row lookup should scan visible items directly.");
     Assert(
         selectUsageBody.Contains("FindVisibleOutputView(outputLabel)", StringComparison.Ordinal)
             && selectUsageBody.Contains("FindVisibleCharacterView(characterName)", StringComparison.Ordinal)
