@@ -1893,6 +1893,17 @@ static void ProjectLanguageFormatterRoundTrips()
 
 static void CharacterTransformsRoundTrip()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "ProjectLanguage.cs"));
+    var copyCharactersBody = ExtractMethodBody(
+        sourceText,
+        "private static void CopyCharacters");
+    var parseCharacterBody = ExtractMethodBody(
+        sourceText,
+        "private CharacterPlacement ParseCharacter");
     var project = NovelProject.CreateDefault();
     var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
     scene.InheritCharacters = false;
@@ -1941,6 +1952,16 @@ static void CharacterTransformsRoundTrip()
     Assert(fromCode.VoiceEveryNthCharacter == 3, "Code parser changed character voice frequency.");
     Assert(Math.Abs(fromJson.X - 742.5) < 0.001, "JSON changed character position.");
     Assert(fromJson.VoiceSounds.Count == 2, "JSON changed character voice sound list.");
+    Assert(
+        copyCharactersBody.Contains("for (var index = 0; index < source.Count; index++)", StringComparison.Ordinal)
+            && copyCharactersBody.Contains("target.Add(source[index].Clone());", StringComparison.Ordinal)
+            && !copyCharactersBody.Contains(".Select(", StringComparison.Ordinal)
+            && !copyCharactersBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Project language character defaults should clone with a direct pass.");
+    Assert(
+        parseCharacterBody.Contains("VoiceSound = voiceSounds.Count > 0 ? voiceSounds[0] : string.Empty", StringComparison.Ordinal)
+            && !parseCharacterBody.Contains("voiceSounds.FirstOrDefault()", StringComparison.Ordinal),
+        "Project language character parsing should reuse the voice list for the primary voice.");
 }
 
 static void MainMenuAndVoiceRoundTrip()

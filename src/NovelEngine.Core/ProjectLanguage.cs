@@ -1646,7 +1646,7 @@ public static class ProjectLanguage
             var characters = overrides.Characters.Count > 0
                 ? overrides.Characters
                 : inherited.Characters;
-            result.Characters.AddRange(characters.Select(character => character.Clone()));
+            CopyCharacters(result.Characters, characters);
             return result;
         }
 
@@ -1664,9 +1664,18 @@ public static class ProjectLanguage
                 InheritCharacters = InheritCharacters,
                 Script = Script,
             };
-            defaults.Characters.AddRange(
-                Characters.Select(character => character.Clone()));
+            CopyCharacters(defaults.Characters, Characters);
             return defaults;
+        }
+
+        private static void CopyCharacters(
+            List<CharacterPlacement> target,
+            IReadOnlyList<CharacterPlacement> source)
+        {
+            for (var index = 0; index < source.Count; index++)
+            {
+                target.Add(source[index].Clone());
+            }
         }
 
         public IEnumerable<string> ExplicitPropertyNames()
@@ -2035,7 +2044,7 @@ public static class ProjectLanguage
                 Y = y,
                 Scale = scale,
                 Rotation = rotation,
-                VoiceSound = voiceSounds.FirstOrDefault() ?? string.Empty,
+                VoiceSound = voiceSounds.Count > 0 ? voiceSounds[0] : string.Empty,
                 VoiceSounds = voiceSounds,
                 VoicePitch = voicePitch,
                 VoiceEveryNthCharacter = voiceEveryNthCharacter,
