@@ -35,7 +35,7 @@ public sealed class VisualScriptBlocksWindow : Window
         IEnumerable<string>? knownVariables = null,
         string importScript = "")
     {
-        _blocks = blocks.Select(block => block.Clone()).ToList();
+        _blocks = CloneBlocks(blocks);
         _knownVariables = NormalizeVariables(knownVariables);
         _importScript = importScript;
         Title = title;
@@ -93,7 +93,7 @@ public sealed class VisualScriptBlocksWindow : Window
     }
 
     public IReadOnlyList<VisualScriptBlock> Blocks =>
-        _blocks.Select(block => block.Clone()).ToList();
+        CloneBlocks(_blocks);
 
     public bool ClearImportedScript => _clearImportedScript;
 
@@ -258,9 +258,7 @@ public sealed class VisualScriptBlocksWindow : Window
         var insertIndex = index >= 0 && index < _blocks.Count
             ? index + 1
             : _blocks.Count;
-        var pasted = VisualScriptBlockOperations
-            .CloneForPaste(_clipboardBlocks)
-            .ToList();
+        var pasted = VisualScriptBlockOperations.CloneForPaste(_clipboardBlocks);
         _blocks.InsertRange(insertIndex, pasted);
         RefreshList(insertIndex);
     }
@@ -397,7 +395,10 @@ public sealed class VisualScriptBlocksWindow : Window
             }
         }
 
-        _blocks.AddRange(imported.Select(block => block.Clone()));
+        foreach (var block in imported)
+        {
+            _blocks.Add(block.Clone());
+        }
         _clearImportedScript = MessageBox.Show(
             this,
             "Очистить текстовый скрипт после импорта, чтобы команды не выполнились дважды?",
@@ -613,14 +614,45 @@ public sealed class VisualScriptBlocksWindow : Window
             _ => string.Empty,
         };
 
+    private static List<VisualScriptBlock> CloneBlocks(
+        IEnumerable<VisualScriptBlock> blocks)
+    {
+        var clones = new List<VisualScriptBlock>();
+        foreach (var block in blocks)
+        {
+            clones.Add(block.Clone());
+        }
+
+        return clones;
+    }
+
     private static IReadOnlyList<string> NormalizeVariables(
-        IEnumerable<string>? variables) =>
-        variables?
-            .Where(variable => !string.IsNullOrWhiteSpace(variable))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList()
-        ?? [];
+        IEnumerable<string>? variables)
+    {
+        if (variables is null)
+        {
+            return [];
+        }
+
+        var values = new List<string>();
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                continue;
+            }
+
+            var value = variable.Trim();
+            if (known.Add(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        values.Sort(StringComparer.OrdinalIgnoreCase);
+        return values;
+    }
 }
 
 public sealed class VisualScriptBlockEditorWindow : Window
@@ -756,11 +788,30 @@ public sealed class VisualScriptBlockEditorWindow : Window
         string Label);
 
     private static IReadOnlyList<string> NormalizeVariables(
-        IEnumerable<string>? variables) =>
-        variables?
-            .Where(variable => !string.IsNullOrWhiteSpace(variable))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList()
-        ?? [];
+        IEnumerable<string>? variables)
+    {
+        if (variables is null)
+        {
+            return [];
+        }
+
+        var values = new List<string>();
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                continue;
+            }
+
+            var value = variable.Trim();
+            if (known.Add(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        values.Sort(StringComparer.OrdinalIgnoreCase);
+        return values;
+    }
 }

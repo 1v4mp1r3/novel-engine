@@ -980,6 +980,14 @@ static void VisualScriptBlocksDescribeSemanticLabels()
 
 static void VisualScriptBlocksCloneForPasteSafely()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "VisualScriptBlocks.cs"));
+    var cloneBody = ExtractMethodBody(
+        sourceText,
+        "public static IReadOnlyList<VisualScriptBlock> CloneForPaste");
     var source = new[]
     {
         new VisualScriptBlock
@@ -1019,6 +1027,11 @@ static void VisualScriptBlocksCloneForPasteSafely()
     Assert(
         source[0].VariableName == "route",
         "Pasted block mutated the source block.");
+    Assert(
+        cloneBody.Contains("foreach (var block in blocks)", StringComparison.Ordinal)
+            && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Visual script paste clones should be built with a direct loop.");
 }
 
 static void VisualScriptBlocksValidateGeneratedScripts()

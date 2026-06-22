@@ -46,8 +46,16 @@ public static class VisualScriptBlockOperations
     }
 
     public static IReadOnlyList<VisualScriptBlock> CloneForPaste(
-        IEnumerable<VisualScriptBlock> blocks) =>
-        blocks.Select(CloneWithNewId).ToList();
+        IEnumerable<VisualScriptBlock> blocks)
+    {
+        var clones = new List<VisualScriptBlock>();
+        foreach (var block in blocks)
+        {
+            clones.Add(CloneWithNewId(block));
+        }
+
+        return clones;
+    }
 }
 
 public static class VisualScriptCompiler

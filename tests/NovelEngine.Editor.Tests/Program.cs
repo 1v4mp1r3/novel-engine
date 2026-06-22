@@ -2753,9 +2753,20 @@ static void VisualScriptFilterUsesDebouncedRefresh()
     var scheduleBody = ExtractMethodBody(
         source,
         "private void ScheduleFilterRefresh");
+    var constructorBody = ExtractMethodBody(
+        source,
+        "public VisualScriptBlocksWindow(");
+    var pasteBody = ExtractMethodBody(source, "private void PasteBlocks");
+    var importBody = ExtractMethodBody(source, "private void ImportFromScript");
     var refreshBody = ExtractMethodBody(
         source,
         "private void RefreshList");
+    var cloneBody = ExtractMethodBody(
+        source,
+        "private static List<VisualScriptBlock> CloneBlocks");
+    var normalizeBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyList<string> NormalizeVariables");
 
     Assert(
         source.Contains(
@@ -2788,6 +2799,27 @@ static void VisualScriptFilterUsesDebouncedRefresh()
             && !refreshBody.Contains(".ToList(", StringComparison.Ordinal)
             && !refreshBody.Contains(".FindIndex(", StringComparison.Ordinal),
         "Visual script filter refresh should build visible rows and selection in one direct pass.");
+    Assert(
+        constructorBody.Contains("_blocks = CloneBlocks(blocks);", StringComparison.Ordinal)
+            && source.Contains("public IReadOnlyList<VisualScriptBlock> Blocks =>", StringComparison.Ordinal)
+            && source.Contains("CloneBlocks(_blocks);", StringComparison.Ordinal)
+            && cloneBody.Contains("foreach (var block in blocks)", StringComparison.Ordinal)
+            && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Visual script block snapshots should clone with direct loops.");
+    Assert(
+        !pasteBody.Contains(".ToList(", StringComparison.Ordinal)
+            && importBody.Contains("foreach (var block in imported)", StringComparison.Ordinal)
+            && !importBody.Contains(".Select(", StringComparison.Ordinal),
+        "Visual script paste/import should avoid transient LINQ clone lists.");
+    Assert(
+        normalizeBody.Contains("var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);", StringComparison.Ordinal)
+            && normalizeBody.Contains("foreach (var variable in variables)", StringComparison.Ordinal)
+            && normalizeBody.Contains("values.Sort(StringComparer.OrdinalIgnoreCase);", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".Where(", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".Order(", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Visual script variable normalization should use direct filtering and sorting.");
 }
 
 static void ScriptLiteralLoadSuppressesChangeEvents()
