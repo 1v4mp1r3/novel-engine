@@ -567,13 +567,18 @@ public sealed class NovelProject
             X = source.X + offsetX,
             Y = source.Y + offsetY,
         };
-        duplicate.ScriptBlocks.AddRange(
-            source.ScriptBlocks.Select(block => block.Clone()));
+        foreach (var block in source.ScriptBlocks)
+        {
+            duplicate.ScriptBlocks.Add(block.Clone());
+        }
         duplicate.PropertyOverrides.UnionWith(source.PropertyOverrides);
-        duplicate.Characters.AddRange(
-            source.Characters.Select(character => character.CloneWithId(CreateId("char"))));
-        duplicate.Outputs.AddRange(
-            source.Outputs.Select(output => new NodeOutput
+        foreach (var character in source.Characters)
+        {
+            duplicate.Characters.Add(character.CloneWithId(CreateId("char")));
+        }
+        foreach (var output in source.Outputs)
+        {
+            var duplicateOutput = new NodeOutput
             {
                 Id = CreateId("out"),
                 Label = output.Label,
@@ -582,11 +587,12 @@ public sealed class NovelProject
                 Script = output.Script,
                 TransitionSound = output.TransitionSound,
                 FadeDurationMs = output.FadeDurationMs,
-            }));
-        foreach (var pair in source.Outputs.Zip(duplicate.Outputs))
-        {
-            pair.Second.ScriptBlocks.AddRange(
-                pair.First.ScriptBlocks.Select(block => block.Clone()));
+            };
+            foreach (var block in output.ScriptBlocks)
+            {
+                duplicateOutput.ScriptBlocks.Add(block.Clone());
+            }
+            duplicate.Outputs.Add(duplicateOutput);
         }
 
         Nodes.Add(duplicate);
@@ -629,8 +635,10 @@ public sealed class NovelProject
             TransitionSound = source.TransitionSound,
             FadeDurationMs = source.FadeDurationMs,
         };
-        duplicate.ScriptBlocks.AddRange(
-            source.ScriptBlocks.Select(block => block.Clone()));
+        foreach (var block in source.ScriptBlocks)
+        {
+            duplicate.ScriptBlocks.Add(block.Clone());
+        }
 
         var sourceIndex = node.Outputs.IndexOf(source);
         node.Outputs.Insert(sourceIndex + 1, duplicate);

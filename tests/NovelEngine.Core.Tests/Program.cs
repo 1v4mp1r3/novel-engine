@@ -477,6 +477,14 @@ static void AddConnectedNodePreservesExistingGraph()
 
 static void DuplicateNodeCopiesAuthoringDataSafely()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var duplicateBody = ExtractMethodBody(
+        sourceText,
+        "public NovelNode DuplicateNode");
     var project = NovelProject.CreateDefault();
     project.Assets.AddRange(
     [
@@ -492,6 +500,14 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     scene.Background = "@city";
     scene.Music = "@theme";
     scene.Script = "set visited = 1";
+    scene.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "scene-block",
+            Kind = VisualScriptBlockKind.SetVariable,
+            VariableName = "visited",
+            Value = "1",
+        });
     scene.Outputs[0].ConditionExpression = new VisualConditionExpression
     {
         Kind = VisualConditionKind.Comparison,
@@ -501,6 +517,14 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     };
     VisualConditionCompiler.SyncTextFromExpression(scene.Outputs[0]);
     scene.Outputs[0].Script = "add score 1";
+    scene.Outputs[0].ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "output-block",
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "score",
+            Value = "1",
+        });
     scene.Outputs[0].TransitionSound = "@click";
     scene.Characters.Add(
         new CharacterPlacement
@@ -520,6 +544,11 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
     Assert(duplicate.Background == scene.Background, "Duplicate background was not copied.");
     Assert(duplicate.Music == scene.Music, "Duplicate music was not copied.");
     Assert(duplicate.Script == scene.Script, "Duplicate script was not copied.");
+    Assert(
+        duplicate.ScriptBlocks.Count == 1
+            && duplicate.ScriptBlocks[0].Id == "scene-block"
+            && !ReferenceEquals(duplicate.ScriptBlocks[0], scene.ScriptBlocks[0]),
+        "Duplicate node did not clone entry visual script blocks.");
     Assert(duplicate.Outputs.Count == scene.Outputs.Count, "Duplicate outputs count changed.");
     Assert(duplicate.Outputs[0].Id != scene.Outputs[0].Id, "Duplicate output reused the source id.");
     Assert(duplicate.Outputs[0].TargetNodeId is null, "Duplicate output kept the source connection.");
@@ -528,13 +557,36 @@ static void DuplicateNodeCopiesAuthoringDataSafely()
         duplicate.Outputs[0].ConditionExpression != scene.Outputs[0].ConditionExpression,
         "Duplicate node reused the output condition expression instance.");
     Assert(duplicate.Outputs[0].TransitionSound == "@click", "Duplicate transition sound was not copied.");
+    Assert(
+        duplicate.Outputs[0].ScriptBlocks.Count == 1
+            && duplicate.Outputs[0].ScriptBlocks[0].Id == "output-block"
+            && !ReferenceEquals(
+                duplicate.Outputs[0].ScriptBlocks[0],
+                scene.Outputs[0].ScriptBlocks[0]),
+        "Duplicate node did not clone output visual script blocks.");
     Assert(duplicate.Characters[0].Id != scene.Characters[0].Id, "Duplicate character reused the source id.");
     Assert(duplicate.Characters[0].Sprite == "@hero", "Duplicate character data was not copied.");
+    Assert(
+        duplicateBody.Contains("foreach (var block in source.ScriptBlocks)", StringComparison.Ordinal)
+            && duplicateBody.Contains("foreach (var character in source.Characters)", StringComparison.Ordinal)
+            && duplicateBody.Contains("foreach (var output in source.Outputs)", StringComparison.Ordinal)
+            && duplicateBody.Contains("foreach (var block in output.ScriptBlocks)", StringComparison.Ordinal)
+            && !duplicateBody.Contains(".Select(", StringComparison.Ordinal)
+            && !duplicateBody.Contains(".Zip(", StringComparison.Ordinal),
+        "Node duplication should copy authoring collections with direct loops.");
     project.Validate();
 }
 
 static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
 {
+    var sourceText = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Core",
+        "Models.cs"));
+    var duplicateOutputBody = ExtractMethodBody(
+        sourceText,
+        "public NodeOutput DuplicateOutput");
     var project = NovelProject.CreateDefault();
     project.Assets.Add(
         new NovelAsset { Id = "click", Kind = AssetKind.Audio, Path = "click.wav" });
@@ -551,6 +603,14 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
     };
     VisualConditionCompiler.SyncTextFromExpression(source);
     source.Script = "add trust 1";
+    source.ScriptBlocks.Add(
+        new VisualScriptBlock
+        {
+            Id = "choice-block",
+            Kind = VisualScriptBlockKind.AddVariable,
+            VariableName = "trust",
+            Value = "1",
+        });
     source.TransitionSound = "@click";
     source.FadeDurationMs = 900;
     source.TargetNodeId = target.Id;
@@ -568,12 +628,22 @@ static void DuplicateDialogueChoiceCopiesAuthoringDataSafely()
         duplicate.ConditionExpression?.VariableName == "trust",
         "Duplicate choice structured condition data changed.");
     Assert(duplicate.Script == source.Script, "Duplicate choice script was not copied.");
+    Assert(
+        duplicate.ScriptBlocks.Count == 1
+            && duplicate.ScriptBlocks[0].Id == "choice-block"
+            && !ReferenceEquals(duplicate.ScriptBlocks[0], source.ScriptBlocks[0]),
+        "Duplicate choice did not clone visual script blocks.");
     Assert(duplicate.TransitionSound == "@click", "Duplicate choice transition sound was not copied.");
     Assert(duplicate.FadeDurationMs == source.FadeDurationMs, "Duplicate choice fade duration was not copied.");
     Assert(duplicate.TargetNodeId is null, "Duplicate choice kept the source connection.");
     Assert(
         dialogue.Outputs.IndexOf(duplicate) == dialogue.Outputs.IndexOf(source) + 1,
         "Duplicate choice was not inserted next to the source choice.");
+    Assert(
+        duplicateOutputBody.Contains("foreach (var block in source.ScriptBlocks)", StringComparison.Ordinal)
+            && !duplicateOutputBody.Contains(".Select(", StringComparison.Ordinal)
+            && !duplicateOutputBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Choice duplication should copy visual script blocks with a direct loop.");
     project.Validate();
 }
 
