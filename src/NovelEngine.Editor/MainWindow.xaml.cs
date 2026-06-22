@@ -1070,13 +1070,24 @@ public partial class MainWindow : Window
         NovelProject project,
         NovelNode? node)
     {
-        if (node is null
-            || !node.Outputs.Any(output => output.TargetNodeId is not null))
+        if (node is null || !NodeHasOutputTargets(node))
         {
             return EmptyNodeTitleLookup;
         }
 
         return BuildNodeTitleLookup(project);
+    }
+
+    private static bool NodeHasOutputTargets(NovelNode node)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.TargetNodeId is not null)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup(
@@ -2253,11 +2264,19 @@ public partial class MainWindow : Window
 
     private AssetView? FindVisibleAssetView(string assetId)
     {
-        return AssetsGrid.ItemsSource is IEnumerable<AssetView> assetViews
-            ? assetViews.FirstOrDefault(view => view.Id.Equals(
-                assetId,
-                StringComparison.OrdinalIgnoreCase))
-            : null;
+        if (AssetsGrid.ItemsSource is not IEnumerable<AssetView> assetViews)
+        {
+            return null;
+        }
+
+        foreach (var view in assetViews)
+        {
+            if (view.Id.Equals(assetId, StringComparison.OrdinalIgnoreCase))
+            {
+                return view;
+            }
+        }
+        return null;
     }
 
     private void RefreshAssetFolders()

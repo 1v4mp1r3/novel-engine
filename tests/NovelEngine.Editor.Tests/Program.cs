@@ -1291,8 +1291,12 @@ static void AssetSelectionUsesVisibleItemsSource()
     var diagnosticBody = ExtractMethodBody(source, "private bool TryNavigateToDiagnosticAsset");
 
     Assert(
-        helperBody.Contains("AssetsGrid.ItemsSource is IEnumerable<AssetView>", StringComparison.Ordinal),
+        helperBody.Contains("AssetsGrid.ItemsSource is not IEnumerable<AssetView>", StringComparison.Ordinal),
         "Visible asset lookup should use the current items source.");
+    Assert(
+        helperBody.Contains("foreach (var view in assetViews)", StringComparison.Ordinal)
+            && !helperBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Visible asset lookup should scan the visible items source directly.");
     Assert(
         !source.Contains("AssetsGrid.Items\r\n            .OfType<AssetView>()", StringComparison.Ordinal)
             && !source.Contains("AssetsGrid.Items\n            .OfType<AssetView>()", StringComparison.Ordinal)
@@ -3866,6 +3870,7 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
     var outputLookupBody = ExtractMethodBody(
         source,
         "private static IReadOnlyDictionary<string, string> BuildOutputTargetTitleLookup");
+    var hasTargetsBody = ExtractMethodBody(source, "private static bool NodeHasOutputTargets");
     var lookupBody = ExtractMethodBody(
         source,
         "private static IReadOnlyDictionary<string, string> BuildNodeTitleLookup");
@@ -3898,9 +3903,15 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
             StringComparison.Ordinal),
         "Node property stamp should reuse a provided target title lookup.");
     Assert(
-        outputLookupBody.Contains("TargetNodeId is not null", StringComparison.Ordinal)
-            && outputLookupBody.Contains("EmptyNodeTitleLookup", StringComparison.Ordinal),
+        outputLookupBody.Contains("NodeHasOutputTargets(node)", StringComparison.Ordinal)
+            && outputLookupBody.Contains("EmptyNodeTitleLookup", StringComparison.Ordinal)
+            && !outputLookupBody.Contains(".Any(", StringComparison.Ordinal),
         "Output target title lookup should skip full graph indexing when no outputs are connected.");
+    Assert(
+        hasTargetsBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && hasTargetsBody.Contains("output.TargetNodeId is not null", StringComparison.Ordinal)
+            && !hasTargetsBody.Contains(".Any(", StringComparison.Ordinal),
+        "Output target detection should use one direct pass over node outputs.");
     Assert(
         !refreshBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal)
             && !stampBody.Contains("FindNode(output.TargetNodeId)", StringComparison.Ordinal),
