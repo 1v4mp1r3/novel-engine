@@ -14,6 +14,7 @@ var tests = new (string Name, Action Run)[]
     ("workspace project can be resolved after creation", WorkspaceProjectCanBeResolvedAfterCreation),
     ("autosave policy skips unchanged saved projects", AutoSavePolicySkipsUnchangedSavedProjects),
     ("manual save policy skips unchanged saved projects", ManualSavePolicySkipsUnchangedSavedProjects),
+    ("file probes use direct checks", FileProbesUseDirectChecks),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
     ("project resolver opens the only project in a folder", ProjectResolverOpensOnlyProject),
     ("project resolver prefers single novel project over generic json", ProjectResolverPrefersSingleNovelProjectOverGenericJson),
@@ -327,6 +328,41 @@ static void ManualSavePolicySkipsUnchangedSavedProjects()
             workspaceNeedsProjectFile: true,
             codeHasPendingChanges: false),
         "Manual save should create missing workspace project files.");
+}
+
+static void FileProbesUseDirectChecks()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var deleteBody = ExtractMethodBody(source, "private void DeleteManagedAssetFile");
+    var restoreBody = ExtractMethodBody(source, "private void RestoreAutoSave");
+    var managedDirectoryBody = ExtractMethodBody(
+        source,
+        "private static bool IsInManagedAssetDirectory");
+    var directoryHasFilesBody = ExtractMethodBody(
+        source,
+        "private static bool DirectoryHasFiles");
+
+    Assert(
+        deleteBody.Contains("IsInManagedAssetDirectory(path, managedDirectories)", StringComparison.Ordinal)
+            && !deleteBody.Contains("managedDirectories.Any", StringComparison.Ordinal),
+        "Managed asset deletion should check candidate directories without LINQ.");
+    Assert(
+        restoreBody.Contains("DirectoryHasFiles(autoSaveDirectory, \"*.novel.json\")", StringComparison.Ordinal)
+            && !restoreBody.Contains("Directory.EnumerateFiles(autoSaveDirectory, \"*.novel.json\").Any()", StringComparison.Ordinal),
+        "Autosave restore should probe autosave files through a direct helper.");
+    Assert(
+        managedDirectoryBody.Contains("for (var index = 0; index < managedDirectories.Count; index++)", StringComparison.Ordinal)
+            && !managedDirectoryBody.Contains(".Any(", StringComparison.Ordinal),
+        "Managed directory checks should use one direct indexed pass.");
+    Assert(
+        directoryHasFilesBody.Contains("Directory.EnumerateFiles(directory, searchPattern)", StringComparison.Ordinal)
+            && directoryHasFilesBody.Contains(".GetEnumerator()", StringComparison.Ordinal)
+            && !directoryHasFilesBody.Contains(".Any(", StringComparison.Ordinal),
+        "Directory file probes should use an enumerator instead of LINQ Any.");
 }
 
 static void ProjectResolverOpensDirectProjectFile()

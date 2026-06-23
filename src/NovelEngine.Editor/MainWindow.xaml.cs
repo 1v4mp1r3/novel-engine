@@ -4140,12 +4140,33 @@ public partial class MainWindow : Window
                 + Path.DirectorySeparatorChar,
         };
         var path = ResolveAssetPath(asset);
-        if (managedDirectories.Any(directory =>
-                path.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
-            && File.Exists(path))
+        if (IsInManagedAssetDirectory(path, managedDirectories) && File.Exists(path))
         {
             File.Delete(path);
         }
+    }
+
+    private static bool IsInManagedAssetDirectory(
+        string path,
+        IReadOnlyList<string> managedDirectories)
+    {
+        for (var index = 0; index < managedDirectories.Count; index++)
+        {
+            if (path.StartsWith(
+                    managedDirectories[index],
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool DirectoryHasFiles(string directory, string searchPattern)
+    {
+        using var files = Directory.EnumerateFiles(directory, searchPattern)
+            .GetEnumerator();
+        return files.MoveNext();
     }
 
     private void OpenAssetsFolder_Click(object sender, RoutedEventArgs e)
@@ -4421,7 +4442,7 @@ public partial class MainWindow : Window
         var autoSaveDirectory = GetAutoSaveDirectory();
         if (autoSaveDirectory is null
             || !Directory.Exists(autoSaveDirectory)
-            || !Directory.EnumerateFiles(autoSaveDirectory, "*.novel.json").Any())
+            || !DirectoryHasFiles(autoSaveDirectory, "*.novel.json"))
         {
             MessageBox.Show(
                 this,
