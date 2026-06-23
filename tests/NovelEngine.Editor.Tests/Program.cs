@@ -77,6 +77,7 @@ var tests = new (string Name, Action Run)[]
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
     ("graph editing shortcuts require graph focus", GraphEditingShortcutsRequireGraphFocus),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
+    ("diagnostic navigation uses direct lookups", DiagnosticNavigationUsesDirectLookups),
     ("app collection styles enable virtualization", AppCollectionStylesEnableVirtualization),
     ("bounded cache evicts least recently used entries", BoundedCacheEvictsLeastRecentlyUsedEntries),
     ("code editor performance policy limits expensive live work", CodeEditorPerformancePolicyLimitsExpensiveLiveWork),
@@ -2394,6 +2395,41 @@ static void DiagnosticPanelStampTracksVisibleDiagnostics()
             && !viewBody.Contains(".Select(", StringComparison.Ordinal)
             && !viewBody.Contains(".ToList(", StringComparison.Ordinal),
         "Diagnostic rows should be built with one direct pass.");
+}
+
+static void DiagnosticNavigationUsesDirectLookups()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var navigateNodeBody = ExtractMethodBody(source, "private bool TryNavigateToDiagnosticNode");
+    var visualBlocksBody = ExtractMethodBody(
+        source,
+        "private bool TryNavigateToDiagnosticVisualBlocks");
+    var findNodeBody = ExtractMethodBody(source, "private NovelNode? FindDiagnosticNode");
+    var findOutputBody = ExtractMethodBody(source, "private static NodeOutput? FindOutputByLabel");
+
+    Assert(
+        navigateNodeBody.Contains("var node = FindDiagnosticNode(location);", StringComparison.Ordinal)
+            && !navigateNodeBody.Contains(".OrderByDescending(", StringComparison.Ordinal)
+            && !navigateNodeBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Diagnostic node navigation should avoid sorting and LINQ searches.");
+    Assert(
+        findNodeBody.Contains("foreach (var node in _project.Nodes)", StringComparison.Ordinal)
+            && findNodeBody.Contains("LocationReferencesNode(location, node)", StringComparison.Ordinal)
+            && findNodeBody.Contains("DiagnosticNodeDisplay(node).Length", StringComparison.Ordinal),
+        "Diagnostic node lookup should choose the longest matching node display in one pass.");
+    Assert(
+        visualBlocksBody.Contains("FindOutputByLabel(node, label)", StringComparison.Ordinal)
+            && !visualBlocksBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Diagnostic visual block navigation should use direct output lookup.");
+    Assert(
+        findOutputBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal)
+            && findOutputBody.Contains("output.Label.Equals(label, StringComparison.Ordinal)", StringComparison.Ordinal)
+            && !findOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Diagnostic output lookup should scan outputs directly.");
 }
 
 static void AppCollectionStylesEnableVirtualization()

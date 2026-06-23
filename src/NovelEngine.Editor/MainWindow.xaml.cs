@@ -6880,9 +6880,7 @@ public partial class MainWindow : Window
 
     private bool TryNavigateToDiagnosticNode(string location)
     {
-        var node = _project.Nodes
-            .OrderByDescending(node => DiagnosticNodeDisplay(node).Length)
-            .FirstOrDefault(node => LocationReferencesNode(location, node));
+        var node = FindDiagnosticNode(location);
         if (node is null)
         {
             return false;
@@ -6925,8 +6923,7 @@ public partial class MainWindow : Window
         var label = ReadQuotedSegmentAfter(location, "visual blocks ");
         var output = label is null
             ? null
-            : node.Outputs.FirstOrDefault(output =>
-                output.Label.Equals(label, StringComparison.Ordinal));
+            : FindOutputByLabel(node, label);
         if (output is null)
         {
             StatusText.Text =
@@ -6936,6 +6933,39 @@ public partial class MainWindow : Window
 
         EditOutputScriptBlocks(node, output);
         return true;
+    }
+
+    private NovelNode? FindDiagnosticNode(string location)
+    {
+        NovelNode? bestNode = null;
+        var bestDisplayLength = -1;
+        foreach (var node in _project.Nodes)
+        {
+            if (!LocationReferencesNode(location, node))
+            {
+                continue;
+            }
+
+            var displayLength = DiagnosticNodeDisplay(node).Length;
+            if (displayLength > bestDisplayLength)
+            {
+                bestNode = node;
+                bestDisplayLength = displayLength;
+            }
+        }
+        return bestNode;
+    }
+
+    private static NodeOutput? FindOutputByLabel(NovelNode node, string label)
+    {
+        foreach (var output in node.Outputs)
+        {
+            if (output.Label.Equals(label, StringComparison.Ordinal))
+            {
+                return output;
+            }
+        }
+        return null;
     }
 
     private static string? TryReadDiagnosticAssetId(string location)
