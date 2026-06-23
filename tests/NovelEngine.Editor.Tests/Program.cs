@@ -4560,6 +4560,8 @@ static void PreviewPlaybackAvoidsTransientLists()
     var constructorBody = ExtractMethodBody(source, "public PreviewWindow(");
     var closedBody = ExtractMethodBody(source, "private void PreviewWindow_Closed");
     var renderBody = ExtractMethodBody(source, "private void RenderNode");
+    var chooseBody = ExtractMethodBody(source, "private async Task ChooseAsync");
+    var findCurrentOutputBody = ExtractMethodBody(source, "private NodeOutput? FindCurrentOutput");
     var debugBody = ExtractMethodBody(source, "private void RefreshDebugState");
     var debugCharactersBody = ExtractMethodBody(source, "private string FormatDebugCharacters");
     var debugVariablesBody = ExtractMethodBody(source, "private string FormatDebugVariables");
@@ -4592,6 +4594,15 @@ static void PreviewPlaybackAvoidsTransientLists()
         choicesBody.Contains("foreach (UIElement child in ChoicesPanel.Children)", StringComparison.Ordinal)
             && !choicesBody.Contains("OfType<Button>", StringComparison.Ordinal),
         "Choice availability toggles should avoid LINQ iterators.");
+    Assert(
+        chooseBody.Contains("var output = FindCurrentOutput(outputId);", StringComparison.Ordinal)
+            && !chooseBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Preview choice handling should resolve outputs through a direct helper.");
+    Assert(
+        findCurrentOutputBody.Contains("for (var index = 0; index < node.Outputs.Count; index++)", StringComparison.Ordinal)
+            && findCurrentOutputBody.Contains("output.Id.Equals(outputId, StringComparison.Ordinal)", StringComparison.Ordinal)
+            && !findCurrentOutputBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Preview current-output lookup should scan outputs directly.");
     Assert(
         resolveVoiceBody.Contains("ResolveVoiceSoundPaths(character)", StringComparison.Ordinal)
             && resolveVoiceBody.Contains("foreach (var candidate in _player.State.CurrentCharacters)", StringComparison.Ordinal)

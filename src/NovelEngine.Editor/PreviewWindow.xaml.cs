@@ -386,8 +386,7 @@ public partial class PreviewWindow : Window
             return;
         }
 
-        var output = _player.CurrentNode?.Outputs.FirstOrDefault(
-            candidate => candidate.Id == outputId);
+        var output = FindCurrentOutput(outputId);
         if (output is null)
         {
             return;
@@ -1023,6 +1022,25 @@ public partial class PreviewWindow : Window
                 player.Play();
             }
         }
+    }
+
+    private NodeOutput? FindCurrentOutput(string outputId)
+    {
+        var node = _player.CurrentNode;
+        if (node is null)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < node.Outputs.Count; index++)
+        {
+            var output = node.Outputs[index];
+            if (output.Id.Equals(outputId, StringComparison.Ordinal))
+            {
+                return output;
+            }
+        }
+        return null;
     }
 
     private void ShowSettings()
