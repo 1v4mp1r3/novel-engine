@@ -6546,9 +6546,20 @@ public partial class MainWindow : Window
         _project.MainMenu.Background = editor.Design.Background;
         _project.MainMenu.Elements.Clear();
         _project.MainMenu.Elements.AddRange(
-            editor.Design.Elements.Select(element => element.Clone()));
+            CloneMainMenuElements(editor.Design.Elements));
         MarkDirty(refreshGraph: false);
         StatusText.Text = "Главное меню обновлено";
+    }
+
+    private static List<MainMenuElement> CloneMainMenuElements(
+        IReadOnlyList<MainMenuElement> source)
+    {
+        var clones = new List<MainMenuElement>(source.Count);
+        for (var index = 0; index < source.Count; index++)
+        {
+            clones.Add(source[index].Clone());
+        }
+        return clones;
     }
 
     private string GetAssetDirectory() =>

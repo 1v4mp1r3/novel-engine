@@ -4919,6 +4919,10 @@ static void ModalEditorsSkipHiddenGraphRefresh()
         "private void EditNodeScene",
         "private void EditMainMenu",
     };
+    var editMainMenuBody = ExtractMethodBody(source, "private void EditMainMenu");
+    var cloneMainMenuBody = ExtractMethodBody(
+        source,
+        "private static List<MainMenuElement> CloneMainMenuElements");
 
     foreach (var method in hiddenModalEditorMethods)
     {
@@ -4927,6 +4931,18 @@ static void ModalEditorsSkipHiddenGraphRefresh()
             body.Contains("MarkDirty(refreshGraph: false);", StringComparison.Ordinal),
             $"{method} should dirty modal editor changes without refreshing the graph.");
     }
+
+    Assert(
+        editMainMenuBody.Contains("CloneMainMenuElements(editor.Design.Elements)", StringComparison.Ordinal)
+            && !editMainMenuBody.Contains(".Select(", StringComparison.Ordinal),
+        "Main menu edits should clone elements through a direct helper.");
+    Assert(
+        cloneMainMenuBody.Contains("var clones = new List<MainMenuElement>(source.Count);", StringComparison.Ordinal)
+            && cloneMainMenuBody.Contains("for (var index = 0; index < source.Count; index++)", StringComparison.Ordinal)
+            && cloneMainMenuBody.Contains("source[index].Clone()", StringComparison.Ordinal)
+            && !cloneMainMenuBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cloneMainMenuBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Main menu element clones should be built with one direct indexed pass.");
 }
 
 static void GraphInheritanceMenuCachesIncomingNodes()
