@@ -644,10 +644,7 @@ public partial class MainWindow : Window
         try
         {
             var enabled = node is not null;
-            foreach (var control in PropertyControls())
-            {
-                control.IsEnabled = enabled;
-            }
+            SetPropertyControlsEnabled(enabled);
 
             if (node is null)
             {
@@ -733,24 +730,24 @@ public partial class MainWindow : Window
         return views;
     }
 
-    private IEnumerable<Control> PropertyControls()
+    private void SetPropertyControlsEnabled(bool enabled)
     {
-        yield return TitleBox;
-        yield return SpeakerBox;
-        yield return BodyTextBox;
-        yield return BackgroundBox;
-        yield return BackgroundFolderBox;
-        yield return BackgroundAssetBox;
-        yield return InheritBackgroundCheck;
-        yield return MusicBox;
-        yield return MusicFolderBox;
-        yield return MusicAssetBox;
-        yield return InheritMusicCheck;
-        yield return InheritCharactersCheck;
-        yield return CharactersGrid;
-        yield return ScriptBox;
-        yield return EditNodeScriptBlocksButton;
-        yield return OutputsGrid;
+        TitleBox.IsEnabled = enabled;
+        SpeakerBox.IsEnabled = enabled;
+        BodyTextBox.IsEnabled = enabled;
+        BackgroundBox.IsEnabled = enabled;
+        BackgroundFolderBox.IsEnabled = enabled;
+        BackgroundAssetBox.IsEnabled = enabled;
+        InheritBackgroundCheck.IsEnabled = enabled;
+        MusicBox.IsEnabled = enabled;
+        MusicFolderBox.IsEnabled = enabled;
+        MusicAssetBox.IsEnabled = enabled;
+        InheritMusicCheck.IsEnabled = enabled;
+        InheritCharactersCheck.IsEnabled = enabled;
+        CharactersGrid.IsEnabled = enabled;
+        ScriptBox.IsEnabled = enabled;
+        EditNodeScriptBlocksButton.IsEnabled = enabled;
+        OutputsGrid.IsEnabled = enabled;
     }
 
     private bool ApplyProperties()

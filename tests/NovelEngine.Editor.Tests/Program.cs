@@ -3961,6 +3961,9 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
     var outputViewsBody = ExtractMethodBody(
         source,
         "private static List<OutputView> CreateOutputViews");
+    var setControlsBody = ExtractMethodBody(
+        source,
+        "private void SetPropertyControlsEnabled");
 
     Assert(
         refreshBody.Contains(
@@ -4000,6 +4003,17 @@ static void NodePropertyPanelUsesCachedTargetTitleLookup()
             && !refreshBody.Contains(".Select(", StringComparison.Ordinal)
             && !refreshBody.Contains(".ToList(", StringComparison.Ordinal),
         "Node property refresh should delegate row creation without LINQ pipelines.");
+    Assert(
+        refreshBody.Contains("SetPropertyControlsEnabled(enabled);", StringComparison.Ordinal)
+            && !refreshBody.Contains("PropertyControls()", StringComparison.Ordinal),
+        "Node property refresh should toggle controls through a direct helper.");
+    Assert(
+        setControlsBody.Contains("TitleBox.IsEnabled = enabled;", StringComparison.Ordinal)
+            && setControlsBody.Contains("BackgroundAssetBox.IsEnabled = enabled;", StringComparison.Ordinal)
+            && setControlsBody.Contains("OutputsGrid.IsEnabled = enabled;", StringComparison.Ordinal)
+            && !setControlsBody.Contains("yield return", StringComparison.Ordinal)
+            && !setControlsBody.Contains("foreach", StringComparison.Ordinal),
+        "Node property controls should toggle without iterator allocation.");
     Assert(
         characterViewsBody.Contains("var views = new List<CharacterView>(characters.Count);", StringComparison.Ordinal)
             && characterViewsBody.Contains("for (var index = 0; index < characters.Count; index++)", StringComparison.Ordinal)
