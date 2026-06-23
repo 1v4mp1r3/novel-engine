@@ -4261,7 +4261,9 @@ static void MainMenuTextPropertiesUseDebouncedApply()
     var buildProperties = ExtractMethodBody(source, "private UIElement BuildProperties");
     var scheduleBody = ExtractMethodBody(source, "private void ScheduleApplyProperties");
     var buildFooter = ExtractMethodBody(source, "private UIElement BuildFooter");
+    var constructorBody = ExtractMethodBody(source, "public MainMenuEditorWindow(");
     var selectElement = ExtractMethodBody(source, "private void SelectElement");
+    var firstElementBody = ExtractMethodBody(source, "private static MainMenuElement? FirstElement");
     var deleteSelected = ExtractMethodBody(source, "private void DeleteSelected");
 
     Assert(
@@ -4292,6 +4294,17 @@ static void MainMenuTextPropertiesUseDebouncedApply()
     Assert(
         deleteSelected.Contains("_propertyApplyTimer.Stop();", StringComparison.Ordinal),
         "Deleting a main menu element should cancel pending property edits.");
+    Assert(
+        constructorBody.Contains("SelectElement(FirstElement(_design.Elements));", StringComparison.Ordinal)
+            && deleteSelected.Contains("SelectElement(FirstElement(_design.Elements));", StringComparison.Ordinal)
+            && !constructorBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
+            && !deleteSelected.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Main menu initial and fallback selection should use direct list access.");
+    Assert(
+        firstElementBody.Contains("if (elements.Count == 0)", StringComparison.Ordinal)
+            && firstElementBody.Contains("return elements[0];", StringComparison.Ordinal)
+            && !firstElementBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Main menu first-element helper should avoid LINQ delegates.");
 }
 
 static void MainMenuPropertyPanelStampTracksFields()

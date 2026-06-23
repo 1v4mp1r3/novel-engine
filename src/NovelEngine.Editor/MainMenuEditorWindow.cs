@@ -85,7 +85,7 @@ public sealed class MainMenuEditorWindow : Window
 
         Content = BuildLayout();
         RefreshStage();
-        SelectElement(_design.Elements.FirstOrDefault());
+        SelectElement(FirstElement(_design.Elements));
     }
 
     public MainMenuDesign Design => _design;
@@ -340,7 +340,7 @@ public sealed class MainMenuEditorWindow : Window
         _propertyApplyTimer.Stop();
         _design.Elements.Remove(_selected);
         RefreshStage();
-        SelectElement(_design.Elements.FirstOrDefault());
+        SelectElement(FirstElement(_design.Elements));
     }
 
     private void RefreshStage()
@@ -577,6 +577,16 @@ public sealed class MainMenuEditorWindow : Window
         _elementList.SelectedItem = element;
         RefreshStage();
         RefreshProperties();
+    }
+
+    private static MainMenuElement? FirstElement(IReadOnlyList<MainMenuElement> elements)
+    {
+        if (elements.Count == 0)
+        {
+            return null;
+        }
+
+        return elements[0];
     }
 
     private void ScheduleApplyProperties()
