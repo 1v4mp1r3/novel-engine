@@ -391,8 +391,13 @@ static void ManualSavePolicySkipsUnchangedSavedProjects()
         "src",
         "NovelEngine.Editor",
         "MainWindow.xaml.cs"));
+    var saveWorkspaceBody = ExtractMethodBody(source, "private bool SaveProjectToWorkspace");
     var fileNameBody = ExtractMethodBody(source, "private string GetDefaultProjectFileName");
     var safeStemBody = ExtractMethodBody(source, "private static string CreateSafeProjectFileStem");
+    Assert(
+        saveWorkspaceBody.Contains("ProjectWorkspace.GetAvailableProjectPath(_workspaceDirectory)", StringComparison.Ordinal)
+            && !saveWorkspaceBody.Contains("Path.Combine(_workspaceDirectory, GetDefaultProjectFileName())", StringComparison.Ordinal),
+        "Workspace saves should use the shared collision-safe project path resolver.");
     Assert(
         source.Contains("private static readonly HashSet<char> InvalidProjectFileNameChars", StringComparison.Ordinal)
             && fileNameBody.Contains("var safeName = CreateSafeProjectFileStem(source);", StringComparison.Ordinal)
