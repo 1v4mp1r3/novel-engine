@@ -306,7 +306,7 @@ public sealed class MainMenuEditorWindow : Window
 
     private void AddElement(MainMenuElementKind kind)
     {
-        var count = _design.Elements.Count(element => element.Kind == kind) + 1;
+        var count = CountElementsOfKind(kind) + 1;
         var id = $"{kind.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}"[..18];
         var isButton = kind is MainMenuElementKind.Button or MainMenuElementKind.ImageButton;
         var element = new MainMenuElement
@@ -329,6 +329,20 @@ public sealed class MainMenuEditorWindow : Window
         _design.Elements.Add(element);
         RefreshStage();
         SelectElement(element);
+    }
+
+    private int CountElementsOfKind(MainMenuElementKind kind)
+    {
+        var count = 0;
+        for (var index = 0; index < _design.Elements.Count; index++)
+        {
+            if (_design.Elements[index].Kind == kind)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private void DeleteSelected()

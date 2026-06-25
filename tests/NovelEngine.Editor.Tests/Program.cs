@@ -4389,6 +4389,8 @@ static void MainMenuTextPropertiesUseDebouncedApply()
     var firstElementBody = ExtractMethodBody(source, "private static MainMenuElement? FirstElement");
     var setControlsBody = ExtractMethodBody(source, "private void SetPropertyControlsEnabled");
     var deleteSelected = ExtractMethodBody(source, "private void DeleteSelected");
+    var addElementBody = ExtractMethodBody(source, "private void AddElement");
+    var countElementsOfKindBody = ExtractMethodBody(source, "private int CountElementsOfKind");
 
     Assert(
         buildProperties.Contains(
@@ -4429,6 +4431,15 @@ static void MainMenuTextPropertiesUseDebouncedApply()
             && firstElementBody.Contains("return elements[0];", StringComparison.Ordinal)
             && !firstElementBody.Contains("FirstOrDefault", StringComparison.Ordinal),
         "Main menu first-element helper should avoid LINQ delegates.");
+    Assert(
+        addElementBody.Contains("var count = CountElementsOfKind(kind) + 1;", StringComparison.Ordinal)
+            && !addElementBody.Contains(".Count(", StringComparison.Ordinal),
+        "Main menu element naming should use a direct count helper.");
+    Assert(
+        countElementsOfKindBody.Contains("for (var index = 0; index < _design.Elements.Count; index++)", StringComparison.Ordinal)
+            && countElementsOfKindBody.Contains("_design.Elements[index].Kind == kind", StringComparison.Ordinal)
+            && !countElementsOfKindBody.Contains(".Count(", StringComparison.Ordinal),
+        "Main menu element count helper should scan elements directly.");
     Assert(
         refreshBody.Contains("SetPropertyControlsEnabled(enabled);", StringComparison.Ordinal)
             && !refreshBody.Contains("new Control[]", StringComparison.Ordinal)
