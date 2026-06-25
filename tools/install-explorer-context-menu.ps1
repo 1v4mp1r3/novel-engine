@@ -65,8 +65,9 @@ $items = @(
         Argument = '%V'
     },
     @{
-        Key = 'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
+        Key = 'HKCU:\Software\Classes\SystemFileAssociations\.json\shell\NovelEngine.Open'
         Argument = '%1'
+        AppliesTo = 'System.FileName:"*.novel.json"'
     }
 )
 

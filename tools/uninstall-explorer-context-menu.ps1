@@ -19,6 +19,7 @@ $keys = @(
     'HKCU:\Software\Classes\Directory\shell\NovelEngine.Open',
     'HKCU:\Software\Classes\Directory\Background\shell\NovelEngine.Open',
     'HKCU:\Software\Classes\*\shell\NovelEngine.Open',
+    'HKCU:\Software\Classes\SystemFileAssociations\.json\shell\NovelEngine.Open',
     'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open'
 )
 

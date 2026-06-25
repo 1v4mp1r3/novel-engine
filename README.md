@@ -49,8 +49,9 @@ adjacent managed files. Empty folders are opened as a workspace too, so you can
 create a new project there with `Ctrl+S`; the editor writes the project file
 into the opened folder, creates `files/` for managed game files, and keeps
 timestamped backups in `autosaves/`.
-The file-level Explorer entry is registered specifically for `.novel.json`
-project files without taking over every JSON file on the system.
+The file-level Explorer entry is attached to Windows' `.json` association with
+a `*.novel.json` name filter, so regular JSON files do not get the Novel Engine
+command.
 The startup screen lists recently opened or created projects for quick switching
 between workspaces.
 Use `File -> Restore autosave...` (`Файл -> Восстановить автосейв...`) to load

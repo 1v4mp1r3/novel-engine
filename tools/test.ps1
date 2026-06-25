@@ -54,7 +54,7 @@ Invoke-Step "Check Explorer context menu scripts" {
     $expected = @{
         'HKCU:\Software\Classes\Directory\shell\NovelEngine.Open' = '%1'
         'HKCU:\Software\Classes\Directory\Background\shell\NovelEngine.Open' = '%V'
-        'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open' = '%1'
+        'HKCU:\Software\Classes\SystemFileAssociations\.json\shell\NovelEngine.Open' = '%1'
     }
     foreach ($entry in $install.Entries) {
         if (-not $expected.ContainsKey($entry.Key)) {
@@ -63,6 +63,13 @@ Invoke-Step "Check Explorer context menu scripts" {
         $argument = $expected[$entry.Key]
         if (-not $entry.Command.EndsWith(" `"$argument`"")) {
             throw "Explorer command for $($entry.Key) does not pass $argument."
+        }
+        if ($entry.Key -eq 'HKCU:\Software\Classes\SystemFileAssociations\.json\shell\NovelEngine.Open') {
+            if ($entry.AppliesTo -ne 'System.FileName:"*.novel.json"') {
+                throw 'Explorer JSON file entry should only apply to *.novel.json files.'
+            }
+        } elseif ($entry.AppliesTo) {
+            throw "Explorer entry $($entry.Key) should not have AppliesTo."
         }
     }
 
@@ -74,6 +81,9 @@ Invoke-Step "Check Explorer context menu scripts" {
     }
     if ($uninstall.Keys -notcontains 'HKCU:\Software\Classes\*\shell\NovelEngine.Open') {
         throw 'Explorer uninstall does not remove the legacy wildcard key.'
+    }
+    if ($uninstall.Keys -notcontains 'HKCU:\Software\Classes\SystemFileAssociations\.novel.json\shell\NovelEngine.Open') {
+        throw 'Explorer uninstall does not remove the legacy compound-extension key.'
     }
 
     $packagedRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'Novel Engine Context Menu Smoke'
