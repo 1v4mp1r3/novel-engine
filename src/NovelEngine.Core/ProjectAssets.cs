@@ -194,12 +194,12 @@ public static class ProjectAssets
     public static int SyncFromDisk(NovelProject project, string projectPath)
     {
         var root = GetAssetsDirectory(projectPath);
+        var changes = RemoveMissingManagedAssets(project, projectPath);
         if (!Directory.Exists(root))
         {
-            return 0;
+            return changes;
         }
 
-        var changes = RemoveMissingManagedAssets(project, projectPath);
         var knownAssetFolders = BuildAssetFolderSet(project);
         foreach (var directory in Directory.EnumerateDirectories(
             root,

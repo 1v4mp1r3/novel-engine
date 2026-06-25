@@ -63,6 +63,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
     ("project asset sync removes missing managed files", ProjectAssetSyncRemovesMissingManagedFiles),
+    ("project asset sync removes missing files root assets", ProjectAssetSyncRemovesMissingFilesRootAssets),
     ("project asset sync caches generated lookups", ProjectAssetSyncCachesGeneratedLookups),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("asset folder delete scans directories once", AssetFolderDeleteScansDirectoriesOnce),
@@ -3191,6 +3192,65 @@ static void ProjectAssetSyncRemovesMissingManagedFiles()
     }
 }
 
+static void ProjectAssetSyncRemovesMissingFilesRootAssets()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-sync-root-prune-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var project = NovelProject.CreateDefault();
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "missing_bg",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/missing.png",
+        });
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "missing_voice",
+            Kind = AssetKind.Audio,
+            Folder = "voices",
+            Path = "files/voices/missing.wav",
+        });
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "external_ref",
+            Kind = AssetKind.Image,
+            Folder = "external",
+            Path = "assets/external/missing.png",
+        });
+
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = "@missing_bg";
+        scene.InheritCharacters = false;
+        scene.Characters.Add(new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+            VoiceSound = "@missing_voice",
+            VoiceSounds = ["@missing_voice"],
+        });
+
+        var changes = ProjectAssets.SyncFromDisk(project, projectPath);
+
+        Assert(changes == 2, "Sync did not report the missing managed assets under a missing files root.");
+        Assert(project.FindAsset("missing_bg") is null, "Missing files root image asset stayed registered.");
+        Assert(project.FindAsset("missing_voice") is null, "Missing files root voice asset stayed registered.");
+        Assert(project.FindAsset("external_ref") is not null, "Missing files root pruned a non-managed asset.");
+        Assert(scene.Background.Length == 0, "Missing files root background reference stayed on the node.");
+        Assert(scene.Characters[0].VoiceSound.Length == 0, "Missing files root voice stayed as primary voice.");
+        Assert(scene.Characters[0].VoiceSounds.Count == 0, "Missing files root voice stayed in the voice list.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
 static void ProjectAssetSyncCachesGeneratedLookups()
 {
     var source = File.ReadAllText(Path.Combine(
@@ -3217,6 +3277,12 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     var folderSetBody = ExtractMethodBody(
         source,
         "private static HashSet<string> BuildAssetFolderSet");
+    var pruneIndex = syncBody.IndexOf(
+        "var changes = RemoveMissingManagedAssets(project, projectPath);",
+        StringComparison.Ordinal);
+    var missingRootIndex = syncBody.IndexOf(
+        "if (!Directory.Exists(root))",
+        StringComparison.Ordinal);
 
     Assert(
         syncBody.Contains("BuildAssetIdSet(project)", StringComparison.Ordinal),
@@ -3224,6 +3290,9 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     Assert(
         syncBody.Contains("RemoveMissingManagedAssets(project, projectPath)", StringComparison.Ordinal),
         "Asset sync should prune missing managed assets before rebuilding lookup sets.");
+    Assert(
+        pruneIndex >= 0 && missingRootIndex > pruneIndex,
+        "Asset sync should prune stale managed assets even when the files root is missing.");
     Assert(
         syncBody.Contains("BuildAssetFolderSet(project)", StringComparison.Ordinal),
         "Asset sync should build the known folder set once.");
