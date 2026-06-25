@@ -18,7 +18,7 @@ internal sealed class ProjectStartupWindow : Window
 
     public ProjectStartupWindow(IEnumerable<RecentProjectEntry>? recentProjects = null)
     {
-        _recentProjects = recentProjects?.ToList() ?? [];
+        _recentProjects = CreateRecentProjectList(recentProjects);
         Title = "Novel Engine";
         Width = 640;
         Height = 560;
@@ -29,6 +29,28 @@ internal sealed class ProjectStartupWindow : Window
         Background = new SolidColorBrush(Color.FromRgb(12, 18, 26));
         Foreground = Brushes.White;
         Content = CreateContent();
+    }
+
+    private static IReadOnlyList<RecentProjectEntry> CreateRecentProjectList(
+        IEnumerable<RecentProjectEntry>? recentProjects)
+    {
+        if (recentProjects is null)
+        {
+            return [];
+        }
+
+        if (recentProjects is IReadOnlyList<RecentProjectEntry> list)
+        {
+            return list;
+        }
+
+        var entries = new List<RecentProjectEntry>();
+        foreach (var entry in recentProjects)
+        {
+            entries.Add(entry);
+        }
+
+        return entries;
     }
 
     public ProjectStartupAction SelectedAction { get; private set; }

@@ -39,6 +39,7 @@ var tests = new (string Name, Action Run)[]
     ("recent projects ignore missing paths", RecentProjectsIgnoreMissingPaths),
     ("recent projects keep workspace folders", RecentProjectsKeepWorkspaceFolders),
     ("recent projects keep only newest entries", RecentProjectsKeepOnlyNewestEntries),
+    ("startup window keeps recent project lists", StartupWindowKeepsRecentProjectLists),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("asset list filter searches in one pass", AssetListFilterSearchesInOnePass),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
@@ -1075,6 +1076,31 @@ static void RecentProjectsKeepOnlyNewestEntries()
     {
         Directory.Delete(directory, recursive: true);
     }
+}
+
+static void StartupWindowKeepsRecentProjectLists()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "ProjectStartupWindow.cs"));
+    var constructorBody = ExtractMethodBody(source, "public ProjectStartupWindow(");
+    var listBody = ExtractMethodBody(
+        source,
+        "private static IReadOnlyList<RecentProjectEntry> CreateRecentProjectList");
+
+    Assert(
+        constructorBody.Contains("_recentProjects = CreateRecentProjectList(recentProjects);", StringComparison.Ordinal)
+            && !constructorBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Startup window should delegate recent project list materialization without a constructor copy.");
+    Assert(
+        listBody.Contains("recentProjects is IReadOnlyList<RecentProjectEntry> list", StringComparison.Ordinal)
+            && listBody.Contains("return list;", StringComparison.Ordinal)
+            && listBody.Contains("foreach (var entry in recentProjects)", StringComparison.Ordinal)
+            && !listBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !listBody.Contains(".Select(", StringComparison.Ordinal),
+        "Startup window should reuse existing recent project lists and materialize other enumerables directly.");
 }
 
 static void AssetListFilterSearchesWithinSelectedFolder()
