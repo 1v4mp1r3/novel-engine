@@ -571,7 +571,7 @@ public sealed class MainMenuEditorWindow : Window
         element.Y = nextPosition.Y;
         Canvas.SetLeft(_dragVisual, element.X);
         Canvas.SetTop(_dragVisual, element.Y);
-        RefreshProperties();
+        RefreshDraggedPositionProperties(element);
     }
 
     private void Element_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -651,6 +651,26 @@ public sealed class MainMenuEditorWindow : Window
             _backgroundBox.Text = _selected.Background;
             _borderBox.Text = _selected.Border;
             _styleCodeBox.Text = _selected.CustomStyleCode;
+        }
+        finally
+        {
+            _refreshingProperties = false;
+        }
+    }
+
+    private void RefreshDraggedPositionProperties(MainMenuElement element)
+    {
+        if (!ReferenceEquals(_selected, element))
+        {
+            return;
+        }
+
+        _refreshingProperties = true;
+        try
+        {
+            _xBox.Text = Number(element.X);
+            _yBox.Text = Number(element.Y);
+            _propertyPanelStamp = CreatePropertyPanelStamp(element);
         }
         finally
         {

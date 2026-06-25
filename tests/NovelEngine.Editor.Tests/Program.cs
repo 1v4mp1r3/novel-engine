@@ -4523,6 +4523,10 @@ static void MainMenuTextPropertiesUseDebouncedApply()
     var deleteSelected = ExtractMethodBody(source, "private void DeleteSelected");
     var addElementBody = ExtractMethodBody(source, "private void AddElement");
     var countElementsOfKindBody = ExtractMethodBody(source, "private int CountElementsOfKind");
+    var dragBody = ExtractMethodBody(source, "private void Element_MouseMove");
+    var dragPropertiesBody = ExtractMethodBody(
+        source,
+        "private void RefreshDraggedPositionProperties");
 
     Assert(
         buildProperties.Contains(
@@ -4577,6 +4581,15 @@ static void MainMenuTextPropertiesUseDebouncedApply()
             && !refreshBody.Contains("new Control[]", StringComparison.Ordinal)
             && !refreshBody.Contains("foreach", StringComparison.Ordinal),
         "Main menu property refresh should toggle controls through a direct helper.");
+    Assert(
+        dragBody.Contains("RefreshDraggedPositionProperties(element);", StringComparison.Ordinal)
+            && !dragBody.Contains("RefreshProperties();", StringComparison.Ordinal),
+        "Main menu drag should not refresh every property field on each mouse move.");
+    Assert(
+        dragPropertiesBody.Contains("_xBox.Text = Number(element.X);", StringComparison.Ordinal)
+            && dragPropertiesBody.Contains("_yBox.Text = Number(element.Y);", StringComparison.Ordinal)
+            && dragPropertiesBody.Contains("_propertyPanelStamp = CreatePropertyPanelStamp(element);", StringComparison.Ordinal),
+        "Main menu drag should only refresh the visible coordinate fields.");
     Assert(
         setControlsBody.Contains("_textBox.IsEnabled = enabled;", StringComparison.Ordinal)
             && setControlsBody.Contains("_actionBox.IsEnabled = enabled;", StringComparison.Ordinal)
