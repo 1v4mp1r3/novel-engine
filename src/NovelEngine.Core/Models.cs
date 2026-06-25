@@ -227,10 +227,23 @@ public sealed class CharacterPlacement
     private static void AddDistinctVoiceSound(List<string> values, string sound)
     {
         if (!string.IsNullOrWhiteSpace(sound)
-            && !values.Contains(sound, StringComparer.OrdinalIgnoreCase))
+            && !ContainsVoiceSound(values, sound))
         {
             values.Add(sound);
         }
+    }
+
+    private static bool ContainsVoiceSound(IReadOnlyList<string> values, string sound)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            if (string.Equals(values[index], sound, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

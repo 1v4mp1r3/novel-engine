@@ -2456,6 +2456,12 @@ static void CharacterVoiceSoundsNormalizeWithoutLinq()
     var collectBody = ExtractMethodBody(
         source,
         "private static List<string> CollectDistinctVoiceSounds");
+    var addBody = ExtractMethodBody(
+        source,
+        "private static void AddDistinctVoiceSound");
+    var containsBody = ExtractMethodBody(
+        source,
+        "private static bool ContainsVoiceSound");
 
     Assert(
         getBody.Contains("CollectDistinctVoiceSounds(VoiceSounds)", StringComparison.Ordinal)
@@ -2473,6 +2479,14 @@ static void CharacterVoiceSoundsNormalizeWithoutLinq()
     Assert(
         collectBody.Contains("foreach (var sound in sounds)", StringComparison.Ordinal),
         "Voice sound normalization should use one direct pass.");
+    Assert(
+        addBody.Contains("!ContainsVoiceSound(values, sound)", StringComparison.Ordinal)
+            && !addBody.Contains(".Contains(", StringComparison.Ordinal),
+        "Voice sound normalization should check duplicates without LINQ Contains.");
+    Assert(
+        containsBody.Contains("for (var index = 0; index < values.Count; index++)", StringComparison.Ordinal)
+            && containsBody.Contains("string.Equals(values[index], sound, StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal),
+        "Voice duplicate checks should scan normalized sounds directly.");
 }
 
 static void RemovedVoiceAssetsAreClearedFromCharacters()

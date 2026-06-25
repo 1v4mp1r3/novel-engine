@@ -3531,8 +3531,7 @@ public partial class MainWindow : Window
                 return NodeVoiceBindingResult.Unavailable;
             }
 
-            var inheritedVoices = CharacterVoiceReferences(character);
-            if (inheritedVoices.Contains(reference, StringComparer.OrdinalIgnoreCase))
+            if (CharacterHasVoiceReference(character, reference))
             {
                 return NodeVoiceBindingResult.Unchanged;
             }
@@ -3554,16 +3553,13 @@ public partial class MainWindow : Window
             }
         }
 
-        var voices = CharacterVoiceReferences(character);
-        if (!voices.Contains(reference, StringComparer.OrdinalIgnoreCase))
-        {
-            voices.Add(reference);
-        }
-        else
+        if (CharacterHasVoiceReference(character, reference))
         {
             return NodeVoiceBindingResult.Unchanged;
         }
 
+        var voices = CharacterVoiceReferences(character);
+        voices.Add(reference);
         character.SetVoiceSounds(voices);
         if (node.UsesTypeDefaults)
         {
@@ -3604,11 +3600,15 @@ public partial class MainWindow : Window
         }
 
         var reference = AssetReference.Create(asset.Id);
-        var voices = CharacterVoiceReferences(character);
-        if (!voices.Contains(reference, StringComparer.OrdinalIgnoreCase))
+        if (CharacterHasVoiceReference(character, reference))
         {
-            voices.Add(reference);
+            StatusText.Text =
+                $"Voice-блип уже привязан к «{CharacterLabel(character)}»";
+            return;
         }
+
+        var voices = CharacterVoiceReferences(character);
+        voices.Add(reference);
         character.SetVoiceSounds(voices);
 
         MarkDirty(refreshGraph: false);

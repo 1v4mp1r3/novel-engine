@@ -802,13 +802,26 @@ public partial class PreviewWindow : Window
             var sound = ResolveAsset(reference);
             if (sound.Length == 0
                 || !File.Exists(sound)
-                || sounds.Contains(sound, StringComparer.OrdinalIgnoreCase))
+                || ContainsSoundPath(sounds, sound))
             {
                 continue;
             }
             sounds.Add(sound);
         }
         return sounds;
+    }
+
+    private static bool ContainsSoundPath(IReadOnlyList<string> sounds, string sound)
+    {
+        for (var index = 0; index < sounds.Count; index++)
+        {
+            if (string.Equals(sounds[index], sound, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void PlayCharacterVoice(CharacterVoice voice)

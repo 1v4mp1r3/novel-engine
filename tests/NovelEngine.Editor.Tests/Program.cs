@@ -1736,6 +1736,12 @@ static void CharacterAssetMenusReuseFilteredAssetCaches()
     var effectiveCharactersBody = ExtractMethodBody(
         source,
         "private IReadOnlyList<CharacterPlacement> GetEffectiveCharacters");
+    var tryBindVoiceBody = ExtractMethodBody(
+        source,
+        "internal static NodeVoiceBindingResult TryBindVoiceAssetToNodeCharacter");
+    var libraryBindVoiceBody = ExtractMethodBody(
+        source,
+        "private void BindVoiceAssetToLibraryCharacter");
     var clearBody = ExtractMethodBody(source, "private void ClearNodeAssetPickerCaches");
 
     Assert(
@@ -1788,6 +1794,21 @@ static void CharacterAssetMenusReuseFilteredAssetCaches()
             && !effectiveCharactersBody.Contains(".Select(", StringComparison.Ordinal)
             && !effectiveCharactersBody.Contains(".ToList(", StringComparison.Ordinal),
         "Inherited effective characters should be cloned without LINQ pipelines.");
+    Assert(
+        tryBindVoiceBody.Contains("CharacterHasVoiceReference(character, reference)", StringComparison.Ordinal)
+            && !tryBindVoiceBody.Contains("Contains(reference, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
+        "Node voice binding should reuse the direct voice-reference scan for duplicate checks.");
+    Assert(
+        libraryBindVoiceBody.Contains("if (CharacterHasVoiceReference(character, reference))", StringComparison.Ordinal)
+            && libraryBindVoiceBody.Contains("Voice-блип уже привязан", StringComparison.Ordinal)
+            && libraryBindVoiceBody.IndexOf(
+                "Voice-блип уже привязан",
+                StringComparison.Ordinal)
+                < libraryBindVoiceBody.IndexOf(
+                    "MarkDirty(refreshGraph: false);",
+                    StringComparison.Ordinal)
+            && !libraryBindVoiceBody.Contains("Contains(reference, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
+        "Duplicate library voice binding should exit before dirtying the project.");
 }
 
 static void SelectedNodeActionsUseGraphSelectedNodeCache()
@@ -5070,6 +5091,9 @@ static void PreviewPlaybackAvoidsTransientLists()
     var resolveVoicePathsBody = ExtractMethodBody(
         source,
         "private List<string> ResolveVoiceSoundPaths");
+    var containsSoundPathBody = ExtractMethodBody(
+        source,
+        "private static bool ContainsSoundPath");
     var typeDialogueBody = ExtractMethodBody(
         source,
         "private async Task TypeDialogueAsync");
@@ -5127,8 +5151,13 @@ static void PreviewPlaybackAvoidsTransientLists()
         "Preview debug state formatting should use direct loops.");
     Assert(
         resolveVoicePathsBody.Contains("foreach (var reference in character.GetVoiceSounds())", StringComparison.Ordinal)
-            && resolveVoicePathsBody.Contains("sounds.Contains(sound, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
+            && resolveVoicePathsBody.Contains("ContainsSoundPath(sounds, sound)", StringComparison.Ordinal)
+            && !resolveVoicePathsBody.Contains("sounds.Contains(sound, StringComparer.OrdinalIgnoreCase)", StringComparison.Ordinal),
         "Voice sound path collection should preserve first-seen unique paths in a direct loop.");
+    Assert(
+        containsSoundPathBody.Contains("for (var index = 0; index < sounds.Count; index++)", StringComparison.Ordinal)
+            && containsSoundPathBody.Contains("string.Equals(sounds[index], sound, StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal),
+        "Preview voice sound path duplicate checks should scan cached paths directly.");
     Assert(
         stopBody.Contains("foreach (var pool in _voicePlayerPools.Values)", StringComparison.Ordinal)
             && stopBody.Contains("foreach (var player in pool)", StringComparison.Ordinal)
