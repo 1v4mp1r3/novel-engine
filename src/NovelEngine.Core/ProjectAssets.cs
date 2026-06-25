@@ -199,7 +199,7 @@ public static class ProjectAssets
             return 0;
         }
 
-        var changes = 0;
+        var changes = RemoveMissingManagedAssets(project, projectPath);
         var knownAssetFolders = BuildAssetFolderSet(project);
         foreach (var directory in Directory.EnumerateDirectories(
             root,
@@ -248,6 +248,28 @@ public static class ProjectAssets
             knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
             knownAssetsByFullPath[ResolvePath(projectPath, imported)] = imported;
             changes += project.Assets.Count - before;
+        }
+
+        return changes;
+    }
+
+    private static int RemoveMissingManagedAssets(
+        NovelProject project,
+        string projectPath)
+    {
+        var changes = 0;
+        for (var index = project.Assets.Count - 1; index >= 0; index--)
+        {
+            var asset = project.Assets[index];
+            if (!IsManagedAssetPath(asset.Path)
+                || File.Exists(ResolvePath(projectPath, asset)))
+            {
+                continue;
+            }
+
+            project.ReplaceAssetReference(asset.Id, string.Empty);
+            project.Assets.RemoveAt(index);
+            changes++;
         }
 
         return changes;
@@ -512,6 +534,14 @@ public static class ProjectAssets
 
     private static string NormalizeRelativeAssetPath(string path) =>
         path.Replace('\\', '/');
+
+    private static bool IsManagedAssetPath(string path)
+    {
+        var normalized = NormalizeRelativeAssetPath(path);
+        return normalized.StartsWith(
+            $"{ManagedFilesDirectoryName}/",
+            StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string GetProjectDirectory(string projectPath) =>
         Path.GetDirectoryName(Path.GetFullPath(projectPath))

@@ -62,6 +62,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
+    ("project asset sync removes missing managed files", ProjectAssetSyncRemovesMissingManagedFiles),
     ("project asset sync caches generated lookups", ProjectAssetSyncCachesGeneratedLookups),
     ("asset folders move and rename physical files", AssetFoldersMoveFiles),
     ("asset folder delete scans directories once", AssetFolderDeleteScansDirectoriesOnce),
@@ -3116,6 +3117,80 @@ static void ProjectAssetSyncNormalizesExistingPathSeparators()
     }
 }
 
+static void ProjectAssetSyncRemovesMissingManagedFiles()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        $"novel-engine-sync-prune-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var projectPath = Path.Combine(directory, "story.novel.json");
+        var existingFolder = Path.Combine(directory, "files", "backgrounds");
+        Directory.CreateDirectory(existingFolder);
+        File.WriteAllBytes(Path.Combine(existingFolder, "existing.png"), [137, 80, 78, 71]);
+        var project = NovelProject.CreateDefault();
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "missing_bg",
+            Kind = AssetKind.Image,
+            Folder = "backgrounds",
+            Path = "files/backgrounds/missing.png",
+        });
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "missing_voice",
+            Kind = AssetKind.Audio,
+            Folder = "voices",
+            Path = "files/voices/missing.wav",
+        });
+        project.Assets.Add(new NovelAsset
+        {
+            Id = "external_ref",
+            Kind = AssetKind.Image,
+            Folder = "external",
+            Path = "assets/external/missing.png",
+        });
+
+        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        scene.Background = "@missing_bg";
+        scene.InheritCharacters = false;
+        scene.Characters.Add(new CharacterPlacement
+        {
+            Id = "hero",
+            Name = "Hero",
+            VoiceSound = "@missing_voice",
+            VoiceSounds = ["@missing_voice"],
+        });
+        project.Characters.Add(new CharacterPlacement
+        {
+            Id = "library_hero",
+            Name = "Library Hero",
+            VoiceSound = "@missing_voice",
+            VoiceSounds = ["@missing_voice"],
+        });
+
+        var changes = ProjectAssets.SyncFromDisk(project, projectPath);
+
+        Assert(changes >= 3, "Sync did not report removed and discovered managed files.");
+        Assert(project.FindAsset("missing_bg") is null, "Missing managed image asset stayed registered.");
+        Assert(project.FindAsset("missing_voice") is null, "Missing managed voice asset stayed registered.");
+        Assert(project.FindAsset("external_ref") is not null, "Non-managed external asset was pruned.");
+        Assert(scene.Background.Length == 0, "Deleted managed background reference stayed on the node.");
+        Assert(scene.Characters[0].VoiceSound.Length == 0, "Deleted managed voice stayed as node primary voice.");
+        Assert(scene.Characters[0].VoiceSounds.Count == 0, "Deleted managed voice stayed in node voice list.");
+        Assert(project.Characters[0].VoiceSound.Length == 0, "Deleted managed voice stayed as library primary voice.");
+        Assert(project.Characters[0].VoiceSounds.Count == 0, "Deleted managed voice stayed in library voice list.");
+        Assert(
+            project.Assets.Any(asset => asset.Path == "files/backgrounds/existing.png"),
+            "Existing managed file was not discovered after pruning missing assets.");
+    }
+    finally
+    {
+        Directory.Delete(directory, recursive: true);
+    }
+}
+
 static void ProjectAssetSyncCachesGeneratedLookups()
 {
     var source = File.ReadAllText(Path.Combine(
@@ -3127,6 +3202,9 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     var registerBody = ExtractMethodBody(
         source,
         "private static NovelAsset RegisterManagedFile");
+    var removeMissingBody = ExtractMethodBody(
+        source,
+        "private static int RemoveMissingManagedAssets");
     var ensureFolderBody = ExtractMethodBody(
         source,
         "private static int EnsureFolder");
@@ -3143,6 +3221,9 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     Assert(
         syncBody.Contains("BuildAssetIdSet(project)", StringComparison.Ordinal),
         "Asset sync should build the known id set once.");
+    Assert(
+        syncBody.Contains("RemoveMissingManagedAssets(project, projectPath)", StringComparison.Ordinal),
+        "Asset sync should prune missing managed assets before rebuilding lookup sets.");
     Assert(
         syncBody.Contains("BuildAssetFolderSet(project)", StringComparison.Ordinal),
         "Asset sync should build the known folder set once.");
@@ -3177,6 +3258,16 @@ static void ProjectAssetSyncCachesGeneratedLookups()
         !syncBody.Contains("FindAsset(", StringComparison.Ordinal)
             && !registerBody.Contains("FindAsset(", StringComparison.Ordinal),
         "Asset sync should not use linear asset lookup while registering files.");
+    Assert(
+        removeMissingBody.Contains(
+            "for (var index = project.Assets.Count - 1; index >= 0; index--)",
+            StringComparison.Ordinal)
+            && removeMissingBody.Contains(
+                "project.ReplaceAssetReference(asset.Id, string.Empty);",
+                StringComparison.Ordinal)
+            && removeMissingBody.Contains("project.Assets.RemoveAt(index);", StringComparison.Ordinal)
+            && !removeMissingBody.Contains("RemoveAll(", StringComparison.Ordinal),
+        "Missing managed asset pruning should use a direct reverse pass and clean references.");
     Assert(
         !ensureFolderBody.Contains("AssetFolders.Contains", StringComparison.Ordinal),
         "Folder registration should use the cached folder set.");
