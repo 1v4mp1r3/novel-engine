@@ -80,6 +80,7 @@ var tests = new (string Name, Action Run)[]
     ("output buttons hide choice actions for scene outputs", OutputButtonsHideChoiceActionsForSceneOutputs),
     ("output transition reset appears only for customized transitions", OutputTransitionResetAppearsOnlyForCustomizedTransitions),
     ("output transition change guard skips unchanged edits", OutputTransitionChangeGuardSkipsUnchangedEdits),
+    ("global build shortcut yields to local editors", GlobalBuildShortcutYieldsToLocalEditors),
     ("graph editing shortcuts require graph focus", GraphEditingShortcutsRequireGraphFocus),
     ("diagnostic panel stamp tracks visible diagnostics", DiagnosticPanelStampTracksVisibleDiagnostics),
     ("diagnostic navigation uses direct lookups", DiagnosticNavigationUsesDirectLookups),
@@ -2553,6 +2554,54 @@ static void OutputTransitionChangeGuardSkipsUnchangedEdits()
     Assert(
         MainWindow.HasOutputTransitionChanges(output, "@click", 350),
         "Changed transition fade duration should dirty the project.");
+}
+
+static void GlobalBuildShortcutYieldsToLocalEditors()
+{
+    Assert(
+        MainWindow.IsGlobalBuildShortcut(
+            Key.B,
+            ModifierKeys.Control,
+            isTextEditing: false,
+            isOutputShortcutContext: false),
+        "Ctrl+B should build from global editor contexts.");
+    Assert(
+        !MainWindow.IsGlobalBuildShortcut(
+            Key.B,
+            ModifierKeys.Control,
+            isTextEditing: true,
+            isOutputShortcutContext: false),
+        "Ctrl+B should not build while a text editor owns the keyboard focus.");
+    Assert(
+        !MainWindow.IsGlobalBuildShortcut(
+            Key.B,
+            ModifierKeys.Control,
+            isTextEditing: false,
+            isOutputShortcutContext: true),
+        "Ctrl+B should let the output grid open selected output script blocks.");
+    Assert(
+        !MainWindow.IsGlobalBuildShortcut(
+            Key.B,
+            ModifierKeys.None,
+            isTextEditing: false,
+            isOutputShortcutContext: false),
+        "Global build shortcut should require Ctrl+B.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var previewKeyBody = ExtractMethodBody(
+        source,
+        "protected override void OnPreviewKeyDown");
+    Assert(
+        previewKeyBody.Contains("var isOutputShortcutContext = IsOutputShortcutContext();", StringComparison.Ordinal)
+            && previewKeyBody.Contains("IsGlobalBuildShortcut(", StringComparison.Ordinal)
+            && previewKeyBody.Contains("isOutputShortcutContext))", StringComparison.Ordinal)
+            && previewKeyBody.IndexOf("IsGlobalBuildShortcut(", StringComparison.Ordinal)
+                < previewKeyBody.IndexOf("CompileGameAsync(debugSymbols: false", StringComparison.Ordinal),
+        "Window Ctrl+B handling should check local output shortcut context before compiling.");
 }
 
 static void GraphEditingShortcutsRequireGraphFocus()

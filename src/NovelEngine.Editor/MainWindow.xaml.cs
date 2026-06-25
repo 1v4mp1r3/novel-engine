@@ -240,6 +240,7 @@ public partial class MainWindow : Window
         var modifiers = Keyboard.Modifiers;
         var isTextEditing = IsTextEditing();
         var isGraphShortcutContext = IsGraphShortcutContext();
+        var isOutputShortcutContext = IsOutputShortcutContext();
         if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None)
         {
             _ = RunCompiledGameAsync(debugMode: false);
@@ -324,7 +325,11 @@ public partial class MainWindow : Window
             SaveProject();
             e.Handled = true;
         }
-        else if (e.Key == Key.B && Keyboard.Modifiers == ModifierKeys.Control)
+        else if (IsGlobalBuildShortcut(
+            e.Key,
+            modifiers,
+            isTextEditing,
+            isOutputShortcutContext))
         {
             _ = CompileGameAsync(debugSymbols: false, reportSuccess: true);
             e.Handled = true;
@@ -337,6 +342,10 @@ public partial class MainWindow : Window
     private bool IsGraphShortcutContext() =>
         Keyboard.FocusedElement is DependencyObject focused
         && IsDescendantOf(focused, Graph);
+
+    private bool IsOutputShortcutContext() =>
+        Keyboard.FocusedElement is DependencyObject focused
+        && IsDescendantOf(focused, OutputsGrid);
 
     private static bool IsDescendantOf(
         DependencyObject source,
@@ -385,6 +394,16 @@ public partial class MainWindow : Window
         && modifiers == ModifierKeys.None
         && !isTextEditing
         && isGraphShortcutContext;
+
+    internal static bool IsGlobalBuildShortcut(
+        Key key,
+        ModifierKeys modifiers,
+        bool isTextEditing,
+        bool isOutputShortcutContext) =>
+        key == Key.B
+        && modifiers == ModifierKeys.Control
+        && !isTextEditing
+        && !isOutputShortcutContext;
 
     private void SetProject(
         NovelProject project,
