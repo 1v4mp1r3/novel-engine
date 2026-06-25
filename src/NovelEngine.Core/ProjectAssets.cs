@@ -195,6 +195,7 @@ public static class ProjectAssets
     {
         var root = GetAssetsDirectory(projectPath);
         var changes = RemoveMissingManagedAssets(project, projectPath);
+        changes += RemoveMissingManagedFolders(project, root);
         if (!Directory.Exists(root))
         {
             return changes;
@@ -248,6 +249,28 @@ public static class ProjectAssets
             knownRelativePaths.Add(NormalizeRelativeAssetPath(imported.Path));
             knownAssetsByFullPath[ResolvePath(projectPath, imported)] = imported;
             changes += project.Assets.Count - before;
+        }
+
+        return changes;
+    }
+
+    private static int RemoveMissingManagedFolders(
+        NovelProject project,
+        string root)
+    {
+        var changes = 0;
+        for (var index = project.AssetFolders.Count - 1; index >= 0; index--)
+        {
+            var folder = NormalizeFolder(project.AssetFolders[index]);
+            if (IsDefaultProjectFolder(folder)
+                || HasAssetInFolder(project, folder)
+                || Directory.Exists(GetManagedFolderDirectory(root, folder)))
+            {
+                continue;
+            }
+
+            project.AssetFolders.RemoveAt(index);
+            changes++;
         }
 
         return changes;
@@ -543,9 +566,27 @@ public static class ProjectAssets
             StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsDefaultProjectFolder(string folder)
+    {
+        for (var index = 0; index < DefaultProjectFolders.Count; index++)
+        {
+            if (DefaultProjectFolders[index].Equals(
+                folder,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static string GetProjectDirectory(string projectPath) =>
         Path.GetDirectoryName(Path.GetFullPath(projectPath))
         ?? throw new InvalidOperationException("Не удалось определить папку проекта.");
+
+    private static string GetManagedFolderDirectory(string root, string folder) =>
+        Path.Combine(root, folder.Replace('/', Path.DirectorySeparatorChar));
 
     private static string ExistingManagedFolderDirectory(string projectPath, string folder)
     {

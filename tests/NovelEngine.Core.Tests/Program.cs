@@ -3131,6 +3131,8 @@ static void ProjectAssetSyncRemovesMissingManagedFiles()
         Directory.CreateDirectory(existingFolder);
         File.WriteAllBytes(Path.Combine(existingFolder, "existing.png"), [137, 80, 78, 71]);
         var project = NovelProject.CreateDefault();
+        ProjectAssets.CreateFolder(project, "custom/empty");
+        ProjectAssets.CreateFolder(project, "external");
         project.Assets.Add(new NovelAsset
         {
             Id = "missing_bg",
@@ -3177,6 +3179,11 @@ static void ProjectAssetSyncRemovesMissingManagedFiles()
         Assert(project.FindAsset("missing_bg") is null, "Missing managed image asset stayed registered.");
         Assert(project.FindAsset("missing_voice") is null, "Missing managed voice asset stayed registered.");
         Assert(project.FindAsset("external_ref") is not null, "Non-managed external asset was pruned.");
+        Assert(
+            !project.AssetFolders.Contains("custom")
+                && !project.AssetFolders.Contains("custom/empty"),
+            "Missing custom physical folders stayed registered.");
+        Assert(project.AssetFolders.Contains("external"), "Folder with a non-managed asset was pruned.");
         Assert(scene.Background.Length == 0, "Deleted managed background reference stayed on the node.");
         Assert(scene.Characters[0].VoiceSound.Length == 0, "Deleted managed voice stayed as node primary voice.");
         Assert(scene.Characters[0].VoiceSounds.Count == 0, "Deleted managed voice stayed in node voice list.");
@@ -3202,6 +3209,9 @@ static void ProjectAssetSyncRemovesMissingFilesRootAssets()
     {
         var projectPath = Path.Combine(directory, "story.novel.json");
         var project = NovelProject.CreateDefault();
+        ProjectAssets.CreateFolder(project, "backgrounds");
+        ProjectAssets.CreateFolder(project, "custom/empty");
+        ProjectAssets.CreateFolder(project, "external");
         project.Assets.Add(new NovelAsset
         {
             Id = "missing_bg",
@@ -3237,10 +3247,16 @@ static void ProjectAssetSyncRemovesMissingFilesRootAssets()
 
         var changes = ProjectAssets.SyncFromDisk(project, projectPath);
 
-        Assert(changes == 2, "Sync did not report the missing managed assets under a missing files root.");
+        Assert(changes == 4, "Sync did not report missing managed assets and folders under a missing files root.");
         Assert(project.FindAsset("missing_bg") is null, "Missing files root image asset stayed registered.");
         Assert(project.FindAsset("missing_voice") is null, "Missing files root voice asset stayed registered.");
         Assert(project.FindAsset("external_ref") is not null, "Missing files root pruned a non-managed asset.");
+        Assert(project.AssetFolders.Contains("backgrounds"), "Missing files root pruned a default folder.");
+        Assert(
+            !project.AssetFolders.Contains("custom")
+                && !project.AssetFolders.Contains("custom/empty"),
+            "Missing files root kept custom folders without files or assets.");
+        Assert(project.AssetFolders.Contains("external"), "Missing files root pruned a folder with a non-managed asset.");
         Assert(scene.Background.Length == 0, "Missing files root background reference stayed on the node.");
         Assert(scene.Characters[0].VoiceSound.Length == 0, "Missing files root voice stayed as primary voice.");
         Assert(scene.Characters[0].VoiceSounds.Count == 0, "Missing files root voice stayed in the voice list.");
@@ -3265,6 +3281,12 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     var removeMissingBody = ExtractMethodBody(
         source,
         "private static int RemoveMissingManagedAssets");
+    var removeFoldersBody = ExtractMethodBody(
+        source,
+        "private static int RemoveMissingManagedFolders");
+    var defaultFolderBody = ExtractMethodBody(
+        source,
+        "private static bool IsDefaultProjectFolder");
     var ensureFolderBody = ExtractMethodBody(
         source,
         "private static int EnsureFolder");
@@ -3280,6 +3302,9 @@ static void ProjectAssetSyncCachesGeneratedLookups()
     var pruneIndex = syncBody.IndexOf(
         "var changes = RemoveMissingManagedAssets(project, projectPath);",
         StringComparison.Ordinal);
+    var pruneFoldersIndex = syncBody.IndexOf(
+        "changes += RemoveMissingManagedFolders(project, root);",
+        StringComparison.Ordinal);
     var missingRootIndex = syncBody.IndexOf(
         "if (!Directory.Exists(root))",
         StringComparison.Ordinal);
@@ -3291,7 +3316,9 @@ static void ProjectAssetSyncCachesGeneratedLookups()
         syncBody.Contains("RemoveMissingManagedAssets(project, projectPath)", StringComparison.Ordinal),
         "Asset sync should prune missing managed assets before rebuilding lookup sets.");
     Assert(
-        pruneIndex >= 0 && missingRootIndex > pruneIndex,
+        pruneIndex >= 0
+            && pruneFoldersIndex > pruneIndex
+            && missingRootIndex > pruneFoldersIndex,
         "Asset sync should prune stale managed assets even when the files root is missing.");
     Assert(
         syncBody.Contains("BuildAssetFolderSet(project)", StringComparison.Ordinal),
@@ -3337,6 +3364,20 @@ static void ProjectAssetSyncCachesGeneratedLookups()
             && removeMissingBody.Contains("project.Assets.RemoveAt(index);", StringComparison.Ordinal)
             && !removeMissingBody.Contains("RemoveAll(", StringComparison.Ordinal),
         "Missing managed asset pruning should use a direct reverse pass and clean references.");
+    Assert(
+        removeFoldersBody.Contains(
+            "for (var index = project.AssetFolders.Count - 1; index >= 0; index--)",
+            StringComparison.Ordinal)
+            && removeFoldersBody.Contains("IsDefaultProjectFolder(folder)", StringComparison.Ordinal)
+            && removeFoldersBody.Contains("HasAssetInFolder(project, folder)", StringComparison.Ordinal)
+            && removeFoldersBody.Contains("Directory.Exists(GetManagedFolderDirectory(root, folder))", StringComparison.Ordinal)
+            && removeFoldersBody.Contains("project.AssetFolders.RemoveAt(index);", StringComparison.Ordinal)
+            && !removeFoldersBody.Contains("RemoveAll(", StringComparison.Ordinal),
+        "Missing custom folder pruning should use a direct reverse pass and preserve folders with assets.");
+    Assert(
+        defaultFolderBody.Contains("for (var index = 0; index < DefaultProjectFolders.Count; index++)", StringComparison.Ordinal)
+            && !defaultFolderBody.Contains(".Contains(", StringComparison.Ordinal),
+        "Default folder checks should use one direct pass over the fixed folder list.");
     Assert(
         !ensureFolderBody.Contains("AssetFolders.Contains", StringComparison.Ordinal),
         "Folder registration should use the cached folder set.");
