@@ -1747,7 +1747,8 @@ public static class AssetReference
         var extension = Path.GetExtension(path).ToLowerInvariant();
         return extension switch
         {
-            ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp" or ".gif" =>
+            ".png" or ".jpg" or ".jpeg" or ".jpe" or ".jfif"
+                or ".webp" or ".bmp" or ".gif" or ".tif" or ".tiff" or ".ico" =>
                 AssetKind.Image,
             ".mp3" or ".wav" or ".wma" or ".aac" or ".m4a" or ".ogg" or ".flac" =>
                 AssetKind.Audio,

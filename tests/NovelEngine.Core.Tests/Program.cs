@@ -47,6 +47,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu and character voice survive JSON", MainMenuAndVoiceRoundTrip),
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("character voice sounds normalize without linq", CharacterVoiceSoundsNormalizeWithoutLinq),
+    ("asset kind detects common image extensions", AssetKindDetectsCommonImageExtensions),
     ("asset reference lookups avoid linq pipelines", AssetReferenceLookupsAvoidLinqPipelines),
     ("removed voice assets are cleared from characters", RemovedVoiceAssetsAreClearedFromCharacters),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
@@ -2301,6 +2302,32 @@ static void MainMenuAndVoiceAssetReferences()
         scene.Characters.Single().VoiceSounds.Count(
             value => value.Equals("@voice_main", StringComparison.OrdinalIgnoreCase)) == 1,
         "Replacing voice assets with the same target should not store duplicates.");
+}
+
+static void AssetKindDetectsCommonImageExtensions()
+{
+    foreach (var extension in new[]
+             {
+                 ".png",
+                 ".jpg",
+                 ".jpeg",
+                 ".jpe",
+                 ".jfif",
+                 ".webp",
+                 ".bmp",
+                 ".gif",
+                 ".tif",
+                 ".tiff",
+                 ".ico",
+             })
+    {
+        Assert(
+            AssetReference.GuessKind($"asset{extension}") == AssetKind.Image,
+            $"Image extension was not detected: {extension}");
+        Assert(
+            AssetReference.GuessKind($"ASSET{extension.ToUpperInvariant()}") == AssetKind.Image,
+            $"Uppercase image extension was not detected: {extension}");
+    }
 }
 
 static void AssetReferenceLookupsAvoidLinqPipelines()
