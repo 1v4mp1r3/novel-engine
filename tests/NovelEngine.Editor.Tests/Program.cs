@@ -2151,6 +2151,14 @@ static void ScreenshotAssetSmokeUsesDirectScans()
     var voiceReferenceBody = ExtractMethodBody(source, "private static bool CharacterHasVoiceReference");
 
     Assert(
+        !source.Contains(".Single(", StringComparison.Ordinal)
+            && !source.Contains(".First(", StringComparison.Ordinal)
+            && !source.Contains(".Cast<", StringComparison.Ordinal)
+            && !source.Contains(".Where(", StringComparison.Ordinal)
+            && !source.Contains(".Select(", StringComparison.Ordinal)
+            && !source.Contains(".ToList(", StringComparison.Ordinal),
+        "Screenshot renderer smoke setup should avoid LINQ lookup pipelines.");
+    Assert(
         smokeBody.Contains("TryFindAssetSmokeItems(", StringComparison.Ordinal)
             && smokeBody.Contains("FindNodeByKind(project, NodeKind.Scene)", StringComparison.Ordinal)
             && smokeBody.Contains("FindNodeById(window.ProjectForSmoke, scene.Id)", StringComparison.Ordinal)
@@ -3117,6 +3125,9 @@ static void VisualScriptFilterUsesDebouncedRefresh()
     var constructorBody = ExtractMethodBody(
         source,
         "public VisualScriptBlocksWindow(");
+    var blockEditorConstructorBody = ExtractMethodBody(
+        source,
+        "public VisualScriptBlockEditorWindow(");
     var pasteBody = ExtractMethodBody(source, "private void PasteBlocks");
     var importBody = ExtractMethodBody(source, "private void ImportFromScript");
     var refreshBody = ExtractMethodBody(
@@ -3128,6 +3139,9 @@ static void VisualScriptFilterUsesDebouncedRefresh()
     var normalizeBody = ExtractMethodBody(
         source,
         "private static IReadOnlyList<string> NormalizeVariables");
+    var findKindChoiceBody = ExtractMethodBody(
+        source,
+        "private static BlockKindChoice FindKindChoice");
 
     Assert(
         source.Contains(
@@ -3168,6 +3182,12 @@ static void VisualScriptFilterUsesDebouncedRefresh()
             && !cloneBody.Contains(".Select(", StringComparison.Ordinal)
             && !cloneBody.Contains(".ToList(", StringComparison.Ordinal),
         "Visual script block snapshots should clone with direct loops.");
+    Assert(
+        blockEditorConstructorBody.Contains("SelectedItem = FindKindChoice(block.Kind)", StringComparison.Ordinal)
+            && findKindChoiceBody.Contains("for (var index = 0; index < KindChoices.Count; index++)", StringComparison.Ordinal)
+            && !blockEditorConstructorBody.Contains("KindChoices.First(", StringComparison.Ordinal)
+            && !findKindChoiceBody.Contains(".First(", StringComparison.Ordinal),
+        "Visual script block kind selection should use a direct helper.");
     Assert(
         !pasteBody.Contains(".ToList(", StringComparison.Ordinal)
             && importBody.Contains("foreach (var block in imported)", StringComparison.Ordinal)
@@ -3276,6 +3296,11 @@ static void ScriptLiteralLoadSuppressesChangeEvents()
         "ScriptLiteralEditorControl.cs"));
     var loadBody = ExtractMethodBody(source, "public void LoadLiteral");
     var raiseBody = ExtractMethodBody(source, "private void RaiseLiteralChanged");
+    var constructorBody = ExtractMethodBody(source, "public ScriptLiteralEditorControl()");
+    var selectKindBody = ExtractMethodBody(source, "private void SelectKind");
+    var findKindChoiceBody = ExtractMethodBody(
+        source,
+        "private static LiteralKindChoice FindKindChoice");
 
     Assert(
         source.Contains("private bool _suppressLiteralChanged;", StringComparison.Ordinal),
@@ -3292,6 +3317,12 @@ static void ScriptLiteralLoadSuppressesChangeEvents()
         raiseBody.Contains("if (!_suppressLiteralChanged)", StringComparison.Ordinal)
             && raiseBody.Contains("LiteralChanged?.Invoke(this, EventArgs.Empty);", StringComparison.Ordinal),
         "Script literal changes should still notify after interactive edits.");
+    Assert(
+        constructorBody.Contains("SelectedItem = FindKindChoice(ScriptLiteralKind.Raw)", StringComparison.Ordinal)
+            && selectKindBody.Contains("_kindBox.SelectedItem = FindKindChoice(kind);", StringComparison.Ordinal)
+            && findKindChoiceBody.Contains("for (var index = 0; index < KindChoices.Count; index++)", StringComparison.Ordinal)
+            && !source.Contains("KindChoices.First(", StringComparison.Ordinal),
+        "Script literal kind selection should use a direct helper.");
 }
 
 static void ScriptBlockDialogGuardSkipsUnchangedApply()
@@ -4284,8 +4315,10 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
         "Node asset choices should be cached through a direct filter and sort pass.");
     Assert(
         refreshAssetPickerBody.Contains("FindFolderOption(folderOptions, selectedFolder)", StringComparison.Ordinal)
+            && refreshAssetPickerBody.Contains("?? folderOptions[0]", StringComparison.Ordinal)
             && preferredFolderBody.Contains("FindPreferredFolderOption(options, preferred)", StringComparison.Ordinal)
             && refreshAssetChoicesBody.Contains("FindAssetChoice(choices, currentAsset)", StringComparison.Ordinal)
+            && !refreshAssetPickerBody.Contains(".First(", StringComparison.Ordinal)
             && !refreshAssetPickerBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
             && !preferredFolderBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
             && !refreshAssetChoicesBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),

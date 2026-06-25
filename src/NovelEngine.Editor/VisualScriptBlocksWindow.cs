@@ -680,7 +680,7 @@ public sealed class VisualScriptBlockEditorWindow : Window
         {
             ItemsSource = KindChoices,
             DisplayMemberPath = nameof(BlockKindChoice.Label),
-            SelectedItem = KindChoices.First(choice => choice.Kind == block.Kind),
+            SelectedItem = FindKindChoice(block.Kind),
             Margin = new Thickness(0, 4, 0, 12),
         };
         _kindBox.SelectionChanged += (_, _) => UpdateFields();
@@ -786,6 +786,20 @@ public sealed class VisualScriptBlockEditorWindow : Window
     private sealed record BlockKindChoice(
         VisualScriptBlockKind Kind,
         string Label);
+
+    private static BlockKindChoice FindKindChoice(VisualScriptBlockKind kind)
+    {
+        for (var index = 0; index < KindChoices.Count; index++)
+        {
+            var choice = KindChoices[index];
+            if (choice.Kind == kind)
+            {
+                return choice;
+            }
+        }
+
+        return KindChoices[0];
+    }
 
     private static IReadOnlyList<string> NormalizeVariables(
         IEnumerable<string>? variables)

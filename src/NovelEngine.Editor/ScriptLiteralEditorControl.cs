@@ -19,7 +19,7 @@ public sealed class ScriptLiteralEditorControl : StackPanel
         {
             ItemsSource = KindChoices,
             DisplayMemberPath = nameof(LiteralKindChoice.Label),
-            SelectedItem = KindChoices.First(choice => choice.Kind == ScriptLiteralKind.Raw),
+            SelectedItem = FindKindChoice(ScriptLiteralKind.Raw),
             Margin = new Thickness(0, 4, 0, 8),
         };
         _valueBox = DialogUi.TextBox(string.Empty);
@@ -152,7 +152,7 @@ public sealed class ScriptLiteralEditorControl : StackPanel
 
     private void SelectKind(ScriptLiteralKind kind)
     {
-        _kindBox.SelectedItem = KindChoices.First(choice => choice.Kind == kind);
+        _kindBox.SelectedItem = FindKindChoice(kind);
         UpdateValueBox();
     }
 
@@ -200,6 +200,20 @@ public sealed class ScriptLiteralEditorControl : StackPanel
     ];
 
     private sealed record LiteralKindChoice(ScriptLiteralKind Kind, string Label);
+
+    private static LiteralKindChoice FindKindChoice(ScriptLiteralKind kind)
+    {
+        for (var index = 0; index < KindChoices.Count; index++)
+        {
+            var choice = KindChoices[index];
+            if (choice.Kind == kind)
+            {
+                return choice;
+            }
+        }
+
+        return KindChoices[0];
+    }
 
     private enum ScriptLiteralKind
     {

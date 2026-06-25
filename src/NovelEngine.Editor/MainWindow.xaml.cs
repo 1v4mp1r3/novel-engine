@@ -1850,7 +1850,7 @@ public partial class MainWindow : Window
             ?? PreferredFolder(folderOptions, preferredFolders)
             ?? string.Empty;
         folderBox.SelectedItem = FindFolderOption(folderOptions, selectedFolder)
-            ?? folderOptions.First();
+            ?? folderOptions[0];
         RefreshAssetChoices(assetBox, kind, selectedFolder, currentReference);
         folderBox.IsEnabled = enabled && folderOptions.Count > 1;
         assetBox.IsEnabled = enabled;

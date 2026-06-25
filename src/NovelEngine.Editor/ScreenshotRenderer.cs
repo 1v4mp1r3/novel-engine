@@ -67,7 +67,7 @@ internal static class ScreenshotRenderer
                 Kind = AssetKind.Image,
                 Path = character,
             });
-        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        var scene = FindNodeByKind(project, NodeKind.Scene);
         scene.Background = "@preview_background";
         scene.InheritBackground = false;
         scene.InheritCharacters = false;
@@ -79,7 +79,7 @@ internal static class ScreenshotRenderer
                 Sprite = "@preview_character",
                 Position = CharacterPosition.Left,
             });
-        var dialogue = project.Nodes.Single(node => node.Kind == NodeKind.Dialogue);
+        var dialogue = FindNodeByKind(project, NodeKind.Dialogue);
 
         var window = new PreviewWindow(project, dialogue.Id, assetDirectory)
         {
@@ -107,7 +107,7 @@ internal static class ScreenshotRenderer
         CreateImage(character, 360, 640, backgroundImage: false);
 
         var project = NovelProject.CreateDefault();
-        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        var scene = FindNodeByKind(project, NodeKind.Scene);
         scene.Background = background;
         scene.InheritBackground = false;
         scene.InheritCharacters = false;
@@ -166,7 +166,7 @@ internal static class ScreenshotRenderer
             Path.Combine(rootDirectory, "preview.novel.json"),
             character,
             "characters");
-        var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+        var scene = FindNodeByKind(project, NodeKind.Scene);
         scene.Background = AssetReference.Create(backgroundAsset.Id);
         scene.InheritBackground = false;
         scene.InheritCharacters = false;
@@ -188,8 +188,7 @@ internal static class ScreenshotRenderer
             Path.Combine(rootDirectory, "build"),
             debugSymbols: true);
         var loaded = NovelBuildCompiler.LoadBuild(build.ManifestPath);
-        var dialogue = loaded.Project.Nodes.Single(
-            node => node.Kind == NodeKind.Dialogue);
+        var dialogue = FindNodeByKind(loaded.Project, NodeKind.Dialogue);
         var window = new PreviewWindow(
             loaded.Project,
             dialogue.Id,
