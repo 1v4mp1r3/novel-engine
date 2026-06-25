@@ -340,7 +340,11 @@ public static class ProjectAssets
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var folder in project.AssetFolders)
         {
-            folders.Add(folder);
+            var normalized = NormalizeFolder(folder);
+            if (normalized.Length > 0)
+            {
+                folders.Add(normalized);
+            }
         }
 
         return folders;
@@ -666,9 +670,11 @@ public static class ProjectAssets
 
     private static bool FolderExists(NovelProject project, string folder)
     {
+        folder = NormalizeFolder(folder);
         for (var index = 0; index < project.AssetFolders.Count; index++)
         {
-            if (project.AssetFolders[index].Equals(
+            var candidate = NormalizeFolder(project.AssetFolders[index]);
+            if (candidate.Equals(
                     folder,
                     StringComparison.OrdinalIgnoreCase))
             {
@@ -712,9 +718,11 @@ public static class ProjectAssets
 
     private static void RemoveFolder(NovelProject project, string folder)
     {
+        folder = NormalizeFolder(folder);
         for (var index = project.AssetFolders.Count - 1; index >= 0; index--)
         {
-            if (project.AssetFolders[index].Equals(
+            var candidate = NormalizeFolder(project.AssetFolders[index]);
+            if (candidate.Equals(
                     folder,
                     StringComparison.OrdinalIgnoreCase))
             {

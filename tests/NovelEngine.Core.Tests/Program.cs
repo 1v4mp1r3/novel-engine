@@ -61,6 +61,7 @@ var tests = new (string Name, Action Run)[]
     ("project asset import copies and registers files", ProjectAssetImportCopiesFiles),
     ("project asset import many reuses lookups", ProjectAssetImportManyReusesLookups),
     ("project default file structure is created", ProjectDefaultFileStructureIsCreated),
+    ("project asset folders normalize legacy entries", ProjectAssetFoldersNormalizeLegacyEntries),
     ("project asset sync discovers files from disk", ProjectAssetSyncDiscoversFilesFromDisk),
     ("project asset sync preserves managed file paths", ProjectAssetSyncPreservesManagedFilePaths),
     ("project asset sync normalizes existing path separators", ProjectAssetSyncNormalizesExistingPathSeparators),
@@ -3072,6 +3073,27 @@ static void ProjectDefaultFileStructureIsCreated()
     }
 }
 
+static void ProjectAssetFoldersNormalizeLegacyEntries()
+{
+    var project = NovelProject.CreateDefault();
+    project.AssetFolders.Add(@"backgrounds\");
+
+    var changes = ProjectAssets.EnsureDefaultFolders(project);
+
+    Assert(
+        changes == ProjectAssets.DefaultProjectFolders.Count - 1,
+        "Legacy-normalized folder entry was registered as a new default folder.");
+    Assert(
+        CountNormalizedAssetFolders(project, "backgrounds") == 1,
+        "Legacy-normalized folder entry created a duplicate backgrounds folder.");
+
+    ProjectAssets.CreateFolder(project, "/backgrounds");
+
+    Assert(
+        CountNormalizedAssetFolders(project, "backgrounds") == 1,
+        "Creating an existing legacy-normalized folder added a duplicate.");
+}
+
 static void ProjectAssetSyncDiscoversFilesFromDisk()
 {
     var directory = Path.Combine(
@@ -3493,9 +3515,10 @@ static void ProjectAssetSyncCachesGeneratedLookups()
         "Asset id set should be built in one direct pass.");
     Assert(
         folderSetBody.Contains("foreach (var folder in project.AssetFolders)", StringComparison.Ordinal)
-            && folderSetBody.Contains("folders.Add(folder)", StringComparison.Ordinal)
+            && folderSetBody.Contains("var normalized = NormalizeFolder(folder);", StringComparison.Ordinal)
+            && folderSetBody.Contains("folders.Add(normalized)", StringComparison.Ordinal)
             && !folderSetBody.Contains(".ToHashSet(", StringComparison.Ordinal),
-        "Asset folder set should be built in one direct pass.");
+        "Asset folder set should be normalized in one direct pass.");
 }
 
 static void AssetFoldersMoveFiles()
@@ -3697,10 +3720,14 @@ static void AssetFolderDeleteScansDirectoriesOnce()
         "DeleteFolder should route folder checks and removal through direct helpers.");
     Assert(
         folderExistsBody.Contains("for (var index = 0; index < project.AssetFolders.Count; index++)", StringComparison.Ordinal)
+            && folderExistsBody.Contains("folder = NormalizeFolder(folder);", StringComparison.Ordinal)
+            && folderExistsBody.Contains("var candidate = NormalizeFolder(project.AssetFolders[index]);", StringComparison.Ordinal)
             && hasAssetBody.Contains("foreach (var asset in project.Assets)", StringComparison.Ordinal)
             && hasNestedBody.Contains("foreach (var candidate in project.AssetFolders)", StringComparison.Ordinal)
             && directoryHasEntriesBody.Contains(".GetEnumerator()", StringComparison.Ordinal)
             && removeFolderBody.Contains("for (var index = project.AssetFolders.Count - 1; index >= 0; index--)", StringComparison.Ordinal)
+            && removeFolderBody.Contains("folder = NormalizeFolder(folder);", StringComparison.Ordinal)
+            && removeFolderBody.Contains("var candidate = NormalizeFolder(project.AssetFolders[index]);", StringComparison.Ordinal)
             && !folderExistsBody.Contains(".Any(", StringComparison.Ordinal)
             && !hasAssetBody.Contains(".Any(", StringComparison.Ordinal)
             && !hasNestedBody.Contains(".Any(", StringComparison.Ordinal)
@@ -4289,6 +4316,22 @@ static int CountOccurrences(string source, string value)
     {
         count++;
         offset += value.Length;
+    }
+    return count;
+}
+
+static int CountNormalizedAssetFolders(NovelProject project, string folder)
+{
+    var normalizedFolder = ProjectAssets.NormalizeFolder(folder);
+    var count = 0;
+    foreach (var candidate in project.AssetFolders)
+    {
+        if (ProjectAssets.NormalizeFolder(candidate).Equals(
+                normalizedFolder,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            count++;
+        }
     }
     return count;
 }
