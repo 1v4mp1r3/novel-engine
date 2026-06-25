@@ -132,6 +132,7 @@ var tests = new (string Name, Action Run)[]
     ("main window closing stops editor timers", MainWindowClosingStopsEditorTimers),
     ("graph surface shortcuts use exact modifiers", GraphSurfaceShortcutsUseExactModifiers),
     ("graph drag movement skips micro deltas", GraphDragMovementSkipsMicroDeltas),
+    ("graph grid starts on visible lines", GraphGridStartsOnVisibleLines),
     ("graph node drag defers hit cache rebuild", GraphNodeDragDefersHitCacheRebuild),
     ("graph surface uses cached node lookup", GraphSurfaceUsesCachedNodeLookup),
     ("graph centering calculates bounds in one pass", GraphCenteringCalculatesBoundsInOnePass),
@@ -5481,6 +5482,22 @@ static void GraphDragMovementSkipsMicroDeltas()
     Assert(
         GraphSurface.HasMeaningfulDragPositionChange(10, 20, 10, 20.5),
         "Graph node drag at the render threshold should update Y.");
+}
+
+static void GraphGridStartsOnVisibleLines()
+{
+    Assert(
+        GraphSurface.NormalizeGridLineStart(80, 32) == 16,
+        "Positive graph grid offset was changed.");
+    Assert(
+        GraphSurface.NormalizeGridLineStart(-10, 32) == 22,
+        "Negative graph grid offset should advance to the first visible line.");
+    Assert(
+        GraphSurface.NormalizeGridLineStart(-33, 32) == 31,
+        "Negative graph grid offset should skip offscreen lines.");
+    Assert(
+        GraphSurface.NormalizeGridLineStart(-64, 32) == 0,
+        "Exact negative grid multiples should start at the viewport edge.");
 }
 
 static void GraphNodeDragDefersHitCacheRebuild()

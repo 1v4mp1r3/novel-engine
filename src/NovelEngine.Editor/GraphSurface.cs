@@ -1049,8 +1049,8 @@ public sealed class GraphSurface : FrameworkElement
 
     private void DrawGrid(DrawingContext drawingContext)
     {
-        var startX = _viewOffset.X % GridSize;
-        var startY = _viewOffset.Y % GridSize;
+        var startX = NormalizeGridLineStart(_viewOffset.X, GridSize);
+        var startY = NormalizeGridLineStart(_viewOffset.Y, GridSize);
         for (var x = startX; x < ActualWidth; x += GridSize)
         {
             drawingContext.DrawLine(GridPen, new Point(x, 0), new Point(x, ActualHeight));
@@ -1059,6 +1059,12 @@ public sealed class GraphSurface : FrameworkElement
         {
             drawingContext.DrawLine(GridPen, new Point(0, y), new Point(ActualWidth, y));
         }
+    }
+
+    internal static double NormalizeGridLineStart(double viewOffset, double gridSize)
+    {
+        var start = viewOffset % gridSize;
+        return start < 0 ? start + gridSize : start;
     }
 
     private void DrawConnections(DrawingContext drawingContext, Rect viewport)
