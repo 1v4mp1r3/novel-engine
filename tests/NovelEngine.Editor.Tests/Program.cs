@@ -14,6 +14,7 @@ var tests = new (string Name, Action Run)[]
     ("workspace project path avoids existing file", WorkspaceProjectPathAvoidsExistingFile),
     ("workspace project can be resolved after creation", WorkspaceProjectCanBeResolvedAfterCreation),
     ("autosave policy skips unchanged saved projects", AutoSavePolicySkipsUnchangedSavedProjects),
+    ("autosave keeps pending code changes dirty", AutoSaveKeepsPendingCodeChangesDirty),
     ("manual save policy skips unchanged saved projects", ManualSavePolicySkipsUnchangedSavedProjects),
     ("file probes use direct checks", FileProbesUseDirectChecks),
     ("project resolver opens direct project file", ProjectResolverOpensDirectProjectFile),
@@ -307,6 +308,25 @@ static void AutoSavePolicySkipsUnchangedSavedProjects()
             workspaceNeedsProjectFile: true,
             codeHasPendingChanges: false),
         "Autosave should skip unsaved projects without a workspace directory.");
+}
+
+static void AutoSaveKeepsPendingCodeChangesDirty()
+{
+    Assert(
+        MainWindow.ShouldRemainDirtyAfterAutoSave(codeHasPendingChanges: true),
+        "Autosave should keep the project dirty while DSL changes are still unapplied.");
+    Assert(
+        !MainWindow.ShouldRemainDirtyAfterAutoSave(codeHasPendingChanges: false),
+        "Autosave should clear dirty state when all changes are represented in the graph.");
+    Assert(
+        MainWindow.ShouldConfirmDiscardChanges(dirty: false, codeHasPendingChanges: true),
+        "Closing should confirm unapplied DSL changes even after autosave saved the source text.");
+    Assert(
+        MainWindow.ShouldConfirmDiscardChanges(dirty: true, codeHasPendingChanges: false),
+        "Closing should still confirm normal dirty project changes.");
+    Assert(
+        !MainWindow.ShouldConfirmDiscardChanges(dirty: false, codeHasPendingChanges: false),
+        "Closing should skip confirmation only when the project and code are both clean.");
 }
 
 static void ManualSavePolicySkipsUnchangedSavedProjects()

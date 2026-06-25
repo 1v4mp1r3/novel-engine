@@ -4656,7 +4656,7 @@ public partial class MainWindow : Window
 
     private bool ConfirmDiscardChanges()
     {
-        if (!_dirty)
+        if (!ShouldConfirmDiscardChanges(_dirty, _codeHasPendingChanges))
         {
             return true;
         }
@@ -4674,6 +4674,11 @@ public partial class MainWindow : Window
             _ => false,
         };
     }
+
+    internal static bool ShouldConfirmDiscardChanges(
+        bool dirty,
+        bool codeHasPendingChanges) =>
+        dirty || codeHasPendingChanges;
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
@@ -6666,7 +6671,7 @@ public partial class MainWindow : Window
             ProjectSerializer.Save(_project, projectPath);
             WriteAutoSaveSnapshot();
             _savedProjectSnapshot = CaptureProjectSnapshot();
-            _dirty = false;
+            _dirty = ShouldRemainDirtyAfterAutoSave(_codeHasPendingChanges);
             _workspaceNeedsProjectFile = false;
             RefreshWindowTitle();
             StatusText.Text = $"Автосохранено {DateTime.Now:HH:mm}";
@@ -6679,6 +6684,9 @@ public partial class MainWindow : Window
             StatusText.Text = $"Автосохранение не удалось: {error.Message}";
         }
     }
+
+    internal static bool ShouldRemainDirtyAfterAutoSave(bool codeHasPendingChanges) =>
+        codeHasPendingChanges;
 
     internal static bool ShouldRunAutoSave(
         bool hasProjectPath,
