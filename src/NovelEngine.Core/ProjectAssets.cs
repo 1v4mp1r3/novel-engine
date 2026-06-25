@@ -127,7 +127,7 @@ public static class ProjectAssets
         var fileName = Path.GetFileName(source);
         var target = Path.Combine(targetDirectory, fileName);
         var suffix = 2;
-        while (File.Exists(target)
+        while (FileSystemPathExists(target)
             && !string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
         {
             target = Path.Combine(
@@ -720,7 +720,7 @@ public static class ProjectAssets
     {
         var target = Path.Combine(directory, fileName);
         var suffix = 2;
-        while (File.Exists(target))
+        while (FileSystemPathExists(target))
         {
             target = Path.Combine(
                 directory,
@@ -728,5 +728,10 @@ public static class ProjectAssets
                 + Path.GetExtension(fileName));
         }
         return target;
+    }
+
+    private static bool FileSystemPathExists(string path)
+    {
+        return File.Exists(path) || Directory.Exists(path);
     }
 }

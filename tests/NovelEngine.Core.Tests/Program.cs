@@ -2866,6 +2866,22 @@ static void ProjectAssetImportCopiesFiles()
         Assert(
             Path.GetFileName(secondTarget).Contains("-2", StringComparison.Ordinal),
             "Second imported asset did not receive a unique file name.");
+
+        var directoryConflictSource = Path.Combine(directory, "Castle.png");
+        File.WriteAllBytes(directoryConflictSource, [137, 80, 78, 71, 4]);
+        Directory.CreateDirectory(Path.Combine(
+            directory,
+            "files",
+            "backgrounds",
+            "Castle.png"));
+        var directoryConflictAsset = ProjectAssets.Import(
+            project,
+            projectPath,
+            directoryConflictSource);
+        Assert(
+            Path.GetFileName(ProjectAssets.ResolvePath(projectPath, directoryConflictAsset))
+                == "Castle-2.png",
+            "Imported asset reused a path occupied by an existing directory.");
         Assert(
             target.Contains(
                 Path.Combine("files", "backgrounds"),
@@ -2939,6 +2955,10 @@ static void ProjectAssetImportManyReusesLookups()
         var importCoreBody = ExtractMethodBody(
             source,
             "private static NovelAsset ImportCore");
+        var uniquePathBody = ExtractMethodBody(source, "private static string UniquePath");
+        var pathExistsBody = ExtractMethodBody(
+            source,
+            "private static bool FileSystemPathExists");
 
         Assert(
             CountOccurrences(importManyBody, "BuildAssetIdSet(project)") == 1
@@ -2954,6 +2974,11 @@ static void ProjectAssetImportManyReusesLookups()
                 && importCoreBody.Contains("knownAssetsByFullPath[source] = asset", StringComparison.Ordinal)
                 && importCoreBody.Contains("knownAssetsByFullPath[Path.GetFullPath(target)] = asset", StringComparison.Ordinal),
             "Shared import implementation should use cached path, folder, and id lookups.");
+        Assert(
+            importCoreBody.Contains("FileSystemPathExists(target)", StringComparison.Ordinal)
+                && uniquePathBody.Contains("FileSystemPathExists(target)", StringComparison.Ordinal)
+                && pathExistsBody.Contains("File.Exists(path) || Directory.Exists(path)", StringComparison.Ordinal),
+            "Asset path collision checks should avoid both existing files and directories.");
     }
     finally
     {
@@ -3442,6 +3467,9 @@ static void AssetFoldersMoveFiles()
             "hero.png");
         Directory.CreateDirectory(Path.GetDirectoryName(conflictingTarget)!);
         File.WriteAllBytes(conflictingTarget, [137, 80, 78, 71, 2]);
+        Directory.CreateDirectory(Path.Combine(
+            Path.GetDirectoryName(conflictingTarget)!,
+            "hero-2.png"));
         ProjectAssets.MoveAsset(
             project,
             projectPath,
@@ -3456,8 +3484,8 @@ static void AssetFoldersMoveFiles()
         Assert(File.Exists(conflictingTarget), "Existing target file was overwritten.");
         Assert(
             Path.GetFileName(ProjectAssets.ResolvePath(projectPath, asset))
-                == "hero-2.png",
-            "Moved asset did not receive a unique file name.");
+                == "hero-3.png",
+            "Moved asset reused a target path occupied by an existing directory.");
         Assert(
             project.ResolveAssetReference(scene.Background) == asset.Path,
             "Moved asset reference did not resolve to the new asset path.");
