@@ -225,12 +225,29 @@ static void WorkspaceProjectPathAvoidsExistingFile()
             Path.GetFileName(secondPath) == $"{Path.GetFileName(directory)}-2.novel.json",
             "Available project path did not use the expected numeric suffix.");
 
+        Directory.CreateDirectory(secondPath);
+        var thirdPath = ProjectWorkspace.GetAvailableProjectPath(directory);
+        Assert(
+            Path.GetFileName(thirdPath) == $"{Path.GetFileName(directory)}-3.novel.json",
+            "Available project path reused an existing directory.");
+
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "src",
             "NovelEngine.Editor",
             "ProjectWorkspace.cs"));
+        var availablePathBody = ExtractMethodBody(
+            source,
+            "public static string GetAvailableProjectPath");
+        var isAvailableBody = ExtractMethodBody(
+            source,
+            "private static bool IsProjectPathAvailable");
         var safeStemBody = ExtractMethodBody(source, "private static string MakeSafeFileStem");
+        Assert(
+            availablePathBody.Contains("IsProjectPathAvailable(preferred)", StringComparison.Ordinal)
+                && availablePathBody.Contains("IsProjectPathAvailable(candidate)", StringComparison.Ordinal)
+                && isAvailableBody.Contains("!File.Exists(path) && !Directory.Exists(path)", StringComparison.Ordinal),
+            "Workspace project path selection should avoid existing files and directories.");
         Assert(
             source.Contains("private static readonly HashSet<char> InvalidFileNameChars", StringComparison.Ordinal)
                 && safeStemBody.Contains("for (var index = 0; index < source.Length; index++)", StringComparison.Ordinal)

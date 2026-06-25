@@ -44,7 +44,7 @@ internal static class ProjectWorkspace
         }
 
         var preferred = Path.Combine(workspaceDirectory, $"{baseName}.novel.json");
-        if (!File.Exists(preferred))
+        if (IsProjectPathAvailable(preferred))
         {
             return preferred;
         }
@@ -55,11 +55,16 @@ internal static class ProjectWorkspace
             var candidate = Path.Combine(
                 workspaceDirectory,
                 $"{baseName}-{suffix++}.novel.json");
-            if (!File.Exists(candidate))
+            if (IsProjectPathAvailable(candidate))
             {
                 return candidate;
             }
         }
+    }
+
+    private static bool IsProjectPathAvailable(string path)
+    {
+        return !File.Exists(path) && !Directory.Exists(path);
     }
 
     private static string MakeSafeFileStem(string? source)
