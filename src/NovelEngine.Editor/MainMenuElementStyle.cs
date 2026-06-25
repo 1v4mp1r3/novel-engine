@@ -95,13 +95,26 @@ internal sealed class MainMenuElementStyle
         return null;
     }
 
-    private static string NormalizeKey(string key) =>
-        string.Concat(
-            key.Where(character =>
-                !char.IsWhiteSpace(character)
-                && character != '-'
-                && character != '_'))
-            .ToLowerInvariant();
+    private static string NormalizeKey(string key)
+    {
+        var buffer = new char[key.Length];
+        var count = 0;
+        for (var index = 0; index < key.Length; index++)
+        {
+            var character = key[index];
+            if (char.IsWhiteSpace(character)
+                || character == '-'
+                || character == '_')
+            {
+                continue;
+            }
+
+            buffer[count] = char.ToLowerInvariant(character);
+            count++;
+        }
+
+        return new string(buffer, 0, count);
+    }
 
     private static Brush ParseBrush(string value, Color fallback)
     {
@@ -174,18 +187,15 @@ internal sealed class MainMenuElementStyle
         {
             return new CornerRadius(0);
         }
-        var parts = value
-            .Split([',', ' '], StringSplitOptions.RemoveEmptyEntries)
-            .Select(part => ParseDouble(part, 0))
-            .ToArray();
+        var parts = value.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries);
         return parts.Length switch
         {
-            1 => new CornerRadius(Math.Max(0, parts[0])),
+            1 => new CornerRadius(Math.Max(0, ParseDouble(parts[0], 0))),
             4 => new CornerRadius(
-                Math.Max(0, parts[0]),
-                Math.Max(0, parts[1]),
-                Math.Max(0, parts[2]),
-                Math.Max(0, parts[3])),
+                Math.Max(0, ParseDouble(parts[0], 0)),
+                Math.Max(0, ParseDouble(parts[1], 0)),
+                Math.Max(0, ParseDouble(parts[2], 0)),
+                Math.Max(0, ParseDouble(parts[3], 0))),
             _ => new CornerRadius(0),
         };
     }

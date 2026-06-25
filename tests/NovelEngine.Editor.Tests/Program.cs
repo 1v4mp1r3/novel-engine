@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using NovelEngine.Core;
 using NovelEngine.Editor;
 
@@ -115,6 +116,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu property panel stamp tracks fields", MainMenuPropertyPanelStampTracksFields),
     ("main menu element list stamp tracks visible rows", MainMenuElementListStampTracksVisibleRows),
     ("main menu stage stamp tracks rendered state", MainMenuStageStampTracksRenderedState),
+    ("main menu element style parses directly", MainMenuElementStyleParsesDirectly),
     ("scene editor transform clamps and skips micro moves", SceneEditorTransformClampsAndSkipsMicroMoves),
     ("scene editor character list stamp tracks visible rows", SceneEditorCharacterListStampTracksVisibleRows),
     ("modal editors skip hidden graph refresh", ModalEditorsSkipHiddenGraphRefresh),
@@ -4455,6 +4457,55 @@ static void MainMenuStageStampTracksRenderedState()
     Assert(
         baseline != MainMenuEditorWindow.CreateStageStamp(design, "start"),
         "Main menu stage stamp should track background changes.");
+}
+
+static void MainMenuElementStyleParsesDirectly()
+{
+    var element = new MainMenuElement
+    {
+        Id = "styled-button",
+        Foreground = "#FFFFFF",
+        Background = "#222222",
+        Border = "#333333",
+        FontSize = 20,
+        CustomStyleCode = string.Join(
+            "; ",
+            "font_weight = bold",
+            "font-style: italic",
+            "text-align = left",
+            "corner_radius: 4 8 12 16",
+            "opacity = 0.5"),
+    };
+
+    var style = MainMenuElementStyle.From(element, Colors.Black, Colors.White);
+
+    Assert(style.FontWeight == FontWeights.Bold, "Main menu style should parse normalized font weight.");
+    Assert(style.FontStyle == FontStyles.Italic, "Main menu style should parse normalized font style.");
+    Assert(style.TextAlignment == TextAlignment.Left, "Main menu style should parse normalized alignment.");
+    Assert(Math.Abs(style.CornerRadius.TopLeft - 4) < 0.001, "Main menu style should parse top-left radius.");
+    Assert(Math.Abs(style.CornerRadius.TopRight - 8) < 0.001, "Main menu style should parse top-right radius.");
+    Assert(Math.Abs(style.CornerRadius.BottomRight - 12) < 0.001, "Main menu style should parse bottom-right radius.");
+    Assert(Math.Abs(style.CornerRadius.BottomLeft - 16) < 0.001, "Main menu style should parse bottom-left radius.");
+    Assert(Math.Abs(style.Opacity - 0.5) < 0.001, "Main menu style should parse opacity.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainMenuElementStyle.cs"));
+    var normalizeBody = ExtractMethodBody(source, "private static string NormalizeKey");
+    var cornerRadiusBody = ExtractMethodBody(source, "private static CornerRadius ParseCornerRadius");
+
+    Assert(
+        normalizeBody.Contains("var buffer = new char[key.Length];", StringComparison.Ordinal)
+            && normalizeBody.Contains("for (var index = 0; index < key.Length; index++)", StringComparison.Ordinal)
+            && !normalizeBody.Contains(".Where(", StringComparison.Ordinal)
+            && !normalizeBody.Contains("string.Concat", StringComparison.Ordinal),
+        "Main menu style key normalization should use one direct character pass.");
+    Assert(
+        !cornerRadiusBody.Contains(".Select(", StringComparison.Ordinal)
+            && !cornerRadiusBody.Contains(".ToArray(", StringComparison.Ordinal),
+        "Main menu corner radius parsing should avoid LINQ projections.");
 }
 
 static void SceneEditorTransformClampsAndSkipsMicroMoves()
