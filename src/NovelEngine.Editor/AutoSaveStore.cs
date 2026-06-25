@@ -10,7 +10,7 @@ internal static class AutoSaveStore
         DateTime timestampUtc,
         Func<string, bool>? exists = null)
     {
-        exists ??= File.Exists;
+        exists ??= PathExists;
         var timestamp = timestampUtc.ToLocalTime().ToString("yyyyMMdd-HHmmss");
         var path = Path.Combine(directory, $"{stem}-{timestamp}.novel.json");
         if (!exists(path))
@@ -29,6 +29,11 @@ internal static class AutoSaveStore
                 return candidate;
             }
         }
+    }
+
+    private static bool PathExists(string path)
+    {
+        return File.Exists(path) || Directory.Exists(path);
     }
 
     public static void Prune(

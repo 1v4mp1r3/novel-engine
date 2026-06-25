@@ -708,12 +708,30 @@ static void AutoSaveSnapshotPathsAvoidSameSecondCollisions()
         File.WriteAllText(first, "{}");
 
         var second = AutoSaveStore.CreateSnapshotPath(directory, "story", timestamp);
+        Directory.CreateDirectory(second);
+        var third = AutoSaveStore.CreateSnapshotPath(directory, "story", timestamp);
 
         Assert(first != second, "Autosave snapshot reused an existing path from the same second.");
         Assert(
             Path.GetFileName(second).StartsWith("story-", StringComparison.Ordinal)
                 && Path.GetFileName(second).EndsWith("-2.novel.json", StringComparison.Ordinal),
             "Autosave snapshot did not use a deterministic collision suffix.");
+        Assert(
+            Path.GetFileName(third).StartsWith("story-", StringComparison.Ordinal)
+                && Path.GetFileName(third).EndsWith("-3.novel.json", StringComparison.Ordinal),
+            "Autosave snapshot reused an existing directory path.");
+
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Editor",
+            "AutoSaveStore.cs"));
+        var createBody = ExtractMethodBody(source, "public static string CreateSnapshotPath");
+        var existsBody = ExtractMethodBody(source, "private static bool PathExists");
+        Assert(
+            createBody.Contains("exists ??= PathExists;", StringComparison.Ordinal)
+                && existsBody.Contains("File.Exists(path) || Directory.Exists(path)", StringComparison.Ordinal),
+            "Autosave snapshot path selection should avoid existing files and directories.");
     }
     finally
     {
