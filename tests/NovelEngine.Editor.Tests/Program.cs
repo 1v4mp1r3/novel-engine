@@ -69,6 +69,7 @@ var tests = new (string Name, Action Run)[]
     ("asset usage navigation uses node id directly", AssetUsageNavigationUsesNodeIdDirectly),
     ("preview asset resolution caches references", PreviewAssetResolutionCachesReferences),
     ("editor asset preview windows cache resolved references", EditorAssetPreviewWindowsCacheResolvedReferences),
+    ("screenshot asset smoke uses direct scans", ScreenshotAssetSmokeUsesDirectScans),
     ("output editor copy is output neutral", OutputEditorCopyIsOutputNeutral),
     ("output detail editor policy accepts scene next outputs", OutputDetailEditorPolicyAcceptsSceneNextOutputs),
     ("output transition editor policy accepts scene next outputs", OutputTransitionEditorPolicyAcceptsSceneNextOutputs),
@@ -2133,6 +2134,51 @@ static void EditorAssetPreviewWindowsCacheResolvedReferences()
             "NovelEngine.Editor",
             "SceneEditorWindow.xaml.cs"),
         "Scene editor");
+}
+
+static void ScreenshotAssetSmokeUsesDirectScans()
+{
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "ScreenshotRenderer.cs"));
+    var smokeBody = ExtractMethodBody(source, "public static void SmokeAssetManager");
+    var assetItemsBody = ExtractMethodBody(source, "private static bool TryFindAssetSmokeItems");
+    var findNodeByKindBody = ExtractMethodBody(source, "private static NovelNode FindNodeByKind");
+    var findNodeByIdBody = ExtractMethodBody(source, "private static NovelNode FindNodeById");
+    var findCharacterBody = ExtractMethodBody(source, "private static CharacterPlacement FindCharacterById");
+    var voiceReferenceBody = ExtractMethodBody(source, "private static bool CharacterHasVoiceReference");
+
+    Assert(
+        smokeBody.Contains("TryFindAssetSmokeItems(", StringComparison.Ordinal)
+            && smokeBody.Contains("FindNodeByKind(project, NodeKind.Scene)", StringComparison.Ordinal)
+            && smokeBody.Contains("FindNodeById(window.ProjectForSmoke, scene.Id)", StringComparison.Ordinal)
+            && smokeBody.Contains("FindCharacterById(updatedScene, \"smoke-hero\")", StringComparison.Ordinal)
+            && !smokeBody.Contains(".Cast<", StringComparison.Ordinal)
+            && !smokeBody.Contains(".Where(", StringComparison.Ordinal)
+            && !smokeBody.Contains(".Select(", StringComparison.Ordinal)
+            && !smokeBody.Contains(".ToList(", StringComparison.Ordinal)
+            && !smokeBody.Contains(".Single(", StringComparison.Ordinal)
+            && !smokeBody.Contains(".First(", StringComparison.Ordinal),
+        "Screenshot asset smoke should use direct helper scans.");
+    Assert(
+        assetItemsBody.Contains("foreach (var item in items)", StringComparison.Ordinal)
+            && assetItemsBody.Contains("voiceItem = item;", StringComparison.Ordinal)
+            && !assetItemsBody.Contains(".Where(", StringComparison.Ordinal)
+            && !assetItemsBody.Contains(".Select(", StringComparison.Ordinal)
+            && !assetItemsBody.Contains(".ToList(", StringComparison.Ordinal),
+        "Screenshot asset item discovery should scan the item collection directly.");
+    Assert(
+        findNodeByKindBody.Contains("foreach (var node in project.Nodes)", StringComparison.Ordinal)
+            && findNodeByIdBody.Contains("foreach (var node in project.Nodes)", StringComparison.Ordinal)
+            && findCharacterBody.Contains("foreach (var character in node.Characters)", StringComparison.Ordinal),
+        "Screenshot smoke model lookups should use direct loops.");
+    Assert(
+        voiceReferenceBody.Contains("for (var index = 0; index < character.VoiceSounds.Count; index++)", StringComparison.Ordinal)
+            && !voiceReferenceBody.Contains("GetVoiceSounds()", StringComparison.Ordinal)
+            && !voiceReferenceBody.Contains(".Contains(", StringComparison.Ordinal),
+        "Screenshot smoke voice verification should scan voice refs directly.");
 }
 
 static void AssertResolvedAssetCachePolicy(string path, string owner)

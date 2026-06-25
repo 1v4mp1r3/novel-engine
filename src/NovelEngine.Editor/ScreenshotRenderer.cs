@@ -427,7 +427,7 @@ internal static class ScreenshotRenderer
                 projectPath,
                 sourceVoice,
                 "voices");
-            var scene = project.Nodes.Single(node => node.Kind == NodeKind.Scene);
+            var scene = FindNodeByKind(project, NodeKind.Scene);
             scene.InheritCharacters = false;
             scene.Characters.Add(
                 new CharacterPlacement
@@ -456,22 +456,16 @@ internal static class ScreenshotRenderer
                 DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
 
-            var assetItems = window.AssetsGrid.Items
-                .Cast<object>()
-                .Where(item => item.GetType().Name.Contains("AssetView", StringComparison.Ordinal))
-                .ToList();
-            var assetIds = assetItems
-                .Select(GetAssetViewId)
-                .Where(id => id is not null)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (!assetIds.Contains(backgroundAsset.Id) || !assetIds.Contains(voiceAsset.Id))
+            if (!TryFindAssetSmokeItems(
+                window.AssetsGrid.Items,
+                backgroundAsset.Id,
+                voiceAsset.Id,
+                out var voiceItem))
             {
                 throw new InvalidOperationException(
                     "Asset manager smoke did not load imported background and voice assets.");
             }
 
-            var voiceItem = assetItems.First(item =>
-                string.Equals(GetAssetViewId(item), voiceAsset.Id, StringComparison.OrdinalIgnoreCase));
             window.AssetsGrid.SelectedItem = voiceItem;
             window.AssetsGrid.UpdateLayout();
             if (!window.RebuildAssetsContextMenuForSmoke())
@@ -512,14 +506,10 @@ internal static class ScreenshotRenderer
                     "Asset manager smoke could not invoke the selected-node voice binding action.");
             }
 
-            var updatedScene = window.ProjectForSmoke.Nodes.Single(
-                node => node.Id == scene.Id);
-            var updatedCharacter = updatedScene.Characters.Single(
-                character => character.Id == "smoke-hero");
+            var updatedScene = FindNodeById(window.ProjectForSmoke, scene.Id);
+            var updatedCharacter = FindCharacterById(updatedScene, "smoke-hero");
             var voiceReference = AssetReference.Create(voiceAsset.Id);
-            if (!updatedCharacter.GetVoiceSounds().Contains(
-                voiceReference,
-                StringComparer.OrdinalIgnoreCase))
+            if (!CharacterHasVoiceReference(updatedCharacter, voiceReference))
             {
                 throw new InvalidOperationException(
                     "Asset manager smoke did not bind the selected voice asset to the character.");
@@ -621,6 +611,100 @@ internal static class ScreenshotRenderer
 
     private static string? GetAssetViewId(object item) =>
         item.GetType().GetProperty("Id")?.GetValue(item) as string;
+
+    private static bool TryFindAssetSmokeItems(
+        ItemCollection items,
+        string backgroundAssetId,
+        string voiceAssetId,
+        out object? voiceItem)
+    {
+        var foundBackground = false;
+        voiceItem = null;
+        foreach (var item in items)
+        {
+            if (!item.GetType().Name.Contains("AssetView", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var assetId = GetAssetViewId(item);
+            if (assetId is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(assetId, backgroundAssetId, StringComparison.OrdinalIgnoreCase))
+            {
+                foundBackground = true;
+            }
+
+            if (string.Equals(assetId, voiceAssetId, StringComparison.OrdinalIgnoreCase))
+            {
+                voiceItem = item;
+            }
+        }
+
+        return foundBackground && voiceItem is not null;
+    }
+
+    private static NovelNode FindNodeByKind(NovelProject project, NodeKind kind)
+    {
+        foreach (var node in project.Nodes)
+        {
+            if (node.Kind == kind)
+            {
+                return node;
+            }
+        }
+
+        throw new InvalidOperationException($"Smoke project is missing a {kind} node.");
+    }
+
+    private static NovelNode FindNodeById(NovelProject project, string nodeId)
+    {
+        foreach (var node in project.Nodes)
+        {
+            if (node.Id == nodeId)
+            {
+                return node;
+            }
+        }
+
+        throw new InvalidOperationException($"Smoke project is missing node '{nodeId}'.");
+    }
+
+    private static CharacterPlacement FindCharacterById(NovelNode node, string characterId)
+    {
+        foreach (var character in node.Characters)
+        {
+            if (character.Id == characterId)
+            {
+                return character;
+            }
+        }
+
+        throw new InvalidOperationException($"Smoke node is missing character '{characterId}'.");
+    }
+
+    private static bool CharacterHasVoiceReference(
+        CharacterPlacement character,
+        string reference)
+    {
+        if (string.Equals(character.VoiceSound, reference, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        for (var index = 0; index < character.VoiceSounds.Count; index++)
+        {
+            if (string.Equals(character.VoiceSounds[index], reference, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static Button? FindButtonContainingText(
         DependencyObject root,
