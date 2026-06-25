@@ -44,6 +44,7 @@ var tests = new (string Name, Action Run)[]
     ("startup window keeps recent project lists", StartupWindowKeepsRecentProjectLists),
     ("asset list filter searches within selected folder", AssetListFilterSearchesWithinSelectedFolder),
     ("asset list filter searches in one pass", AssetListFilterSearchesInOnePass),
+    ("asset file dialogs include common media extensions", AssetFileDialogsIncludeCommonMediaExtensions),
     ("asset list stamp tracks visible input state", AssetListStampTracksVisibleInputState),
     ("asset folder tree stamp tracks visible input state", AssetFolderTreeStampTracksVisibleInputState),
     ("asset catalog runtime stamps avoid full scans", AssetCatalogRuntimeStampsAvoidFullScans),
@@ -1282,6 +1283,46 @@ static void AssetListFilterSearchesInOnePass()
             && !applyBody.Contains(".Where(", StringComparison.Ordinal)
             && !applyBody.Contains(".ToList()", StringComparison.Ordinal),
         "Asset list filtering should avoid separate folder and search passes.");
+}
+
+static void AssetFileDialogsIncludeCommonMediaExtensions()
+{
+    var root = FindRepositoryRoot();
+    var mainWindowSource = File.ReadAllText(Path.Combine(
+        root,
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var editorDialogsSource = File.ReadAllText(Path.Combine(
+        root,
+        "src",
+        "NovelEngine.Editor",
+        "EditorDialogs.cs"));
+    var mainMenuSource = File.ReadAllText(Path.Combine(
+        root,
+        "src",
+        "NovelEngine.Editor",
+        "MainMenuEditorWindow.cs"));
+
+    foreach (var extension in new[] { "*.jpe", "*.jfif", "*.tif", "*.tiff", "*.ico" })
+    {
+        Assert(
+            mainWindowSource.Contains(extension, StringComparison.Ordinal),
+            $"Main window asset filters do not include {extension}.");
+        Assert(
+            mainMenuSource.Contains(extension, StringComparison.Ordinal),
+            $"Main menu image filter does not include {extension}.");
+    }
+
+    foreach (var extension in new[] { "*.wave", "*.oga", "*.opus", "*.weba", "*.aif", "*.aiff" })
+    {
+        Assert(
+            mainWindowSource.Contains(extension, StringComparison.Ordinal),
+            $"Main window audio filters do not include {extension}.");
+        Assert(
+            editorDialogsSource.Contains(extension, StringComparison.Ordinal),
+            $"Transition sound filter does not include {extension}.");
+    }
 }
 
 static void AssetListStampTracksVisibleInputState()

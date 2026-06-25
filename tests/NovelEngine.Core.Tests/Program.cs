@@ -48,6 +48,7 @@ var tests = new (string Name, Action Run)[]
     ("main menu and voice assets participate in asset references", MainMenuAndVoiceAssetReferences),
     ("character voice sounds normalize without linq", CharacterVoiceSoundsNormalizeWithoutLinq),
     ("asset kind detects common image extensions", AssetKindDetectsCommonImageExtensions),
+    ("asset kind detects common audio extensions", AssetKindDetectsCommonAudioExtensions),
     ("asset reference lookups avoid linq pipelines", AssetReferenceLookupsAvoidLinqPipelines),
     ("removed voice assets are cleared from characters", RemovedVoiceAssetsAreClearedFromCharacters),
     ("voice blip generator emits wav files", VoiceBlipGeneratorEmitsWav),
@@ -2327,6 +2328,34 @@ static void AssetKindDetectsCommonImageExtensions()
         Assert(
             AssetReference.GuessKind($"ASSET{extension.ToUpperInvariant()}") == AssetKind.Image,
             $"Uppercase image extension was not detected: {extension}");
+    }
+}
+
+static void AssetKindDetectsCommonAudioExtensions()
+{
+    foreach (var extension in new[]
+             {
+                 ".mp3",
+                 ".wav",
+                 ".wave",
+                 ".wma",
+                 ".aac",
+                 ".m4a",
+                 ".ogg",
+                 ".oga",
+                 ".opus",
+                 ".weba",
+                 ".flac",
+                 ".aif",
+                 ".aiff",
+             })
+    {
+        Assert(
+            AssetReference.GuessKind($"asset{extension}") == AssetKind.Audio,
+            $"Audio extension was not detected: {extension}");
+        Assert(
+            AssetReference.GuessKind($"ASSET{extension.ToUpperInvariant()}") == AssetKind.Audio,
+            $"Uppercase audio extension was not detected: {extension}");
     }
 }
 

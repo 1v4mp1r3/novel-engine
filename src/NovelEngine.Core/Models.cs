@@ -1750,7 +1750,9 @@ public static class AssetReference
             ".png" or ".jpg" or ".jpeg" or ".jpe" or ".jfif"
                 or ".webp" or ".bmp" or ".gif" or ".tif" or ".tiff" or ".ico" =>
                 AssetKind.Image,
-            ".mp3" or ".wav" or ".wma" or ".aac" or ".m4a" or ".ogg" or ".flac" =>
+            ".mp3" or ".wav" or ".wave" or ".wma" or ".aac" or ".m4a"
+                or ".ogg" or ".oga" or ".opus" or ".weba"
+                or ".flac" or ".aif" or ".aiff" =>
                 AssetKind.Audio,
             _ => AssetKind.Other,
         };

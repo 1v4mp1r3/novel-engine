@@ -774,7 +774,7 @@ public sealed class MainMenuEditorWindow : Window
         var dialog = new OpenFileDialog
         {
             Title = "Выберите изображение элемента меню",
-            Filter = "Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|Все файлы|*.*",
+            Filter = "Изображения|*.png;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.gif;*.tif;*.tiff;*.ico|Все файлы|*.*",
             InitialDirectory = _assetDirectory,
         };
         if (dialog.ShowDialog(this) == true)

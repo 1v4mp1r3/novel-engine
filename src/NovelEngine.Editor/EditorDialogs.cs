@@ -682,7 +682,7 @@ public sealed class TransitionEditorWindow : Window
         var dialog = new OpenFileDialog
         {
             Title = "Выберите звук перехода",
-            Filter = "Аудио|*.wav;*.mp3;*.wma;*.aac;*.m4a|Все файлы|*.*",
+            Filter = "Аудио|*.wav;*.wave;*.mp3;*.wma;*.aac;*.m4a;*.ogg;*.oga;*.opus;*.weba;*.flac;*.aif;*.aiff|Все файлы|*.*",
             InitialDirectory = Directory.Exists(_assetDirectory) ? _assetDirectory : null,
         };
         if (dialog.ShowDialog(this) == true)

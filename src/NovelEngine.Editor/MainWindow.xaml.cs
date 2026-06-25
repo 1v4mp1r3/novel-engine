@@ -3818,7 +3818,8 @@ public partial class MainWindow : Window
         {
             Title = "Импортировать ассеты в проект",
             Filter =
-                "Ассеты|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac|"
+                "Ассеты|*.png;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.gif;*.tif;*.tiff;*.ico;"
+                + "*.mp3;*.wav;*.wave;*.wma;*.aac;*.m4a;*.ogg;*.oga;*.opus;*.weba;*.flac;*.aif;*.aiff|"
                 + "Все файлы|*.*",
             Multiselect = true,
         };
@@ -4887,7 +4888,7 @@ public partial class MainWindow : Window
     {
         var path = BrowseAsset(
             "Выберите фон",
-            "Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif",
+            "Изображения|*.png;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.gif;*.tif;*.tiff;*.ico",
             "backgrounds");
         if (path is not null)
         {
@@ -4900,7 +4901,7 @@ public partial class MainWindow : Window
     {
         var path = BrowseAsset(
             "Выберите музыку",
-            "Аудио|*.mp3;*.wav;*.wma;*.aac;*.m4a;*.ogg;*.flac",
+            "Аудио|*.mp3;*.wav;*.wave;*.wma;*.aac;*.m4a;*.ogg;*.oga;*.opus;*.weba;*.flac;*.aif;*.aiff",
             "audio");
         if (path is not null)
         {
