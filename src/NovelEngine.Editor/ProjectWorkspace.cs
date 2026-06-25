@@ -5,6 +5,9 @@ namespace NovelEngine.Editor;
 
 internal static class ProjectWorkspace
 {
+    private static readonly HashSet<char> InvalidFileNameChars = new(
+        Path.GetInvalidFileNameChars());
+
     public static string CreateProjectInDirectory(string directory)
     {
         var workspaceDirectory = Path.GetFullPath(directory);
@@ -66,10 +69,16 @@ internal static class ProjectWorkspace
             return string.Empty;
         }
 
-        var invalid = Path.GetInvalidFileNameChars();
-        return string.Concat(
-            source.Select(character =>
-                invalid.Contains(character) ? '_' : character)).Trim();
+        var buffer = new char[source.Length];
+        for (var index = 0; index < source.Length; index++)
+        {
+            var character = source[index];
+            buffer[index] = InvalidFileNameChars.Contains(character)
+                ? '_'
+                : character;
+        }
+
+        return new string(buffer).Trim();
     }
 
     private static void WriteInitialAutoSaveSnapshot(

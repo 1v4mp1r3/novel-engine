@@ -219,6 +219,20 @@ static void WorkspaceProjectPathAvoidsExistingFile()
         Assert(
             Path.GetFileName(secondPath) == $"{Path.GetFileName(directory)}-2.novel.json",
             "Available project path did not use the expected numeric suffix.");
+
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Editor",
+            "ProjectWorkspace.cs"));
+        var safeStemBody = ExtractMethodBody(source, "private static string MakeSafeFileStem");
+        Assert(
+            source.Contains("private static readonly HashSet<char> InvalidFileNameChars", StringComparison.Ordinal)
+                && safeStemBody.Contains("for (var index = 0; index < source.Length; index++)", StringComparison.Ordinal)
+                && safeStemBody.Contains("InvalidFileNameChars.Contains(character)", StringComparison.Ordinal)
+                && !safeStemBody.Contains(".Select(", StringComparison.Ordinal)
+                && !safeStemBody.Contains("Path.GetInvalidFileNameChars()", StringComparison.Ordinal),
+            "Workspace project filename sanitizing should use a cached invalid-character lookup and direct loop.");
     }
     finally
     {
