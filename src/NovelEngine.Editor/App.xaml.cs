@@ -141,9 +141,9 @@ public partial class App : Application
 
         try
         {
-            startupProjectPath = launcher.SelectedAction == ProjectStartupAction.Create
-                ? ProjectWorkspace.CreateProjectInDirectory(launcher.SelectedPath)
-                : launcher.SelectedPath;
+            startupProjectPath = ResolveStartupProjectPath(
+                launcher.SelectedAction,
+                launcher.SelectedPath);
             return true;
         }
         catch (Exception error) when (
@@ -158,6 +158,15 @@ public partial class App : Application
                 MessageBoxImage.Error);
             return false;
         }
+    }
+
+    internal static string ResolveStartupProjectPath(
+        ProjectStartupAction action,
+        string selectedPath)
+    {
+        return action == ProjectStartupAction.Create
+            ? ProjectWorkspace.CreateProjectInDirectory(selectedPath)
+            : selectedPath;
     }
 
     private void CompileProject(

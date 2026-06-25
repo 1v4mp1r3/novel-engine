@@ -598,6 +598,91 @@ internal static class ScreenshotRenderer
                 throw new InvalidOperationException(
                     "Startup smoke did not select the recent project path.");
             }
+
+            var createDirectory = Path.Combine(rootDirectory, "created-project");
+            Directory.CreateDirectory(createDirectory);
+            Exception? createFailure = null;
+            var createWindow = new ProjectStartupWindow()
+            {
+                Left = -20_000,
+                Top = -20_000,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+            };
+            createWindow.Loaded += (_, _) =>
+            {
+                createWindow.Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        try
+                        {
+                            createWindow.SelectDirectoryForSmoke(
+                                ProjectStartupAction.Create,
+                                createDirectory);
+                        }
+                        catch (Exception error) when (
+                            error is InvalidOperationException
+                            or ArgumentException)
+                        {
+                            createFailure = error;
+                            createWindow.Close();
+                        }
+                    },
+                    DispatcherPriority.ApplicationIdle);
+            };
+
+            var createResult = createWindow.ShowDialog();
+            if (createFailure is not null)
+            {
+                throw createFailure;
+            }
+            if (createResult != true
+                || createWindow.SelectedAction != ProjectStartupAction.Create
+                || !string.Equals(
+                    createWindow.SelectedPath,
+                    createDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Startup smoke did not select the create project directory.");
+            }
+
+            var selectedCreatePath = createWindow.SelectedPath!;
+            var createdProjectPath = App.ResolveStartupProjectPath(
+                createWindow.SelectedAction,
+                selectedCreatePath);
+            if (!File.Exists(createdProjectPath))
+            {
+                throw new InvalidOperationException(
+                    "Startup create smoke did not create a project file.");
+            }
+
+            var filesDirectory = Path.Combine(
+                createDirectory,
+                ProjectAssets.ManagedFilesDirectoryName);
+            foreach (var folder in ProjectAssets.DefaultProjectFolders)
+            {
+                if (!Directory.Exists(Path.Combine(filesDirectory, folder)))
+                {
+                    throw new InvalidOperationException(
+                        $"Startup create smoke is missing files/{folder}.");
+                }
+            }
+
+            var editorWindow = new MainWindow(createdProjectPath)
+            {
+                Width = 1180,
+                Height = 760,
+                Left = -20_000,
+                Top = -20_000,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual,
+            };
+            editorWindow.Show();
+            RenderWindow(
+                editorWindow,
+                Path.Combine(rootDirectory, "created-project-editor.png"));
+            editorWindow.Close();
         }
         finally
         {

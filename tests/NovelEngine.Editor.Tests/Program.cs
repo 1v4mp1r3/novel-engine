@@ -1100,10 +1100,29 @@ static void StartupWindowKeepsRecentProjectLists()
         "src",
         "NovelEngine.Editor",
         "ProjectStartupWindow.cs"));
+    var appSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "App.xaml.cs"));
+    var screenshotSource = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "ScreenshotRenderer.cs"));
     var constructorBody = ExtractMethodBody(source, "public ProjectStartupWindow(");
     var listBody = ExtractMethodBody(
         source,
         "private static IReadOnlyList<RecentProjectEntry> CreateRecentProjectList");
+    var chooseDirectoryBody = ExtractMethodBody(source, "private void ChooseDirectory");
+    var smokeSelectionBody = ExtractMethodBody(source, "internal void SelectDirectoryForSmoke");
+    var completeSelectionBody = ExtractMethodBody(source, "private void CompleteSelection");
+    var appResolverBody = ExtractMethodBody(
+        appSource,
+        "internal static string ResolveStartupProjectPath");
+    var startupSmokeBody = ExtractMethodBody(
+        screenshotSource,
+        "public static void SmokeStartupWindow");
 
     Assert(
         constructorBody.Contains("_recentProjects = CreateRecentProjectList(recentProjects);", StringComparison.Ordinal)
@@ -1116,6 +1135,22 @@ static void StartupWindowKeepsRecentProjectLists()
             && !listBody.Contains(".ToList(", StringComparison.Ordinal)
             && !listBody.Contains(".Select(", StringComparison.Ordinal),
         "Startup window should reuse existing recent project lists and materialize other enumerables directly.");
+    Assert(
+        chooseDirectoryBody.Contains("CompleteSelection(action, dialog.FolderName);", StringComparison.Ordinal)
+            && smokeSelectionBody.Contains("CompleteSelection(action, directory);", StringComparison.Ordinal)
+            && completeSelectionBody.Contains("SelectedAction = action;", StringComparison.Ordinal)
+            && completeSelectionBody.Contains("SelectedPath = path;", StringComparison.Ordinal)
+            && completeSelectionBody.Contains("DialogResult = true;", StringComparison.Ordinal),
+        "Startup window directory selections should share one completion path for UI and smoke coverage.");
+    Assert(
+        appResolverBody.Contains("ProjectWorkspace.CreateProjectInDirectory(selectedPath)", StringComparison.Ordinal),
+        "Startup project resolution should create a project file for create actions.");
+    Assert(
+        startupSmokeBody.Contains("ProjectStartupAction.Create", StringComparison.Ordinal)
+            && startupSmokeBody.Contains("App.ResolveStartupProjectPath(", StringComparison.Ordinal)
+            && startupSmokeBody.Contains("ProjectAssets.DefaultProjectFolders", StringComparison.Ordinal)
+            && startupSmokeBody.Contains("new MainWindow(createdProjectPath)", StringComparison.Ordinal),
+        "Startup smoke should verify create-project flow opens the editor.");
 }
 
 static void AssetListFilterSearchesWithinSelectedFolder()

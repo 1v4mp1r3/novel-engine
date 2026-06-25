@@ -240,17 +240,31 @@ internal sealed class ProjectStartupWindow : Window
             return;
         }
 
+        CompleteSelection(action, dialog.FolderName);
+    }
+
+    internal void SelectDirectoryForSmoke(ProjectStartupAction action, string directory)
+    {
+        if (action == ProjectStartupAction.OpenRecent)
+        {
+            throw new ArgumentException(
+                "Use SelectRecent for recent project selections.",
+                nameof(action));
+        }
+
+        CompleteSelection(action, directory);
+    }
+
+    private void CompleteSelection(ProjectStartupAction action, string path)
+    {
         SelectedAction = action;
-        SelectedDirectory = dialog.FolderName;
-        SelectedPath = dialog.FolderName;
+        SelectedDirectory = path;
+        SelectedPath = path;
         DialogResult = true;
     }
 
     private void SelectRecent(string path)
     {
-        SelectedAction = ProjectStartupAction.OpenRecent;
-        SelectedDirectory = path;
-        SelectedPath = path;
-        DialogResult = true;
+        CompleteSelection(ProjectStartupAction.OpenRecent, path);
     }
 }
