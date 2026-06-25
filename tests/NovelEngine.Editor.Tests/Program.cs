@@ -2829,6 +2829,9 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
             && CodeEditorControl.ShouldMoveCompletionSelection(2),
         "Completion selection movement should skip empty and single-item lists.");
     Assert(
+        CodeEditorControl.GetNormalizedTextLength("a\r\nb\nc\r\nd") == 7,
+        "Normalized text length should count CRLF pairs as one character.");
+    Assert(
         MainWindow.ShouldReadCodeCursorSource(highlightedLimit),
         "Cursor source reads should include the configured boundary length.");
     Assert(
@@ -2846,9 +2849,16 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
         "src",
         "NovelEngine.Editor",
         "CodeEditorControl.cs"));
+    var normalizedEditorSource = editorSource.Replace("\r\n", "\n");
     var textChangedBody = ExtractMethodBody(
         editorSource,
         "protected override void OnTextChanged");
+    var cachedCaretBody = ExtractMethodBody(
+        editorSource,
+        "private bool TryReadCaretOffsetFromCachedPointer");
+    var normalizedLengthBody = ExtractMethodBody(
+        editorSource,
+        "internal static int GetNormalizedTextLength");
     Assert(
         textChangedBody.Contains(
             "var insertedText = UpdateEstimatedSourceLength(e);",
@@ -2857,6 +2867,23 @@ static void CodeEditorPerformancePolicyLimitsExpensiveLiveWork()
                 "ShouldScheduleAutomaticCompletion(_estimatedSourceLength, insertedText)",
                 StringComparison.Ordinal),
         "Code editor text changes should skip automatic completion for delete-only edits.");
+    Assert(
+        cachedCaretBody.Contains("GetNormalizedTextLength(range.Text)", StringComparison.Ordinal)
+            && editorSource.Contains(
+                "private int ReadCaretOffsetFromDocumentStart() =>",
+                StringComparison.Ordinal)
+            && normalizedEditorSource.Contains(
+                "GetNormalizedTextLength(\n            new TextRange(Document.ContentStart, CaretPosition).Text)",
+                StringComparison.Ordinal)
+            && !cachedCaretBody.Contains("NormalizeText(range.Text).Length", StringComparison.Ordinal)
+            && !normalizedEditorSource.Contains(
+                "NormalizeText(\n            new TextRange(Document.ContentStart, CaretPosition).Text).Length",
+                StringComparison.Ordinal),
+        "Code editor caret offset reads should avoid allocating normalized strings.");
+    Assert(
+        normalizedLengthBody.Contains("for (var index = 0; index + 1 < text.Length; index++)", StringComparison.Ordinal)
+            && !normalizedLengthBody.Contains(".Replace(", StringComparison.Ordinal),
+        "Normalized text length should be counted with one direct pass.");
 }
 
 static void CodeCursorCacheSkipsOversizedLineScans()

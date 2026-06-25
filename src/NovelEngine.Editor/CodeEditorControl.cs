@@ -973,7 +973,7 @@ public sealed class CodeEditorControl : RichTextBox
             var range = comparison < 0
                 ? new TextRange(_caretPointerCache, CaretPosition)
                 : new TextRange(CaretPosition, _caretPointerCache);
-            var delta = NormalizeText(range.Text).Length;
+            var delta = GetNormalizedTextLength(range.Text);
             offset = comparison < 0
                 ? _caretOffsetCache.Value + delta
                 : _caretOffsetCache.Value - delta;
@@ -987,8 +987,23 @@ public sealed class CodeEditorControl : RichTextBox
     }
 
     private int ReadCaretOffsetFromDocumentStart() =>
-        NormalizeText(
-            new TextRange(Document.ContentStart, CaretPosition).Text).Length;
+        GetNormalizedTextLength(
+            new TextRange(Document.ContentStart, CaretPosition).Text);
+
+    internal static int GetNormalizedTextLength(string text)
+    {
+        var length = text.Length;
+        for (var index = 0; index + 1 < text.Length; index++)
+        {
+            if (text[index] == '\r' && text[index + 1] == '\n')
+            {
+                length--;
+                index++;
+            }
+        }
+
+        return length;
+    }
 
     private static string NormalizeText(string text) =>
         text.Replace("\r\n", "\n");
