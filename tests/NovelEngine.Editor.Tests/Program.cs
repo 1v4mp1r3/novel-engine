@@ -344,6 +344,25 @@ static void ManualSavePolicySkipsUnchangedSavedProjects()
             workspaceNeedsProjectFile: true,
             codeHasPendingChanges: false),
         "Manual save should create missing workspace project files.");
+
+    var source = File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(),
+        "src",
+        "NovelEngine.Editor",
+        "MainWindow.xaml.cs"));
+    var fileNameBody = ExtractMethodBody(source, "private string GetDefaultProjectFileName");
+    var safeStemBody = ExtractMethodBody(source, "private static string CreateSafeProjectFileStem");
+    Assert(
+        source.Contains("private static readonly HashSet<char> InvalidProjectFileNameChars", StringComparison.Ordinal)
+            && fileNameBody.Contains("var safeName = CreateSafeProjectFileStem(source);", StringComparison.Ordinal)
+            && !fileNameBody.Contains(".Select(", StringComparison.Ordinal)
+            && !fileNameBody.Contains("Path.GetInvalidFileNameChars()", StringComparison.Ordinal),
+        "Manual save default filenames should use a cached invalid-character lookup.");
+    Assert(
+        safeStemBody.Contains("for (var index = 0; index < source.Length; index++)", StringComparison.Ordinal)
+            && safeStemBody.Contains("InvalidProjectFileNameChars.Contains(character)", StringComparison.Ordinal)
+            && !safeStemBody.Contains(".Select(", StringComparison.Ordinal),
+        "Manual save filename sanitizing should use one direct character pass.");
 }
 
 static void FileProbesUseDirectChecks()

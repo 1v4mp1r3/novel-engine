@@ -31,6 +31,8 @@ public partial class MainWindow : Window
 
     private static readonly IReadOnlyDictionary<string, string> EmptyNodeTitleLookup =
         new Dictionary<string, string>(0, StringComparer.Ordinal);
+    private static readonly HashSet<char> InvalidProjectFileNameChars = new(
+        Path.GetInvalidFileNameChars());
 
     private NovelProject _project = NovelProject.CreateDefault();
     private string? _projectPath;
@@ -6505,16 +6507,26 @@ public partial class MainWindow : Window
         var source = _workspaceDirectory is null
             ? _project.Title
             : Path.GetFileName(_workspaceDirectory);
-        var safeName = string.Concat(
-            source.Select(character =>
-                Path.GetInvalidFileNameChars().Contains(character)
-                    ? '_'
-                    : character)).Trim();
+        var safeName = CreateSafeProjectFileStem(source);
         if (safeName.Length == 0)
         {
             safeName = "NovelProject";
         }
         return $"{safeName}.novel.json";
+    }
+
+    private static string CreateSafeProjectFileStem(string source)
+    {
+        var buffer = new char[source.Length];
+        for (var index = 0; index < source.Length; index++)
+        {
+            var character = source[index];
+            buffer[index] = InvalidProjectFileNameChars.Contains(character)
+                ? '_'
+                : character;
+        }
+
+        return new string(buffer).Trim();
     }
 
     private static string? NormalizeWorkspaceDirectory(string? directory) =>
