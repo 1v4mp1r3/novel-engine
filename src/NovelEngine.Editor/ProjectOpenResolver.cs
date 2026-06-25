@@ -81,10 +81,9 @@ internal static class ProjectOpenResolver
                 CreatedEmptyWorkspace: false);
         }
 
-        return new ProjectOpenResult(
-            null,
-            directory,
-            CreatedEmptyWorkspace: true);
+        throw new InvalidDataException(
+            $"В папке найдено несколько JSON-проектов: {directory}. "
+            + "Откройте конкретный .novel.json файл.");
     }
 
     private static string? AddJsonProjectFiles(

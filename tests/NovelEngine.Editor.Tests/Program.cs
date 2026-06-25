@@ -26,7 +26,7 @@ var tests = new (string Name, Action Run)[]
     ("project resolver prefers folder-named project", ProjectResolverPrefersFolderNamedProject),
     ("project resolver prefers folder-named json project", ProjectResolverPrefersFolderNamedJsonProject),
     ("project resolver prefers novel project over folder json", ProjectResolverPrefersNovelProjectOverFolderJson),
-    ("project resolver treats ambiguous folder as workspace", ProjectResolverTreatsAmbiguousFolderAsWorkspace),
+    ("project resolver rejects ambiguous folder", ProjectResolverRejectsAmbiguousFolder),
     ("project resolver expands quoted environment paths", ProjectResolverExpandsQuotedEnvironmentPaths),
     ("project resolver scans json projects once", ProjectResolverScansJsonProjectsOnce),
     ("autosave snapshot paths avoid same second collisions", AutoSaveSnapshotPathsAvoidSameSecondCollisions),
@@ -620,7 +620,7 @@ static void ProjectResolverPrefersNovelProjectOverFolderJson()
     }
 }
 
-static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
+static void ProjectResolverRejectsAmbiguousFolder()
 {
     var directory = CreateTempDirectory();
     try
@@ -628,11 +628,20 @@ static void ProjectResolverTreatsAmbiguousFolderAsWorkspace()
         File.WriteAllText(Path.Combine(directory, "first.novel.json"), "{}");
         File.WriteAllText(Path.Combine(directory, "second.novel.json"), "{}");
 
-        var result = ProjectOpenResolver.Resolve(directory);
-
-        Assert(result.ProjectPath is null, "Resolver picked a project from an ambiguous folder.");
-        Assert(result.WorkspaceDirectory == directory, "Resolver changed ambiguous workspace directory.");
-        Assert(result.CreatedEmptyWorkspace, "Resolver did not mark an ambiguous folder as workspace.");
+        try
+        {
+            _ = ProjectOpenResolver.Resolve(directory);
+            throw new InvalidOperationException("Resolver opened an ambiguous project folder.");
+        }
+        catch (InvalidDataException error)
+        {
+            Assert(
+                error.Message.Contains("несколько JSON-проектов", StringComparison.OrdinalIgnoreCase),
+                "Ambiguous project folder error did not explain the conflict.");
+            Assert(
+                error.Message.Contains(".novel.json", StringComparison.OrdinalIgnoreCase),
+                "Ambiguous project folder error did not ask for a concrete project file.");
+        }
     }
     finally
     {
