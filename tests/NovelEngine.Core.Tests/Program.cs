@@ -2329,6 +2329,9 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
     var voiceVisitorBody = ExtractMethodBody(
         source,
         "private static void VisitCharacterVoiceValues");
+    var isValidIdBody = ExtractMethodBody(
+        source,
+        "public static bool IsValidId");
 
     Assert(
         !source.Contains("private IEnumerable<string> EnumerateAssetValues", StringComparison.Ordinal),
@@ -2367,6 +2370,10 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
             && validateBody.Contains("foreach (var output in node.Outputs)", StringComparison.Ordinal),
         "Project validation should inspect output targets through direct nested loops.");
     Assert(
+        validateBody.Contains("CountNodes(NodeKind.Start) != 1", StringComparison.Ordinal)
+            && !validateBody.Contains("Nodes.Count(", StringComparison.Ordinal),
+        "Project validation should count start nodes through the direct node counter.");
+    Assert(
         validateBody.Contains(
             "VisitTypedAssetValues((value, expectedKind, owner, _) =>",
             StringComparison.Ordinal),
@@ -2385,6 +2392,11 @@ static void AssetReferenceLookupsAvoidLinqPipelines()
             StringComparison.Ordinal)
             && !voiceVisitorBody.Contains("GetVoiceSounds", StringComparison.Ordinal),
         "Character voice traversal should not allocate a normalized sound list.");
+    Assert(
+        isValidIdBody.Contains("for (var index = 1; index < value.Length; index++)", StringComparison.Ordinal)
+            && !isValidIdBody.Contains(".Skip(", StringComparison.Ordinal)
+            && !isValidIdBody.Contains(".All(", StringComparison.Ordinal),
+        "Asset reference id validation should scan characters directly.");
 }
 
 static void CharacterVoiceSoundsNormalizeWithoutLinq()

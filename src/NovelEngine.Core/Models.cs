@@ -908,7 +908,7 @@ public sealed class NovelProject
             throw new InvalidDataException($"Версия формата {FormatVersion} не поддерживается.");
         }
 
-        if (Nodes.Count(node => node.Kind == NodeKind.Start) != 1)
+        if (CountNodes(NodeKind.Start) != 1)
         {
             throw new InvalidDataException("Проект должен содержать ровно одну стартовую ноду.");
         }
@@ -1716,8 +1716,17 @@ public static class AssetReference
         {
             return false;
         }
-        return value.Skip(1).All(
-            character => character is '_' or '-' || char.IsLetterOrDigit(character));
+
+        for (var index = 1; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (!(character is '_' or '-' || char.IsLetterOrDigit(character)))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static AssetKind GuessKind(string path)
