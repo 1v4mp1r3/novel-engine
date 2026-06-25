@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -5232,8 +5233,15 @@ static void SilentGameProcessStopDisposesImmediately()
     var killIndex = stopBody.IndexOf("process.Kill(entireProcessTree: true);", silentIndex, StringComparison.Ordinal);
     var disposeIndex = stopBody.IndexOf("process.Dispose();", silentIndex, StringComparison.Ordinal);
     var returnIndex = stopBody.IndexOf("return;", silentIndex, StringComparison.Ordinal);
+    var stopFailureCatchIndex = stopBody.IndexOf(
+        "catch (Exception error) when (IsGameProcessStopFailure(error))",
+        silentIndex,
+        StringComparison.Ordinal);
     var normalStopIndex = stopBody.LastIndexOf(
         "StatusText.Text = \"Остановка игры...\";",
+        StringComparison.Ordinal);
+    var normalFailureStatusIndex = stopBody.LastIndexOf(
+        "StatusText.Text = ShouldForgetGameProcessAfterStopFailure(error)",
         StringComparison.Ordinal);
 
     Assert(
@@ -5244,12 +5252,31 @@ static void SilentGameProcessStopDisposesImmediately()
         silentIndex >= 0
             && clearIndex > silentIndex
             && killIndex > clearIndex
+            && stopFailureCatchIndex > killIndex
             && disposeIndex > killIndex
             && returnIndex > disposeIndex,
-        "Silent game process stop should clear, kill, dispose, and return without waiting for Exited.");
+        "Silent game process stop should clear, kill, catch expected kill failures, dispose, and return without waiting for Exited.");
     Assert(
         normalStopIndex > returnIndex,
         "Normal game process stop should keep the visible stopping status outside the silent cleanup branch.");
+    Assert(
+        normalFailureStatusIndex > normalStopIndex,
+        "Normal game process stop should surface expected kill failures without crashing the editor.");
+    Assert(
+        MainWindow.IsGameProcessStopFailure(new InvalidOperationException())
+            && MainWindow.IsGameProcessStopFailure(new Win32Exception(5))
+            && MainWindow.IsGameProcessStopFailure(new NotSupportedException()),
+        "Game process stop should treat expected Kill exceptions as handled failures.");
+    Assert(
+        !MainWindow.IsGameProcessStopFailure(new IOException()),
+        "Game process stop should not swallow unrelated exceptions.");
+    Assert(
+        MainWindow.ShouldForgetGameProcessAfterStopFailure(new InvalidOperationException())
+            && MainWindow.ShouldForgetGameProcessAfterStopFailure(new NotSupportedException()),
+        "Exited or unsupported process handles should be forgotten after stop failures.");
+    Assert(
+        !MainWindow.ShouldForgetGameProcessAfterStopFailure(new Win32Exception(5)),
+        "Access-denied kill failures should keep the active process handle visible in the editor.");
 }
 
 static void MainWindowClosingStopsEditorTimers()

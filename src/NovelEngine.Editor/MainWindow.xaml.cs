@@ -6450,9 +6450,9 @@ public partial class MainWindow : Window
             {
                 process.Kill(entireProcessTree: true);
             }
-            catch (InvalidOperationException)
+            catch (Exception error) when (IsGameProcessStopFailure(error))
             {
-                // Process already exited while the editor was closing.
+                // The process already exited or the OS refused the kill while the editor was closing.
             }
             finally
             {
@@ -6467,13 +6467,27 @@ public partial class MainWindow : Window
             process.Kill(entireProcessTree: true);
             StatusText.Text = "Остановка игры...";
         }
-        catch (InvalidOperationException)
+        catch (Exception error) when (IsGameProcessStopFailure(error))
         {
-            process.Dispose();
-            _gameProcess = null;
+            if (ShouldForgetGameProcessAfterStopFailure(error))
+            {
+                process.Dispose();
+                _gameProcess = null;
+            }
+            StatusText.Text = ShouldForgetGameProcessAfterStopFailure(error)
+                ? "Игра уже остановлена"
+                : $"Не удалось остановить игру: {error.Message}";
             UpdateGameControls();
         }
     }
+
+    internal static bool IsGameProcessStopFailure(Exception error) =>
+        error is InvalidOperationException
+        or Win32Exception
+        or NotSupportedException;
+
+    internal static bool ShouldForgetGameProcessAfterStopFailure(Exception error) =>
+        error is InvalidOperationException or NotSupportedException;
 
     private bool IsGameRunning() =>
         _gameProcess is { HasExited: false };
