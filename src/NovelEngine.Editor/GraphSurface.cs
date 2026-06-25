@@ -1021,9 +1021,10 @@ public sealed class GraphSurface : FrameworkElement
             return;
         }
 
-        var cursor = HitOutputPort(position) is not null
+        var worldPoint = ScreenToWorld(position);
+        var cursor = HitOutputPortWorld(worldPoint) is not null
             ? Cursors.Cross
-            : HitNode(position) is not null
+            : HitNodeWorld(worldPoint) is not null
                 ? Cursors.SizeAll
                 : Cursors.Arrow;
         _lastHoverHitPoint = position;
@@ -1376,7 +1377,7 @@ public sealed class GraphSurface : FrameworkElement
     private NovelNode? HitNode(Point point)
     {
         EnsureHitTestCache();
-        return _hitTestCache.HitNode(ScreenToWorld(point));
+        return HitNodeWorld(ScreenToWorld(point));
     }
 
     private NovelNode? HitInputPort(Point point)
@@ -1388,7 +1389,19 @@ public sealed class GraphSurface : FrameworkElement
     private GraphOutputPortHitArea? HitOutputPort(Point point)
     {
         EnsureHitTestCache();
-        return _hitTestCache.HitOutputPort(ScreenToWorld(point));
+        return HitOutputPortWorld(ScreenToWorld(point));
+    }
+
+    private NovelNode? HitNodeWorld(Point worldPoint)
+    {
+        EnsureHitTestCache();
+        return _hitTestCache.HitNode(worldPoint);
+    }
+
+    private GraphOutputPortHitArea? HitOutputPortWorld(Point worldPoint)
+    {
+        EnsureHitTestCache();
+        return _hitTestCache.HitOutputPort(worldPoint);
     }
 
     private GraphOutputPortHitArea? GetOutputPort(string nodeId, string outputId)

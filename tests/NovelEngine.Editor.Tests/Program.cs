@@ -5203,6 +5203,11 @@ static void GraphSurfaceUsesCachedNodeLookup()
     var outputPortBody = ExtractMethodBody(
         source,
         "private GraphOutputPortHitArea? GetOutputPort");
+    var hoverBody = ExtractMethodBody(source, "private void UpdateHoverCursor");
+    var hitNodeWorldBody = ExtractMethodBody(source, "private NovelNode? HitNodeWorld");
+    var hitOutputWorldBody = ExtractMethodBody(
+        source,
+        "private GraphOutputPortHitArea? HitOutputPortWorld");
 
     Assert(
         !source.Contains("Project.FindNode(", StringComparison.Ordinal),
@@ -5220,6 +5225,17 @@ static void GraphSurfaceUsesCachedNodeLookup()
     Assert(
         outputPortBody.Contains("FindNode(nodeId)", StringComparison.Ordinal),
         "Graph output-port rendering should use the cached node helper.");
+    Assert(
+        Regex.Matches(hoverBody, Regex.Escape("ScreenToWorld(position)")).Count == 1
+            && hoverBody.Contains("HitOutputPortWorld(worldPoint)", StringComparison.Ordinal)
+            && hoverBody.Contains("HitNodeWorld(worldPoint)", StringComparison.Ordinal)
+            && !hoverBody.Contains("HitOutputPort(position)", StringComparison.Ordinal)
+            && !hoverBody.Contains("HitNode(position)", StringComparison.Ordinal),
+        "Graph hover cursor updates should transform the mouse position once.");
+    Assert(
+        hitNodeWorldBody.Contains("_hitTestCache.HitNode(worldPoint)", StringComparison.Ordinal)
+            && hitOutputWorldBody.Contains("_hitTestCache.HitOutputPort(worldPoint)", StringComparison.Ordinal),
+        "Graph world hit helpers should reuse precomputed world points.");
 }
 
 static void GraphCenteringCalculatesBoundsInOnePass()
