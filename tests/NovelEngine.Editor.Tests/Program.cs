@@ -1771,6 +1771,8 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
     };
     var selectPreviewNodeBody = ExtractMethodBody(source, "internal void SelectPreviewNode");
     var findNodeByKindBody = ExtractMethodBody(source, "private NovelNode? FindFirstNodeByKind");
+    var bindVoiceForSmokeBody = ExtractMethodBody(source, "internal bool BindVoiceAssetToCharacterForSmoke");
+    var characterHasVoiceReferenceBody = ExtractMethodBody(source, "private static bool CharacterHasVoiceReference");
 
     foreach (var method in selectedNodeMethods)
     {
@@ -1792,6 +1794,16 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
             && findNodeByKindBody.Contains("node.Kind == kind", StringComparison.Ordinal)
             && !findNodeByKindBody.Contains("FirstOrDefault", StringComparison.Ordinal),
         "Preview node kind lookup should scan project nodes directly.");
+    Assert(
+        bindVoiceForSmokeBody.Contains("for (var index = 0; index < node.Characters.Count; index++)", StringComparison.Ordinal)
+            && bindVoiceForSmokeBody.Contains("CharacterHasVoiceReference(character, reference)", StringComparison.Ordinal)
+            && !bindVoiceForSmokeBody.Contains(".FirstOrDefault(", StringComparison.Ordinal)
+            && !bindVoiceForSmokeBody.Contains("GetVoiceSounds()", StringComparison.Ordinal),
+        "Smoke voice binding verification should scan selected-node characters directly.");
+    Assert(
+        characterHasVoiceReferenceBody.Contains("for (var index = 0; index < character.VoiceSounds.Count; index++)", StringComparison.Ordinal)
+            && !characterHasVoiceReferenceBody.Contains(".Contains(", StringComparison.Ordinal),
+        "Smoke voice reference verification should scan voice refs directly.");
 }
 
 static void PropertySelectionUsesRowModelReferences()

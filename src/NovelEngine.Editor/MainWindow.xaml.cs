@@ -2922,11 +2922,41 @@ public partial class MainWindow : Window
         BindVoiceAssetToCharacter(asset, characterId);
         var reference = AssetReference.Create(asset.Id);
         var node = Graph.SelectedNode;
-        return node?.Characters
-            .FirstOrDefault(character => character.Id == characterId)
-            ?.GetVoiceSounds()
-            .Contains(reference, StringComparer.OrdinalIgnoreCase)
-            == true;
+        if (node is null)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < node.Characters.Count; index++)
+        {
+            var character = node.Characters[index];
+            if (character.Id == characterId)
+            {
+                return CharacterHasVoiceReference(character, reference);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CharacterHasVoiceReference(
+        CharacterPlacement character,
+        string reference)
+    {
+        if (string.Equals(character.VoiceSound, reference, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        for (var index = 0; index < character.VoiceSounds.Count; index++)
+        {
+            if (string.Equals(character.VoiceSounds[index], reference, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool RebuildAssetsContextMenu()
