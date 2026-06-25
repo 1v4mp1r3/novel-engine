@@ -1968,12 +1968,21 @@ public partial class MainWindow : Window
             EnsureAssetPickerCachesCurrent();
             var normalizedFolder = ProjectAssets.NormalizeFolder(folder);
             var choices = GetCachedAssetChoices(kind, normalizedFolder);
-            assetBox.ItemsSource = choices;
             var currentAsset = ResolveAssetChoice(currentReference);
+            var visibleChoices = choices;
+            if (currentAsset is not null
+                && FindAssetChoice(choices, currentAsset) is null)
+            {
+                visibleChoices = new List<NodeAssetChoice>(choices.Count + 1);
+                visibleChoices.AddRange(choices);
+                visibleChoices.Add(CreateCurrentNodeAssetChoice(currentAsset));
+            }
+
+            assetBox.ItemsSource = visibleChoices;
             assetBox.SelectedItem = currentAsset is null
-                ? choices[0]
-                : FindAssetChoice(choices, currentAsset)
-                    ?? choices[0];
+                ? visibleChoices[0]
+                : FindAssetChoice(visibleChoices, currentAsset)
+                    ?? visibleChoices[0];
         }
         finally
         {
@@ -2027,6 +2036,13 @@ public partial class MainWindow : Window
         }
         _nodeAssetChoicesCache[key] = choices;
         return choices;
+    }
+
+    private static NodeAssetChoice CreateCurrentNodeAssetChoice(NovelAsset asset)
+    {
+        return new NodeAssetChoice(
+            asset,
+            $"Текущее значение: {asset.Id}  ·  {Path.GetFileName(asset.Path)}");
     }
 
     private static NodeAssetFolderOption? FindFolderOption(

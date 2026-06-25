@@ -4510,6 +4510,9 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     var assetChoicesBody = ExtractMethodBody(
         source,
         "private List<NodeAssetChoice> GetCachedAssetChoices");
+    var currentChoiceBody = ExtractMethodBody(
+        source,
+        "private static NodeAssetChoice CreateCurrentNodeAssetChoice");
     var refreshAssetPickerBody = ExtractMethodBody(source, "private void RefreshAssetPicker");
     var preferredFolderBody = ExtractMethodBody(source, "private static string? PreferredFolder");
     var refreshAssetChoicesBody = ExtractMethodBody(source, "private void RefreshAssetChoices");
@@ -4579,6 +4582,15 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
             && !assetChoicesBody.Contains(".Select(", StringComparison.Ordinal)
             && !assetChoicesBody.Contains(".Prepend(", StringComparison.Ordinal),
         "Node asset choices should be cached through a direct filter and sort pass.");
+    Assert(
+        refreshAssetChoicesBody.Contains("var visibleChoices = choices;", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("FindAssetChoice(choices, currentAsset) is null", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("visibleChoices = new List<NodeAssetChoice>(choices.Count + 1);", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("visibleChoices.AddRange(choices);", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("visibleChoices.Add(CreateCurrentNodeAssetChoice(currentAsset));", StringComparison.Ordinal)
+            && refreshAssetChoicesBody.Contains("assetBox.ItemsSource = visibleChoices;", StringComparison.Ordinal)
+            && currentChoiceBody.Contains("Текущее значение:", StringComparison.Ordinal),
+        "Node asset choices should preserve the current asset when a different folder is selected.");
     Assert(
         refreshAssetPickerBody.Contains("FindFolderOption(folderOptions, selectedFolder)", StringComparison.Ordinal)
             && refreshAssetPickerBody.Contains("?? folderOptions[0]", StringComparison.Ordinal)
