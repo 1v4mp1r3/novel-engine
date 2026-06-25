@@ -25,6 +25,8 @@ public partial class PreviewWindow : Window
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
+    private static readonly HashSet<char> InvalidSaveDirectoryNameChars = new(
+        Path.GetInvalidFileNameChars());
 
     private readonly NovelProject _project;
     private readonly NovelPlayer _player;
@@ -1194,11 +1196,7 @@ public partial class PreviewWindow : Window
         NovelProject project,
         NovelBuildManifest? buildManifest)
     {
-        var safeTitle = string.Concat(
-            project.Title.Select(
-                character => Path.GetInvalidFileNameChars().Contains(character)
-                    ? '_'
-                    : character)).Trim();
+        var safeTitle = CreateSafeSaveTitle(project.Title);
         if (safeTitle.Length == 0)
         {
             safeTitle = "NovelProject";
@@ -1212,6 +1210,20 @@ public partial class PreviewWindow : Window
                     Encoding.UTF8.GetBytes(ProjectSerializer.ToJson(project))))[..12];
         }
         return $"{safeTitle}-{key[..Math.Min(12, key.Length)]}";
+    }
+
+    private static string CreateSafeSaveTitle(string title)
+    {
+        var buffer = new char[title.Length];
+        for (var index = 0; index < title.Length; index++)
+        {
+            var character = title[index];
+            buffer[index] = InvalidSaveDirectoryNameChars.Contains(character)
+                ? '_'
+                : character;
+        }
+
+        return new string(buffer).Trim();
     }
 
     private static Task AnimateOpacity(

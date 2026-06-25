@@ -4722,6 +4722,12 @@ static void PreviewPlaybackAvoidsTransientLists()
     var pauseBody = ExtractMethodBody(source, "private void SetPaused");
     var settingsBody = ExtractMethodBody(source, "private void ApplyRuntimeSettings");
     var keyBody = ExtractMethodBody(source, "private void Window_KeyDown");
+    var saveDirectoryBody = ExtractMethodBody(
+        source,
+        "private static string CreateSaveDirectoryName");
+    var safeSaveTitleBody = ExtractMethodBody(
+        source,
+        "private static string CreateSafeSaveTitle");
 
     Assert(
         trimBody.Contains("HasActiveVoicePlayer(pool)", StringComparison.Ordinal)
@@ -4785,6 +4791,17 @@ static void PreviewPlaybackAvoidsTransientLists()
         keyBody.Contains("FindChoiceButton(index, out var buttonCount)", StringComparison.Ordinal)
             && !keyBody.Contains("ChoicesPanel.Children.OfType<Button>().ToList()", StringComparison.Ordinal),
         "Choice shortcuts should find buttons without allocating a temporary list.");
+    Assert(
+        source.Contains("private static readonly HashSet<char> InvalidSaveDirectoryNameChars", StringComparison.Ordinal)
+            && saveDirectoryBody.Contains("var safeTitle = CreateSafeSaveTitle(project.Title);", StringComparison.Ordinal)
+            && !saveDirectoryBody.Contains(".Select(", StringComparison.Ordinal)
+            && !saveDirectoryBody.Contains("Path.GetInvalidFileNameChars()", StringComparison.Ordinal),
+        "Preview save directory names should use a cached invalid-character lookup.");
+    Assert(
+        safeSaveTitleBody.Contains("for (var index = 0; index < title.Length; index++)", StringComparison.Ordinal)
+            && safeSaveTitleBody.Contains("InvalidSaveDirectoryNameChars.Contains(character)", StringComparison.Ordinal)
+            && !safeSaveTitleBody.Contains(".Select(", StringComparison.Ordinal),
+        "Preview save title sanitizing should use one direct character pass.");
     Assert(
         typeDialogueBody.Contains("catch (OperationCanceledException)", StringComparison.Ordinal)
             && typeDialogueBody.Contains("catch (Exception error)", StringComparison.Ordinal)
