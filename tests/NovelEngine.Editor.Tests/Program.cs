@@ -753,6 +753,41 @@ static void RecentProjectsDeduplicateAndOrderEntries()
                     "first",
                     StringComparison.OrdinalIgnoreCase),
                 "Recent project display name was not derived from the project file.");
+
+            var source = File.ReadAllText(Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "NovelEngine.Editor",
+                "RecentProjectsStore.cs"));
+            var loadBody = ExtractMethodBody(source, "public static IReadOnlyList<RecentProjectEntry> Load");
+            var rememberBody = ExtractMethodBody(source, "public static void Remember");
+            var normalizeBody = ExtractMethodBody(
+                source,
+                "private static List<RecentProjectEntry> NormalizeEntries");
+            Assert(
+                loadBody.Contains("return NormalizeEntries(entries);", StringComparison.Ordinal)
+                    && !loadBody.Contains(".GroupBy(", StringComparison.Ordinal)
+                    && !loadBody.Contains(".OrderByDescending(", StringComparison.Ordinal)
+                    && !loadBody.Contains(".Select(", StringComparison.Ordinal)
+                    && !loadBody.Contains(".ToList(", StringComparison.Ordinal),
+                "Recent project loading should delegate direct normalization without LINQ pipelines.");
+            Assert(
+                rememberBody.Contains(
+                    "index < existingEntries.Count && entries.Count < MaxEntries",
+                    StringComparison.Ordinal)
+                    && !rememberBody.Contains(".Where(", StringComparison.Ordinal)
+                    && !rememberBody.Contains(".Prepend(", StringComparison.Ordinal)
+                    && !rememberBody.Contains(".Take(", StringComparison.Ordinal)
+                    && !rememberBody.Contains(".ToList(", StringComparison.Ordinal),
+                "Recent project remembering should rebuild the cache with a bounded direct loop.");
+            Assert(
+                normalizeBody.Contains("new Dictionary<string, RecentProjectEntry>", StringComparison.Ordinal)
+                    && normalizeBody.Contains("for (var index = 0; index < entries.Count; index++)", StringComparison.Ordinal)
+                    && normalizeBody.Contains("result.Sort", StringComparison.Ordinal)
+                    && !normalizeBody.Contains(".GroupBy(", StringComparison.Ordinal)
+                    && !normalizeBody.Contains(".OrderByDescending(", StringComparison.Ordinal)
+                    && !normalizeBody.Contains(".Select(", StringComparison.Ordinal),
+                "Recent project normalization should deduplicate and sort with direct collections.");
         });
     }
     finally

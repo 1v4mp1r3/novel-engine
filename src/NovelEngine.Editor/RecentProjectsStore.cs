@@ -29,16 +29,7 @@ internal static class RecentProjectsStore
             var entries = JsonSerializer.Deserialize<List<RecentProjectEntry>>(
                 File.ReadAllText(path),
                 JsonOptions) ?? [];
-            return entries
-                .Select(NormalizeEntry)
-                .OfType<RecentProjectEntry>()
-                .GroupBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group
-                    .OrderByDescending(entry => entry.LastOpenedUtc)
-                    .First())
-                .OrderByDescending(entry => entry.LastOpenedUtc)
-                .Take(MaxEntries)
-                .ToList();
+            return NormalizeEntries(entries);
         }
         catch (Exception error) when (
             error is IOException
@@ -63,17 +54,28 @@ internal static class RecentProjectsStore
             {
                 return;
             }
-            var entries = Load()
-                .Where(entry => !entry.Path.Equals(
+            var existingEntries = Load();
+            var entries = new List<RecentProjectEntry>(
+                Math.Min(MaxEntries, existingEntries.Count + 1))
+            {
+                new(
                     normalizedPath,
-                    StringComparison.OrdinalIgnoreCase))
-                .Prepend(
-                    new RecentProjectEntry(
-                        normalizedPath,
-                        CreateDisplayName(normalizedPath),
-                        DateTime.UtcNow))
-                .Take(MaxEntries)
-                .ToList();
+                    CreateDisplayName(normalizedPath),
+                    DateTime.UtcNow),
+            };
+
+            for (var index = 0;
+                 index < existingEntries.Count && entries.Count < MaxEntries;
+                 index++)
+            {
+                var entry = existingEntries[index];
+                if (entry.Path.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                entries.Add(entry);
+            }
 
             var storePath = GetStorePath();
             Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
@@ -90,6 +92,47 @@ internal static class RecentProjectsStore
             // Recent projects are a convenience cache; project opening should not fail
             // if the cache cannot be written.
         }
+    }
+
+    private static List<RecentProjectEntry> NormalizeEntries(
+        IReadOnlyList<RecentProjectEntry> entries)
+    {
+        var newestByPath = new Dictionary<string, RecentProjectEntry>(
+            StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < entries.Count; index++)
+        {
+            var normalized = NormalizeEntry(entries[index]);
+            if (normalized is null)
+            {
+                continue;
+            }
+
+            if (!newestByPath.TryGetValue(normalized.Path, out var existing)
+                || normalized.LastOpenedUtc > existing.LastOpenedUtc)
+            {
+                newestByPath[normalized.Path] = normalized;
+            }
+        }
+
+        var result = new List<RecentProjectEntry>(newestByPath.Count);
+        foreach (var entry in newestByPath.Values)
+        {
+            result.Add(entry);
+        }
+
+        result.Sort(static (left, right) =>
+        {
+            var openedCompare = right.LastOpenedUtc.CompareTo(left.LastOpenedUtc);
+            return openedCompare != 0
+                ? openedCompare
+                : string.Compare(left.Path, right.Path, StringComparison.OrdinalIgnoreCase);
+        });
+        if (result.Count > MaxEntries)
+        {
+            result.RemoveRange(MaxEntries, result.Count - MaxEntries);
+        }
+
+        return result;
     }
 
     private static RecentProjectEntry? NormalizeEntry(RecentProjectEntry entry)
