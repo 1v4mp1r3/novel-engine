@@ -206,8 +206,22 @@ public partial class MainWindow : Window
 
     internal void SelectPreviewNode(NodeKind kind)
     {
-        var node = _project.Nodes.FirstOrDefault(candidate => candidate.Kind == kind);
+        var node = FindFirstNodeByKind(kind);
         Graph.SelectNode(node?.Id);
+    }
+
+    private NovelNode? FindFirstNodeByKind(NodeKind kind)
+    {
+        for (var index = 0; index < _project.Nodes.Count; index++)
+        {
+            var node = _project.Nodes[index];
+            if (node.Kind == kind)
+            {
+                return node;
+            }
+        }
+
+        return null;
     }
 
     internal void SelectCodeWorkspace() =>

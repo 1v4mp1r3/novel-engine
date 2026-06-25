@@ -1755,6 +1755,8 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
         "private void EditSelectedOutputTransition()",
         "private void Inheritance_Changed",
     };
+    var selectPreviewNodeBody = ExtractMethodBody(source, "internal void SelectPreviewNode");
+    var findNodeByKindBody = ExtractMethodBody(source, "private NovelNode? FindFirstNodeByKind");
 
     foreach (var method in selectedNodeMethods)
     {
@@ -1766,6 +1768,16 @@ static void SelectedNodeActionsUseGraphSelectedNodeCache()
             !body.Contains("_project.FindNode(Graph.SelectedNodeId)", StringComparison.Ordinal),
             $"{method} should not linearly search the selected project node.");
     }
+
+    Assert(
+        selectPreviewNodeBody.Contains("var node = FindFirstNodeByKind(kind);", StringComparison.Ordinal)
+            && !selectPreviewNodeBody.Contains(".FirstOrDefault(", StringComparison.Ordinal),
+        "Preview node shortcuts should resolve nodes through a direct helper.");
+    Assert(
+        findNodeByKindBody.Contains("for (var index = 0; index < _project.Nodes.Count; index++)", StringComparison.Ordinal)
+            && findNodeByKindBody.Contains("node.Kind == kind", StringComparison.Ordinal)
+            && !findNodeByKindBody.Contains("FirstOrDefault", StringComparison.Ordinal),
+        "Preview node kind lookup should scan project nodes directly.");
 }
 
 static void PropertySelectionUsesRowModelReferences()
