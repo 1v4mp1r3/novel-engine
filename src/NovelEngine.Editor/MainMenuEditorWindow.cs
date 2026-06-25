@@ -619,24 +619,7 @@ public sealed class MainMenuEditorWindow : Window
         try
         {
             var enabled = _selected is not null;
-            foreach (var control in new Control[]
-            {
-                _textBox,
-                _imageBox,
-                _actionBox,
-                _xBox,
-                _yBox,
-                _widthBox,
-                _heightBox,
-                _fontSizeBox,
-                _foregroundBox,
-                _backgroundBox,
-                _borderBox,
-                _styleCodeBox,
-            })
-            {
-                control.IsEnabled = enabled;
-            }
+            SetPropertyControlsEnabled(enabled);
             if (_selected is null)
             {
                 return;
@@ -659,6 +642,22 @@ public sealed class MainMenuEditorWindow : Window
         {
             _refreshingProperties = false;
         }
+    }
+
+    private void SetPropertyControlsEnabled(bool enabled)
+    {
+        _textBox.IsEnabled = enabled;
+        _imageBox.IsEnabled = enabled;
+        _actionBox.IsEnabled = enabled;
+        _xBox.IsEnabled = enabled;
+        _yBox.IsEnabled = enabled;
+        _widthBox.IsEnabled = enabled;
+        _heightBox.IsEnabled = enabled;
+        _fontSizeBox.IsEnabled = enabled;
+        _foregroundBox.IsEnabled = enabled;
+        _backgroundBox.IsEnabled = enabled;
+        _borderBox.IsEnabled = enabled;
+        _styleCodeBox.IsEnabled = enabled;
     }
 
     private void ApplyProperties()

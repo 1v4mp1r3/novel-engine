@@ -4273,11 +4273,13 @@ static void MainMenuTextPropertiesUseDebouncedApply()
         "NovelEngine.Editor",
         "MainMenuEditorWindow.cs"));
     var buildProperties = ExtractMethodBody(source, "private UIElement BuildProperties");
+    var refreshBody = ExtractMethodBody(source, "private void RefreshProperties");
     var scheduleBody = ExtractMethodBody(source, "private void ScheduleApplyProperties");
     var buildFooter = ExtractMethodBody(source, "private UIElement BuildFooter");
     var constructorBody = ExtractMethodBody(source, "public MainMenuEditorWindow(");
     var selectElement = ExtractMethodBody(source, "private void SelectElement");
     var firstElementBody = ExtractMethodBody(source, "private static MainMenuElement? FirstElement");
+    var setControlsBody = ExtractMethodBody(source, "private void SetPropertyControlsEnabled");
     var deleteSelected = ExtractMethodBody(source, "private void DeleteSelected");
 
     Assert(
@@ -4319,6 +4321,18 @@ static void MainMenuTextPropertiesUseDebouncedApply()
             && firstElementBody.Contains("return elements[0];", StringComparison.Ordinal)
             && !firstElementBody.Contains("FirstOrDefault", StringComparison.Ordinal),
         "Main menu first-element helper should avoid LINQ delegates.");
+    Assert(
+        refreshBody.Contains("SetPropertyControlsEnabled(enabled);", StringComparison.Ordinal)
+            && !refreshBody.Contains("new Control[]", StringComparison.Ordinal)
+            && !refreshBody.Contains("foreach", StringComparison.Ordinal),
+        "Main menu property refresh should toggle controls through a direct helper.");
+    Assert(
+        setControlsBody.Contains("_textBox.IsEnabled = enabled;", StringComparison.Ordinal)
+            && setControlsBody.Contains("_actionBox.IsEnabled = enabled;", StringComparison.Ordinal)
+            && setControlsBody.Contains("_styleCodeBox.IsEnabled = enabled;", StringComparison.Ordinal)
+            && !setControlsBody.Contains("new Control[]", StringComparison.Ordinal)
+            && !setControlsBody.Contains("foreach", StringComparison.Ordinal),
+        "Main menu property controls should toggle without allocating a temporary control array.");
 }
 
 static void MainMenuPropertyPanelStampTracksFields()
