@@ -3510,6 +3510,21 @@ static void AssetFoldersMoveFiles()
                 && missingAsset.Path == "files/backgrounds/missing.png",
             "Failed asset move changed the project model.");
 
+        var physicalRenameConflict = Path.Combine(directory, "files", "cast");
+        Directory.CreateDirectory(physicalRenameConflict);
+        AssertThrows<InvalidOperationException>(
+            () => ProjectAssets.RenameFolder(
+                project,
+                projectPath,
+                "characters",
+                "cast"),
+            "Renaming into an existing physical folder should fail.");
+        Assert(
+            asset.Folder == "characters/heroes"
+                && Directory.Exists(Path.Combine(directory, "files", "characters")),
+            "Failed folder rename changed the project model or moved files.");
+        Directory.Delete(physicalRenameConflict);
+
         ProjectAssets.RenameFolder(
             project,
             projectPath,
@@ -3593,14 +3608,18 @@ static void AssetFolderDeleteScansDirectoriesOnce()
     var hasNestedBody = ExtractMethodBody(source, "private static bool HasNestedFolder");
     var directoryHasEntriesBody = ExtractMethodBody(source, "private static bool DirectoryHasEntries");
     var removeFolderBody = ExtractMethodBody(source, "private static void RemoveFolder");
+    var pathExistsBody = ExtractMethodBody(source, "private static bool FileSystemPathExists");
+    var pathsEqualBody = ExtractMethodBody(source, "private static bool PathsEqual");
     var managedDirectoryCalls = CountOccurrences(
         body,
         "ManagedFolderDirectories(projectPath, folder)");
 
     Assert(
         renameBody.Contains("FolderExists(project, target)", StringComparison.Ordinal)
+            && renameBody.Contains("!PathsEqual(sourceDirectory, targetDirectory)", StringComparison.Ordinal)
+            && renameBody.Contains("FileSystemPathExists(targetDirectory)", StringComparison.Ordinal)
             && !renameBody.Contains(".Any(", StringComparison.Ordinal),
-        "RenameFolder should check target folders through a direct helper.");
+        "RenameFolder should check model and physical target folders before moving.");
     Assert(
         managedDirectoryCalls == 1,
         "DeleteFolder should enumerate managed and legacy directories once.");
@@ -3632,6 +3651,11 @@ static void AssetFolderDeleteScansDirectoriesOnce()
             && !directoryHasEntriesBody.Contains(".Any(", StringComparison.Ordinal)
             && !removeFolderBody.Contains("RemoveAll(", StringComparison.Ordinal),
         "Asset folder helpers should use direct loops without LINQ predicates.");
+    Assert(
+        pathExistsBody.Contains("File.Exists(path) || Directory.Exists(path)", StringComparison.Ordinal)
+            && pathsEqualBody.Contains("Path.GetFullPath(left).TrimEnd(", StringComparison.Ordinal)
+            && pathsEqualBody.Contains("Path.GetFullPath(right).TrimEnd(", StringComparison.Ordinal),
+        "Physical path helpers should compare normalized paths and detect files or directories.");
 }
 
 static void ProjectLanguagePreservesFolders()

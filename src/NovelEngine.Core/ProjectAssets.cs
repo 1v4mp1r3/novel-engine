@@ -406,6 +406,13 @@ public static class ProjectAssets
         var targetDirectory = Path.Combine(
             GetAssetsDirectory(projectPath),
             target.Replace('/', Path.DirectorySeparatorChar));
+        if (!PathsEqual(sourceDirectory, targetDirectory)
+            && FileSystemPathExists(targetDirectory))
+        {
+            throw new InvalidOperationException(
+                "Папка с таким именем уже существует на диске.");
+        }
+
         if (Directory.Exists(sourceDirectory))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(targetDirectory)!);
@@ -733,5 +740,17 @@ public static class ProjectAssets
     private static bool FileSystemPathExists(string path)
     {
         return File.Exists(path) || Directory.Exists(path);
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        return string.Equals(
+            Path.GetFullPath(left).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(right).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
     }
 }
