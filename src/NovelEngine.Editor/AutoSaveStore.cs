@@ -38,12 +38,14 @@ internal static class AutoSaveStore
         Action<string>? delete = null)
     {
         delete ??= File.Delete;
-        foreach (var file in Directory
-            .EnumerateFiles(directory, $"{stem}-*.novel.json")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .Skip(keepCount))
+        var files = Directory.GetFiles(directory, $"{stem}-*.novel.json");
+        Array.Sort(
+            files,
+            (left, right) => File.GetLastWriteTimeUtc(right)
+                .CompareTo(File.GetLastWriteTimeUtc(left)));
+        for (var index = Math.Max(keepCount, 0); index < files.Length; index++)
         {
-            TryDelete(file, delete);
+            TryDelete(files[index], delete);
         }
     }
 

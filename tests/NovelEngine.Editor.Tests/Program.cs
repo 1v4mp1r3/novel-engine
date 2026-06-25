@@ -700,6 +700,20 @@ static void AutoSavePruningKeepsNewestSnapshots()
         Assert(File.Exists(middle), "Autosave pruning deleted a retained snapshot.");
         Assert(File.Exists(newest), "Autosave pruning deleted the newest snapshot.");
         Assert(File.Exists(otherProject), "Autosave pruning deleted a different project's snapshot.");
+
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "NovelEngine.Editor",
+            "AutoSaveStore.cs"));
+        var pruneBody = ExtractMethodBody(source, "public static void Prune");
+        Assert(
+            pruneBody.Contains("Directory.GetFiles(directory, $\"{stem}-*.novel.json\")", StringComparison.Ordinal)
+                && pruneBody.Contains("Array.Sort(", StringComparison.Ordinal)
+                && pruneBody.Contains("for (var index = Math.Max(keepCount, 0); index < files.Length; index++)", StringComparison.Ordinal)
+                && !pruneBody.Contains(".OrderBy", StringComparison.Ordinal)
+                && !pruneBody.Contains(".Skip(", StringComparison.Ordinal),
+            "Autosave pruning should sort and trim snapshots without LINQ iterator chains.");
     }
     finally
     {
