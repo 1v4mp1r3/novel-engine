@@ -7164,9 +7164,15 @@ public partial class MainWindow : Window
         public string Path => Asset.Path;
     }
 
-    private sealed record NodeAssetFolderOption(string Folder, string Name);
+    private sealed record NodeAssetFolderOption(string Folder, string Name)
+    {
+        public override string ToString() => Name;
+    }
 
-    private sealed record NodeAssetChoice(NovelAsset? Asset, string Name);
+    private sealed record NodeAssetChoice(NovelAsset? Asset, string Name)
+    {
+        public override string ToString() => Name;
+    }
 
     private readonly record struct NodeAssetChoiceCacheKey(
         AssetKind Kind,

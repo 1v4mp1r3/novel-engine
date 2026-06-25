@@ -2658,11 +2658,13 @@ static void DiagnosticNavigationUsesDirectLookups()
 
 static void AppCollectionStylesEnableVirtualization()
 {
-    var appXaml = XDocument.Load(Path.Combine(
+    var appXamlPath = Path.Combine(
         FindRepositoryRoot(),
         "src",
         "NovelEngine.Editor",
-        "App.xaml"));
+        "App.xaml");
+    var appXaml = XDocument.Load(appXamlPath);
+    var appXamlSource = File.ReadAllText(appXamlPath);
 
     AssertStyleSetters(
         appXaml,
@@ -2684,6 +2686,18 @@ static void AppCollectionStylesEnableVirtualization()
         "VirtualizingPanel.IsVirtualizing",
         "VirtualizingPanel.VirtualizationMode",
         "ScrollViewer.CanContentScroll");
+    Assert(
+        appXamlSource.Contains("<ToggleButton.Template>", StringComparison.Ordinal)
+            && appXamlSource.Contains(
+                "<ControlTemplate TargetType=\"ToggleButton\">",
+                StringComparison.Ordinal)
+            && appXamlSource.Contains(
+                "<Setter TargetName=\"ComboChrome\" Property=\"Background\" Value=\"#121A25\" />",
+                StringComparison.Ordinal)
+            && appXamlSource.Contains(
+                "<Setter Property=\"Opacity\" Value=\"1\" />",
+                StringComparison.Ordinal),
+        "Disabled ComboBox chrome should use the dark app template instead of the light system template.");
 }
 
 static void BoundedCacheEvictsLeastRecentlyUsedEntries()
@@ -4304,6 +4318,24 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
     var catalogChangeBody = ExtractMethodBody(
         source,
         "private void RefreshAssetCatalogAfterEditorChange");
+    var folderOptionIndex = source.IndexOf(
+        "private sealed record NodeAssetFolderOption",
+        StringComparison.Ordinal);
+    var assetChoiceIndex = source.IndexOf(
+        "private sealed record NodeAssetChoice",
+        StringComparison.Ordinal);
+    var folderOptionTextIndex = folderOptionIndex >= 0
+        ? source.IndexOf(
+            "public override string ToString() => Name;",
+            folderOptionIndex,
+            StringComparison.Ordinal)
+        : -1;
+    var assetChoiceTextIndex = assetChoiceIndex >= 0
+        ? source.IndexOf(
+            "public override string ToString() => Name;",
+            assetChoiceIndex,
+            StringComparison.Ordinal)
+        : -1;
     var clearIndex = catalogChangeBody.IndexOf(
         "ClearNodeAssetPickerCaches();",
         StringComparison.Ordinal);
@@ -4366,6 +4398,11 @@ static void NodeAssetPickerCacheInvalidatesPropertyPanel()
         resolveBody.Contains("_nodeAssetByIdCache.TryGetValue", StringComparison.Ordinal)
             && !resolveBody.Contains("_project.FindAsset", StringComparison.Ordinal),
         "Node asset picker reference resolution should use the cached id lookup.");
+    Assert(
+        folderOptionTextIndex > folderOptionIndex
+            && folderOptionTextIndex < assetChoiceIndex
+            && assetChoiceTextIndex > assetChoiceIndex,
+        "Node asset picker choices should render their display names in custom ComboBox templates.");
     Assert(
         clearBody.Contains("_nodePropertyPanelStamp = null;", StringComparison.Ordinal),
         "Asset picker cache invalidation should force the property panel to rebuild.");

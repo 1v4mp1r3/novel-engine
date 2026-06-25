@@ -60,6 +60,24 @@
                                           ClickMode="Press"
                                           Focusable="False"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ComboChrome"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                SnapsToDevicePixels="True">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="ComboChrome" Property="Background" Value="#121A25" />
+                                                <Setter TargetName="ComboChrome" Property="BorderBrush" Value="#2A3646" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
