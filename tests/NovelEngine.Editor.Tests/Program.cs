@@ -5128,13 +5128,21 @@ static void GameProcessStartIsRegisteredBeforeLaunch()
     var startIndex = startBody.IndexOf("process.Start()", StringComparison.Ordinal);
     var clearIndex = startBody.IndexOf("_gameProcess = null;", startIndex, StringComparison.Ordinal);
     var disposeIndex = startBody.IndexOf("process.Dispose();", startIndex, StringComparison.Ordinal);
+    var catchIndex = startBody.IndexOf("catch", startIndex, StringComparison.Ordinal);
+    var throwIndex = startBody.IndexOf("throw;", catchIndex, StringComparison.Ordinal);
 
     Assert(
         assignIndex >= 0 && startIndex > assignIndex,
         "Game process should be stored before Start so fast Exited events can match the active process.");
     Assert(
-        clearIndex > startIndex && clearIndex < disposeIndex,
-        "Failed game starts should clear the stored process before disposal.");
+        catchIndex > startIndex
+            && clearIndex > catchIndex
+            && disposeIndex > clearIndex
+            && throwIndex > disposeIndex,
+        "Failed game starts should clear and dispose the stored process before rethrowing.");
+    Assert(
+        startBody.Contains("ReferenceEquals(_gameProcess, process)", StringComparison.Ordinal),
+        "Game process start cleanup should only clear the process it registered.");
     Assert(
         exitedBody.Contains("ReferenceEquals(process, _gameProcess)", StringComparison.Ordinal)
             && exitedBody.Contains("_gameProcess = null;", StringComparison.Ordinal)

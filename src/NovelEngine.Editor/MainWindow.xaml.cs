@@ -6366,11 +6366,21 @@ public partial class MainWindow : Window
         };
         process.Exited += GameProcess_Exited;
         _gameProcess = process;
-        if (!process.Start())
+        try
         {
-            _gameProcess = null;
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("Не удалось запустить процесс игры.");
+            }
+        }
+        catch
+        {
+            if (ReferenceEquals(_gameProcess, process))
+            {
+                _gameProcess = null;
+            }
             process.Dispose();
-            throw new InvalidOperationException("Не удалось запустить процесс игры.");
+            throw;
         }
         UpdateGameControls();
         StatusText.Text = debugMode
