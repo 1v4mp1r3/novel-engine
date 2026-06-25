@@ -75,6 +75,31 @@ Invoke-Step "Check Explorer context menu scripts" {
     if ($uninstall.Keys -notcontains 'HKCU:\Software\Classes\*\shell\NovelEngine.Open') {
         throw 'Explorer uninstall does not remove the legacy wildcard key.'
     }
+
+    $packagedRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'Novel Engine Context Menu Smoke'
+    $packagedExe = Join-Path $packagedRoot 'NovelEngine.Editor.exe'
+    Remove-Item -LiteralPath $packagedRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $packagedRoot | Out-Null
+    New-Item -ItemType File -Path $packagedExe | Out-Null
+    try {
+        $packaged = powershell -NoProfile -ExecutionPolicy Bypass -File tools\install-explorer-context-menu.ps1 -ExecutablePath $packagedExe -Describe | ConvertFrom-Json
+        $resolvedPackagedExe = (Resolve-Path -LiteralPath $packagedExe).Path
+        $quotedPackagedExe = '"' + $resolvedPackagedExe + '"'
+        if ($packaged.BaseCommand -ne "$quotedPackagedExe --open-project") {
+            throw 'Packaged Explorer install command should launch the provided executable directly.'
+        }
+        foreach ($entry in $packaged.Entries) {
+            if ($entry.Icon -ne $resolvedPackagedExe) {
+                throw "Packaged Explorer install icon should use the executable for $($entry.Key)."
+            }
+            if (-not $entry.Command.StartsWith("$quotedPackagedExe --open-project ")) {
+                throw "Packaged Explorer command for $($entry.Key) does not use the executable path."
+            }
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $packagedRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 Invoke-Step "Smoke context menus" {
     dotnet run --no-build --project src\NovelEngine.Editor\NovelEngine.Editor.csproj -- --context-menu-smoke

@@ -34,6 +34,12 @@ double-clicking `install-context-menu.bat`, or run:
 powershell -ExecutionPolicy Bypass -File tools/install-explorer-context-menu.ps1
 ```
 
+For a packaged editor, point the menu item at the built executable:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/install-explorer-context-menu.ps1 -ExecutablePath "D:\Tools\NovelEngine\NovelEngine.Editor.exe"
+```
+
 Remove it later with `uninstall-context-menu.bat`.
 
 After installation, right-click a project folder, empty space inside it, or a
